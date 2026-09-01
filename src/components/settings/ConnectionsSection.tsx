@@ -42,7 +42,7 @@ import {
   type SheetConnection,
 } from "@/lib/connections.functions";
 const DEFAULT_SA_EMAIL = "blue-dots-admin@blue-dots-project.iam.gserviceaccount.com";
-import type { ProgramId } from "@/programs/registry";
+import { registry, type ProgramId } from "@/programs/registry";
 
 function extractSheetId(input: string): string {
   const m = input.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
@@ -85,8 +85,8 @@ export function ConnectionsSection() {
 
       <Tabs defaultValue="seekers">
         <TabsList>
-          <TabsTrigger value="seekers">KKB sheets</TabsTrigger>
-          <TabsTrigger value="providers">DKB sheets</TabsTrigger>
+          <TabsTrigger value="seekers">Seeker Sheets</TabsTrigger>
+          <TabsTrigger value="providers">Provider Sheets</TabsTrigger>
         </TabsList>
         <TabsContent value="seekers" className="mt-4">
           <ProgramConnections program="seekers" />
@@ -217,7 +217,7 @@ function ProgramConnections({ program }: { program: ProgramId }) {
         ))}
         {!isLoading && (data?.length ?? 0) === 0 && (
           <div className="rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">
-            No sheets connected yet for {program.toUpperCase()}.
+            No sheets connected yet for {registry[program].label}.
           </div>
         )}
       </div>
@@ -402,7 +402,7 @@ function ConnectDialog({ program, onCreated }: { program: ProgramId; onCreated: 
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Connect a {program.toUpperCase()} sheet</DialogTitle>
+          <DialogTitle>Connect a {registry[program].label} sheet</DialogTitle>
         </DialogHeader>
         <div className="space-y-3 pt-2">
           <div>
