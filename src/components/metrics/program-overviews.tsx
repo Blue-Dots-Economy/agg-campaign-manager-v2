@@ -218,10 +218,11 @@ export function KkbOverviewMetrics({
   const stageDefs: Array<{ key: string; label: string; description: string; color: FunnelColor; extraSub?: string }> = [
     { key: "calls", label: "Calls made", description: "All dialled attempts", color: "blue", extraSub: topExtraSub },
     { key: "picked", label: "Picked up", description: "Seeker answered", color: "green" },
-    { key: "engaged", label: "Engaged", description: "3+ real conversation turns", color: "green" },
-    { key: "jobs", label: "Jobs shown", description: "Bot presented openings", color: "amber" },
-    { key: "intent", label: "High-Intent (≥5)", description: "Intent score ≥ 5", color: "coral" },
-    { key: "apps", label: "Applications", description: `${m.applicationsSubmitted.toLocaleString()} submitted + ${m.applicationsBlocked.toLocaleString()} blocked`, color: "coral" },
+    { key: "engaged", label: "Engaged", description: "Real conversation", color: "green" },
+    { key: "profile", label: "Profile captured", description: "Profile details recorded", color: "amber" },
+    { key: "needs", label: "Needs captured", description: "Needs and challenges shared", color: "amber" },
+    { key: "found", label: "Providers found", description: "Matching providers identified", color: "coral" },
+    { key: "connected", label: "Providers connected", description: "Seeker connected to a provider", color: "purple" },
   ];
   const stages: VerticalFunnelStage[] = stageDefs.map((s, i) => {
     const value = valOf(s.key);
