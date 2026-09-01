@@ -4,7 +4,7 @@ const STATUS_STYLES: Record<string, string> = {
   Unverified: "bg-amber-500/15 text-amber-700 dark:text-amber-300", "Not Called": "bg-muted text-muted-foreground",
 };
 const OUTCOME_STYLES: Record<string, string> = {
-  Completed: "bg-teal-500/15 text-teal-700 dark:text-teal-300", "Early Disconnect": "bg-orange-500/15 text-orange-700 dark:text-orange-300",
+  Completed: "bg-violet-500/15 text-violet-700 dark:text-violet-300", "Early Disconnect": "bg-orange-500/15 text-orange-700 dark:text-orange-300",
   "No Answer": "bg-muted text-muted-foreground",
 };
 export function StatusChip({ status }: { status?: string }) {

@@ -35,12 +35,12 @@ void main(){
   vec2 r = vec2(fbm(p + 3.5*q + vec2(1.7, 9.2)), fbm(p + 3.5*q + vec2(8.3, 2.8)));
   float f = fbm(p + 3.5*r);
   f += infl * 0.12;
-  vec3 deep  = vec3(0.031, 0.271, 0.204);
-  vec3 mid   = vec3(0.086, 0.529, 0.400);
-  vec3 light = vec3(0.573, 0.855, 0.752);
+  vec3 deep  = vec3(0.231, 0.114, 0.435);
+  vec3 mid   = vec3(0.486, 0.227, 0.929);
+  vec3 light = vec3(0.769, 0.710, 1.000);
   vec3 col = mix(deep, mid, clamp(f*1.5, 0.0, 1.0));
   col = mix(col, light, clamp((f-0.45)*1.3, 0.0, 1.0));
-  vec3 bg = vec3(0.965, 0.976, 0.972);
+  vec3 bg = vec3(0.980, 0.976, 0.996);
   col = mix(bg, col, 0.40 + infl*0.10);
   gl_FragColor = vec4(col, 1.0);
 }
