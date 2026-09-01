@@ -1,7 +1,7 @@
 // Raya integration interface — Phase 2 will wire these to the real API.
 
 export interface RayaBatchInput {
-  programId: "kkb" | "dkb";
+  programId: "seekers" | "providers";
   agentId: string;
   rows: Array<Record<string, unknown>>;
   region: string;
@@ -20,13 +20,13 @@ export interface RayaExecution {
   startedAt: string;
   finishedAt?: string;
   status: RayaBatch["status"];
-  programId: "kkb" | "dkb";
+  programId: "seekers" | "providers";
 }
 
 export interface RayaClient {
   createBatch(input: RayaBatchInput): Promise<RayaBatch>;
   scheduleBatch(batchId: string, isoDateTime: string): Promise<RayaBatch>;
-  listExecutions(programId: "kkb" | "dkb"): Promise<RayaExecution[]>;
+  listExecutions(programId: "seekers" | "providers"): Promise<RayaExecution[]>;
 }
 
 // Stub client. TODO(phase-2): replace with real HTTP calls to Raya.

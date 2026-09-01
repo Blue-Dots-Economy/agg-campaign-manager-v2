@@ -8,7 +8,7 @@ import {
   readAllReviewedIds,
 } from "./sheets.server";
 
-export type ReviewDataset = "kkb" | "dkb";
+export type ReviewDataset = "seekers" | "providers";
 
 async function sb() {
   const { sbFor } = await import("@/lib/db.server");

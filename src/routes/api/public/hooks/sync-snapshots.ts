@@ -8,11 +8,11 @@ export const Route = createFileRoute("/api/public/hooks/sync-snapshots")({
     handlers: {
       POST: async () => {
         const results = await Promise.allSettled([
-          performSync("kkb"),
-          performSync("dkb"),
+          performSync("seekers"),
+          performSync("providers"),
         ]);
         const body = results.map((r, i) => ({
-          program: i === 0 ? "kkb" : "dkb",
+          program: i === 0 ? "seekers" : "providers",
           status: r.status,
           ...(r.status === "fulfilled"
             ? { ok: r.value.ok, rowCount: r.value.rowCount, skipped: (r.value as { skipped?: boolean }).skipped ?? false }

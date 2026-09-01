@@ -16,7 +16,7 @@ function isPhaseReached(s: string): boolean {
 export function computeKpis(config: ProgramConfig, rows: CallRow[]): Record<string, number> {
   const total = rows.length;
 
-  if (config.id === "dkb") {
+  if (config.id === "providers") {
     const answered = rows.filter((r) => isAnsweredStatus(dkbField(r, "call_status"))).length;
     const jobsVerified = rows.filter((r) => {
       const s = dkbField(r, "job_status").toLowerCase();
@@ -61,14 +61,14 @@ export function byCampaignDay(config: ProgramConfig, rows: CallRow[]) {
   return Array.from(map.entries())
     .sort(([a], [b]) => parseInt(a.split(" ")[1]) - parseInt(b.split(" ")[1]))
     .map(([day, dayRows]) => {
-      const isDkb = config.id === "dkb";
+      const isDkb = config.id === "providers";
       const answered = isDkb
         ? dayRows.filter((r) => isAnsweredStatus(dkbField(r, "call_status"))).length
         : dayRows.filter((r) => r.call_answered).length;
       const engaged = dayRows.filter((r) => r.call_engaged).length;
       const converted = isDkb
         ? dayRows.filter((r) => dkbField(r, "new_job_posted").toLowerCase() === "yes").length
-        : config.id === "kkb"
+        : config.id === "seekers"
           ? dayRows.filter((r) => r.applied_to_job).length
           : dayRows.filter((r) => r.interview_scheduled).length;
       const highIntent = isDkb

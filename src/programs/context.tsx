@@ -10,7 +10,7 @@ interface Ctx {
 const ProgramCtx = createContext<Ctx | null>(null);
 
 export function ProgramProvider({ children }: { children: ReactNode }) {
-  const [programId, setProgramId] = useState<ProgramId>("kkb");
+  const [programId, setProgramId] = useState<ProgramId>("seekers");
   return (
     <ProgramCtx.Provider value={{ programId, config: registry[programId], setProgramId }}>
       {children}

@@ -448,7 +448,7 @@ function LaunchWizard() {
       {step === 0 && (
         <Panel title="Step 1 · Program" description="Pick which program this batch belongs to">
           <div className="grid gap-3 sm:grid-cols-2 max-w-xl">
-            {(["kkb", "dkb"] as ProgramId[]).map((p) => (
+            {(["seekers", "providers"] as ProgramId[]).map((p) => (
               <button
                 key={p}
                 onClick={() => setProgram(p)}

@@ -138,7 +138,7 @@ function ReviewHub() {
       if (filters.city !== "All" && c.city_campaign !== filters.city) return false;
       if (filters.outcome !== "All" && c.call_outcome !== filters.outcome) return false;
       if (filters.dropReason !== "All" && c.drop_reason !== filters.dropReason) return false;
-      if (dataset === "kkb" && filters.channel !== "All" && String(c.channel || "outbound").toLowerCase() !== filters.channel.toLowerCase()) return false;
+      if (dataset === "seekers" && filters.channel !== "All" && String(c.channel || "outbound").toLowerCase() !== filters.channel.toLowerCase()) return false;
       const sec = Number(c.call_duration_seconds) || 0;
       if (!durationBucket(sec, filters.duration)) return false;
       if (filters.intent !== "All") {
@@ -249,7 +249,7 @@ function ReviewHub() {
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
-          {dataset === "kkb" && <SelectFilter value={filters.channel} onChange={(v) => set("channel", v)} options={CHANNEL_OPTIONS} placeholder="Channel" />}
+          {dataset === "seekers" && <SelectFilter value={filters.channel} onChange={(v) => set("channel", v)} options={CHANNEL_OPTIONS} placeholder="Channel" />}
           <SelectFilter value={filters.day} onChange={(v) => set("day", v)} options={["All", ...options.days]} placeholder="Day" />
           <SelectFilter value={filters.campaign} onChange={(v) => set("campaign", v)} options={["All", ...options.campaigns]} placeholder="Campaign" />
           <SelectFilter value={filters.lang} onChange={(v) => set("lang", v)} options={["All", ...options.langs]} placeholder="Language" />

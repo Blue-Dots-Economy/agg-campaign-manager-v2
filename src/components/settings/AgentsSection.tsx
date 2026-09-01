@@ -44,16 +44,16 @@ export function AgentsSection() {
         </div>
       </Panel>
 
-      <Tabs defaultValue="kkb">
+      <Tabs defaultValue="seekers">
         <TabsList>
-          <TabsTrigger value="kkb">KKB agents</TabsTrigger>
-          <TabsTrigger value="dkb">DKB agents</TabsTrigger>
+          <TabsTrigger value="seekers">KKB agents</TabsTrigger>
+          <TabsTrigger value="providers">DKB agents</TabsTrigger>
         </TabsList>
-        <TabsContent value="kkb" className="mt-4">
-          <ProgramAgents program="kkb" />
+        <TabsContent value="seekers" className="mt-4">
+          <ProgramAgents program="seekers" />
         </TabsContent>
-        <TabsContent value="dkb" className="mt-4">
-          <ProgramAgents program="dkb" />
+        <TabsContent value="providers" className="mt-4">
+          <ProgramAgents program="providers" />
         </TabsContent>
       </Tabs>
     </div>
@@ -241,8 +241,8 @@ function AddAgentDialog({
             <Select value={program} onValueChange={(v) => setProgram(v as ProgramId)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="kkb">KKB</SelectItem>
-                <SelectItem value="dkb">DKB</SelectItem>
+                <SelectItem value="seekers">KKB</SelectItem>
+                <SelectItem value="providers">DKB</SelectItem>
               </SelectContent>
             </Select>
           </div>

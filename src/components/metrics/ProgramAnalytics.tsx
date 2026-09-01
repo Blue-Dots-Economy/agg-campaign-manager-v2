@@ -100,7 +100,7 @@ export function ProgramAnalytics({
   campaign,
   comparison,
 }: ProgramAnalyticsProps) {
-  const isDkb = config.id === "dkb";
+  const isDkb = config.id === "providers";
   const navigate = useNavigate();
   const scopedFilters = campaign ? { ...filters, campaign } : filters;
   const query = useProgramAggregates(config, scopedFilters);
@@ -240,7 +240,7 @@ export function ProgramAnalytics({
     if (action === "review") {
       let queue = ids;
       try {
-        const reviewed = await fetchAllReviewed({ data: { program: config.id as "kkb" | "dkb" } });
+        const reviewed = await fetchAllReviewed({ data: { program: config.id as "seekers" | "providers" } });
         const done = new Set(reviewed);
         const remaining = ids.filter((id) => !done.has(id));
         if (remaining.length === 0) {
@@ -271,7 +271,7 @@ export function ProgramAnalytics({
 
   return (
     <div className="space-y-6">
-      {campaign && config.id === "kkb" && (
+      {campaign && config.id === "seekers" && (
         <div className="flex justify-end">
           <NorthStarMetrics program={config.id} m={metrics as unknown as Record<string, number>} />
         </div>

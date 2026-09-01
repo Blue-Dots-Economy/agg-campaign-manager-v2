@@ -17,7 +17,7 @@ export interface LaunchStep {
 }
 
 export interface ProgramConfig {
-  id: "kkb" | "dkb";
+  id: "seekers" | "providers";
   label: string;
   subtitle: string;
   brandColor: string;
@@ -109,7 +109,7 @@ const DKB_COLUMNS = [
 ];
 
 export const kkb: ProgramConfig = {
-  id: "kkb",
+  id: "seekers",
   label: "Seekers",
   subtitle: "",
   brandColor: "#7C3AED",
@@ -143,7 +143,7 @@ export const kkb: ProgramConfig = {
 };
 
 export const dkb: ProgramConfig = {
-  id: "dkb",
+  id: "providers",
   label: "Providers",
   subtitle: "",
   brandColor: "#6366F1",
@@ -176,5 +176,5 @@ export const dkb: ProgramConfig = {
   ],
 };
 
-export const registry: Record<"kkb" | "dkb", ProgramConfig> = { kkb, dkb };
+export const registry: Record<"seekers" | "providers", ProgramConfig> = { kkb, dkb };
 export type ProgramId = keyof typeof registry;

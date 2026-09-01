@@ -14,7 +14,7 @@ export const Route = createFileRoute("/")({
 
 function Overview() {
   const { config } = useProgram();
-  const isDkb = config.id === "dkb";
+  const isDkb = config.id === "providers";
   const [filters, setFilters] = useState<OverviewFilterValue>({
     state: "all",
     dateFrom: null,

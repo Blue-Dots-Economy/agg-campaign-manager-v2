@@ -268,7 +268,7 @@ function ReferenceSettings() {
   );
 }
 
-function ExportStagingPanel({ program }: { program: "kkb" | "dkb" }) {
+function ExportStagingPanel({ program }: { program: "seekers" | "providers" }) {
   const getFn = useServerFn(getExportTarget);
   const setFn = useServerFn(setExportTarget);
   const qc = useQueryClient();

@@ -68,7 +68,7 @@ interface CampaignLike { campaignType: string; campaignDate: string | null; regi
 
 function CompletedCampaigns() {
   const { config } = useProgram();
-  const isDkb = config.id === "dkb";
+  const isDkb = config.id === "providers";
   const successLabel = isDkb ? "Active providers" : "Converted";
   const [channel, setChannel] = useState<"all" | "outbound" | "inbound">("all");
   const { data, isLoading } = useCampaignList(config, { channel });
@@ -226,7 +226,7 @@ function Metric({ label, value, align }: { label: string; value: string; align?:
   return (<div className={align === "right" ? "text-right" : ""}><div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div><div className="text-sm font-semibold tabular-nums">{value}</div></div>);
 }
 
-function LiveBatchesSection({ program, onOpen }: { program: "kkb" | "dkb"; onOpen: (b: LiveBatch) => void }) {
+function LiveBatchesSection({ program, onOpen }: { program: "seekers" | "providers"; onOpen: (b: LiveBatch) => void }) {
   const listFn = useServerFn(listProgramLiveBatches);
   const visible = useTabVisible();
   const query = useQuery({ queryKey: ["live-batches", program], queryFn: () => listFn({ data: { program } }), staleTime: 20_000, refetchInterval: visible ? 30_000 : false, refetchOnWindowFocus: false });
@@ -323,7 +323,7 @@ function StatusTile({ label, value, accent }: { label: string; value: number; ac
 function Meta({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (<div className="flex items-center justify-between gap-3"><span className="text-muted-foreground">{label}</span><span className={`truncate text-foreground ${mono ? "font-mono text-[11px]" : ""}`}>{value}</span></div>);
 }
-function LiveBatchDetailDialog({ batch, program, onClose }: { batch: LiveBatch | null; program: "kkb"|"dkb"; onClose: () => void }) {
+function LiveBatchDetailDialog({ batch, program, onClose }: { batch: LiveBatch | null; program: "seekers"|"providers"; onClose: () => void }) {
   const detailFn = useServerFn(getBatchLiveDetail);
   const stopFn = useServerFn(rayaStopBatch);
   const exportFn = useServerFn(exportBatchToStaging);
