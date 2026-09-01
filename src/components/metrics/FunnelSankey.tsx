@@ -16,8 +16,8 @@ const REASON_COLORS: Record<string, string> = {
   Other: "#B6B3AC",
 };
 const SINK_GREY = "#888780";
-const TRUNK = "#0E9F8F"; // brand teal
-const TRUNK_END = "#0B7C70";
+const TRUNK = "#7C3AED"; // brand violet
+const TRUNK_END = "#6D28D9";
 
 // Which trunk node a drop stage peels off from
 const STAGE_SOURCE: Record<string, string> = {

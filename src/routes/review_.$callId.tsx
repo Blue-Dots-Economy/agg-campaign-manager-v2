@@ -36,7 +36,7 @@ const ISSUE_OPTIONS = [
   { id: "Wrong Language", color: "bg-gray-800", desc: "Bot spoke in wrong language" },
   { id: "API Failing", color: "bg-pink-500", desc: "API errors or failures during the call" },
   { id: "Irrelevant Job Shared", color: "bg-indigo-500", desc: "Job recommendation didn't match the seeker", datasets: ["kkb"] as string[] },
-  { id: "Weak Introduction", color: "bg-teal-500", desc: "Introduction needs to be better" },
+  { id: "Weak Introduction", color: "bg-violet-500", desc: "Introduction needs to be better" },
   { id: "No Issues", color: "bg-emerald-500", desc: "Everything looked correct" },
 ];
 
