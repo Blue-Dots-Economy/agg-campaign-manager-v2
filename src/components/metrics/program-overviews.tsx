@@ -188,13 +188,15 @@ export function KkbOverviewMetrics({
   const [view, setView] = useState<"hybrid" | "calls" | "seekers">("hybrid");
   const callsByStage: Record<string, number> = {
     calls: m.totalCalls, picked: m.answeredCalls, engaged: m.engagedCalls,
-    jobs: m.jobsShownCalls, intent: m.highIntentCalls, apps: m.applicationsTotal,
+    profile: m.profileCapturedCalls, needs: m.needsCapturedCalls,
+    found: m.providersFoundCalls, connected: m.providersConnectedCalls,
   };
   const seekersByStage: Record<string, number> = {
     calls: m.seekers, picked: m.answeredSeekers, engaged: m.engagedSeekers,
-    jobs: m.jobsShownSeekers, intent: m.highIntentSeekers, apps: m.applicationsSeekers,
+    profile: m.profileCapturedSeekers, needs: m.needsCapturedSeekers,
+    found: m.providersFoundSeekers, connected: m.providersConnectedSeekers,
   };
-  const seekerStageKeys = new Set(["engaged", "jobs", "intent", "apps"]);
+  const seekerStageKeys = new Set(["engaged", "profile", "needs", "found", "connected"]);
   const dimOf = (key: string): "calls" | "seekers" =>
     view === "calls" ? "calls" : view === "seekers" ? "seekers" : seekerStageKeys.has(key) ? "seekers" : "calls";
   const valOf = (key: string): number =>
