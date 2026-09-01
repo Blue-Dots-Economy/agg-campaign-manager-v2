@@ -202,8 +202,8 @@ export function KkbOverviewMetrics({
   const valOf = (key: string): number =>
     (dimOf(key) === "seekers" ? seekersByStage[key] : callsByStage[key]) ?? 0;
   const dropLabels: Record<string, string> = {
-    calls: "no pickup", picked: "drop after pickup", engaged: "don't reach jobs",
-    jobs: "reach high-intent", intent: "never apply",
+    calls: "no pickup", picked: "drop after pickup", engaged: "no profile captured",
+    profile: "no needs captured", needs: "no providers found", found: "not connected",
   };
   const uploaded = (callOutcomes ?? []).reduce((s, o) => s + o.n, 0);
   const notDialled = (callOutcomes ?? []).filter((o) => {
