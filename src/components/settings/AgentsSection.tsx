@@ -25,7 +25,7 @@ import {
   deleteProgramAgent,
   loadAgent,
 } from "@/lib/agents.functions";
-import type { ProgramId } from "@/programs/registry";
+import { registry, type ProgramId } from "@/programs/registry";
 
 function maskId(id: string) {
   if (id.length <= 14) return id;
@@ -46,8 +46,8 @@ export function AgentsSection() {
 
       <Tabs defaultValue="seekers">
         <TabsList>
-          <TabsTrigger value="seekers">KKB agents</TabsTrigger>
-          <TabsTrigger value="providers">DKB agents</TabsTrigger>
+          <TabsTrigger value="seekers">Seeker Agents</TabsTrigger>
+          <TabsTrigger value="providers">Provider Agents</TabsTrigger>
         </TabsList>
         <TabsContent value="seekers" className="mt-4">
           <ProgramAgents program="seekers" />
@@ -108,7 +108,7 @@ function ProgramAgents({ program }: { program: ProgramId }) {
               <div className="flex items-center gap-2">
                 <Bot className="h-4 w-4 text-brand" />
                 <div className="font-medium">{a.name || "Unnamed agent"}</div>
-                <Badge variant="outline" className="uppercase text-[10px]">{a.program}</Badge>
+                <Badge variant="outline" className="text-[10px]">{registry[a.program as ProgramId]?.label ?? a.program}</Badge>
                 <StatusBadge status={a.status} lastError={a.last_error} />
               </div>
               <div className="mt-1 text-xs text-muted-foreground font-mono">{maskId(a.agent_id)}</div>
@@ -145,7 +145,7 @@ function ProgramAgents({ program }: { program: ProgramId }) {
         ))}
         {!isLoading && (data?.length ?? 0) === 0 && (
           <div className="rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">
-            No agents added yet for {program.toUpperCase()}.
+            No agents added yet for {registry[program].label}.
           </div>
         )}
       </div>
@@ -241,8 +241,9 @@ function AddAgentDialog({
             <Select value={program} onValueChange={(v) => setProgram(v as ProgramId)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="seekers">KKB</SelectItem>
-                <SelectItem value="providers">DKB</SelectItem>
+                {Object.values(registry).map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
