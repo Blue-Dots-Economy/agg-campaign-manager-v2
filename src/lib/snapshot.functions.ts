@@ -67,15 +67,22 @@ function mapRow(headers: string[], values: string[]): CallRow {
     const i = idx[normKey(k)];
     return i !== undefined ? values[i] : undefined;
   };
+  const firstNonEmpty = (...keys: string[]): string | undefined => {
+    for (const k of keys) {
+      const v = get(k);
+      if (v !== undefined && String(v).trim() !== "") return v;
+    }
+    return undefined;
+  };
   const callStatus = (get("call_status") ?? "").trim().toLowerCase();
   const answeredFromStatus = callStatus.startsWith("answered") || callStatus === "completed";
   return {
     campaign_day: get("campaign_day") ?? "",
     campaign_date: get("campaign_date") ?? "",
-    campaign_type: get("campaign_type") ?? "",
+    campaign_type: firstNonEmpty("campaign_type", "campaign_name") ?? "",
     language: get("language") ?? "",
     call_id: get("call_id") ?? "",
-    phone: get("phone") ?? get("contact_phone") ?? "",
+    phone: firstNonEmpty("phone", "contact_phone", "phone_number") ?? "",
     call_duration_seconds: asNum(get("call_duration_seconds")),
     call_datetime_ist: get("call_datetime_ist") ?? "",
     call_outcome: get("call_outcome") ?? "",
@@ -98,7 +105,7 @@ function mapRow(headers: string[], values: string[]): CallRow {
     jobs_recommended: asJsonArr(get("jobs_recommended")),
     jobs_applied: asJsonArr(get("jobs_applied")),
     jobs_failed_to_apply: asJsonArr(get("jobs_failed_to_apply")),
-    "Intent Score": asNum(get("intent_score")),
+    "Intent Score": asNum(firstNonEmpty("intent_score", "call_value_score")),
     "Intent Score Reasoning": "",
     counselled: asYesNoBool(get("counselled")),
     interview_scheduled: asYesNoBool(get("interview_scheduled")),
