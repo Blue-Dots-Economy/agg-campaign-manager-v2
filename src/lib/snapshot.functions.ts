@@ -475,7 +475,12 @@ export interface ProgramAggregates {
   jobStatus: Array<{ status: string; count: number }>;
   outcomes: Array<{ outcome: string; count: number }>;
   dkbIntents: Array<{ score: string; count: number }>;
-  dropAnalysis: Array<{ stage: string; reason: string; gzb: number; ka: number; total: number }>;
+  dropAnalysis: Array<{
+    stage: string;
+    reason: string;
+    byRegion: Record<string, number>;
+    total: number;
+  }>;
 }
 
 function emptyAggregates(): ProgramAggregates {
