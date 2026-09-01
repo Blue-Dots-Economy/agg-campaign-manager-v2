@@ -43,6 +43,14 @@ export interface KkbMetrics {
   jobsShownSeekers: number;
   highIntentSeekers: number;
   applicationsSeekers: number;
+  profileCapturedCalls: number;
+  profileCapturedSeekers: number;
+  needsCapturedCalls: number;
+  needsCapturedSeekers: number;
+  providersFoundCalls: number;
+  providersFoundSeekers: number;
+  providersConnectedCalls: number;
+  providersConnectedSeekers: number;
 }
 
 export interface DkbProviderFunnelStage {
@@ -180,20 +188,22 @@ export function KkbOverviewMetrics({
   const [view, setView] = useState<"hybrid" | "calls" | "seekers">("hybrid");
   const callsByStage: Record<string, number> = {
     calls: m.totalCalls, picked: m.answeredCalls, engaged: m.engagedCalls,
-    jobs: m.jobsShownCalls, intent: m.highIntentCalls, apps: m.applicationsTotal,
+    profile: (m.profileCapturedCalls ?? 0), needs: (m.needsCapturedCalls ?? 0),
+    found: (m.providersFoundCalls ?? 0), connected: (m.providersConnectedCalls ?? 0),
   };
   const seekersByStage: Record<string, number> = {
     calls: m.seekers, picked: m.answeredSeekers, engaged: m.engagedSeekers,
-    jobs: m.jobsShownSeekers, intent: m.highIntentSeekers, apps: m.applicationsSeekers,
+    profile: (m.profileCapturedSeekers ?? 0), needs: (m.needsCapturedSeekers ?? 0),
+    found: (m.providersFoundSeekers ?? 0), connected: (m.providersConnectedSeekers ?? 0),
   };
-  const seekerStageKeys = new Set(["engaged", "jobs", "intent", "apps"]);
+  const seekerStageKeys = new Set(["engaged", "profile", "needs", "found", "connected"]);
   const dimOf = (key: string): "calls" | "seekers" =>
     view === "calls" ? "calls" : view === "seekers" ? "seekers" : seekerStageKeys.has(key) ? "seekers" : "calls";
   const valOf = (key: string): number =>
     (dimOf(key) === "seekers" ? seekersByStage[key] : callsByStage[key]) ?? 0;
   const dropLabels: Record<string, string> = {
-    calls: "no pickup", picked: "drop after pickup", engaged: "don't reach jobs",
-    jobs: "reach high-intent", intent: "never apply",
+    calls: "no pickup", picked: "drop after pickup", engaged: "no profile captured",
+    profile: "no needs captured", needs: "no providers found", found: "not connected",
   };
   const uploaded = (callOutcomes ?? []).reduce((s, o) => s + o.n, 0);
   const notDialled = (callOutcomes ?? []).filter((o) => {
@@ -208,10 +218,11 @@ export function KkbOverviewMetrics({
   const stageDefs: Array<{ key: string; label: string; description: string; color: FunnelColor; extraSub?: string }> = [
     { key: "calls", label: "Calls made", description: "All dialled attempts", color: "blue", extraSub: topExtraSub },
     { key: "picked", label: "Picked up", description: "Seeker answered", color: "green" },
-    { key: "engaged", label: "Engaged", description: "3+ real conversation turns", color: "green" },
-    { key: "jobs", label: "Jobs shown", description: "Bot presented openings", color: "amber" },
-    { key: "intent", label: "High-Intent (≥5)", description: "Intent score ≥ 5", color: "coral" },
-    { key: "apps", label: "Applications", description: `${m.applicationsSubmitted.toLocaleString()} submitted + ${m.applicationsBlocked.toLocaleString()} blocked`, color: "coral" },
+    { key: "engaged", label: "Engaged", description: "Real conversation", color: "green" },
+    { key: "profile", label: "Profile captured", description: "Profile details recorded", color: "amber" },
+    { key: "needs", label: "Needs captured", description: "Needs and challenges shared", color: "amber" },
+    { key: "found", label: "Providers found", description: "Matching providers identified", color: "coral" },
+    { key: "connected", label: "Providers connected", description: "Seeker connected to a provider", color: "purple" },
   ];
   const stages: VerticalFunnelStage[] = stageDefs.map((s, i) => {
     const value = valOf(s.key);
@@ -260,10 +271,10 @@ export function KkbOverviewMetrics({
                 trend={series(perDay, (p) => safeDiv(p.engaged, p.rows) * 100)}
               />
               <MetricCard
-                label="High Intent Seekers"
-                value={m.highIntentCalls}
-                sub={previous ? undefined : "Intent score ≥ 5"}
-                previous={prev(previous, "highIntentCalls")}
+                label="High value"
+                value={m.highIntentSeekers}
+                sub={previous ? undefined : "Value score ≥ 5"}
+                previous={prev(previous, "highIntentSeekers")}
                 comparisonLabel={comparisonLabel}
                 trend={series(perDay, (p) => p.high_intent)}
               />
