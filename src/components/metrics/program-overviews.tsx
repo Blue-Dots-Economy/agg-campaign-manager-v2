@@ -43,6 +43,14 @@ export interface KkbMetrics {
   jobsShownSeekers: number;
   highIntentSeekers: number;
   applicationsSeekers: number;
+  profileCapturedCalls: number;
+  profileCapturedSeekers: number;
+  needsCapturedCalls: number;
+  needsCapturedSeekers: number;
+  providersFoundCalls: number;
+  providersFoundSeekers: number;
+  providersConnectedCalls: number;
+  providersConnectedSeekers: number;
 }
 
 export interface DkbProviderFunnelStage {
