@@ -243,7 +243,19 @@ export async function performSync(program: ProgramId, opts?: { force?: boolean }
     let totalRows = 0;
 
     try {
-      if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON && list.length > 0) {
+      const hasGoogleCreds = Boolean(process.env.GOOGLE_SERVICE_ACCOUNT_JSON?.trim());
+      if (!hasGoogleCreds && list.length > 0) {
+        const msg = "GOOGLE_SERVICE_ACCOUNT_JSON is not set. Add it in Project Settings → Secrets, then run Refresh again.";
+        errors.push({ id: "_config", name: "Google credentials", message: msg });
+        const nowIso = new Date().toISOString();
+        for (const c of list) {
+          await client
+            .from("sheet_connections")
+            .update({ status: "error", last_error: msg, last_synced_at: nowIso })
+            .eq("id", c.id);
+        }
+      }
+      if (hasGoogleCreds && list.length > 0) {
         const { readSheet } = await import("./sheets.server");
 
         for (const c of list) {
