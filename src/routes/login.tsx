@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
-import { Briefcase } from "lucide-react";
+import logoAsset from "@/assets/purple-dots-logo.png.asset.json";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/auth/context";
@@ -38,10 +38,8 @@ function LoginPage() {
       <div className="relative z-10 w-full max-w-sm rounded-2xl border border-border bg-card/90 backdrop-blur-sm p-8 shadow-sm">
 
         <div className="flex flex-col items-center text-center">
-          <div className="h-11 w-11 rounded-lg bg-gradient-to-br from-[#7C3AED] to-[#6D28D9] text-primary-foreground flex items-center justify-center">
-            <Briefcase className="h-5 w-5" />
-          </div>
-          <h1 className="mt-4 text-lg font-semibold text-foreground">Purple Dots</h1>
+          <img src={logoAsset.url} alt="Purple Dots" className="h-14 w-auto" />
+          <h1 className="sr-only">Purple Dots</h1>
         </div>
 
         <form onSubmit={onSubmit} className="mt-6 space-y-4">
