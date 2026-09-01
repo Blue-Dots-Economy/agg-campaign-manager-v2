@@ -195,7 +195,7 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="hidden min-h-screen w-64 shrink-0 overflow-hidden rounded-r-2xl bg-sidebar text-sidebar-foreground md:sticky md:top-0 md:flex md:h-screen md:flex-col">
+    <aside style={{ backgroundImage: "var(--sidebar-gradient)" }} className="hidden min-h-screen w-64 shrink-0 overflow-hidden rounded-r-2xl bg-sidebar text-sidebar-foreground md:sticky md:top-0 md:flex md:h-screen md:flex-col">
       <div className="px-5 pt-6 pb-4">
         <BlueDotsMark />
 
