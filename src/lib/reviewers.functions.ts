@@ -28,8 +28,6 @@ export const resolveLogin = createServerFn({ method: "POST" })
         };
       }
     } catch { /* fall through to legacy checks */ }
-    if (ADMIN_CREDENTIALS[email] && ADMIN_CREDENTIALS[email] === password) return { role: "admin" };
-    if (ECOSYSTEM_CREDENTIALS[email] && ECOSYSTEM_CREDENTIALS[email] === password) return { role: "ecosystem" };
     try {
       const { data: r } = await client.from("reviewers").select("email").eq("email", email).maybeSingle();
       if (r) return { role: "user" };
