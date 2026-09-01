@@ -49,6 +49,16 @@ export function OverviewFilters({
   showChannel?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const { config } = useProgram();
+  const { data: options } = useProgramFilterOptions(config);
+  const stateOptions = useMemo(
+    () => [{ value: "all", label: "All states" }, ...(options?.cities ?? []).map((c) => ({ value: c, label: c }))],
+    [options?.cities],
+  );
+  const campaignTypeOptions = useMemo(
+    () => [{ value: "all", label: "All types" }, ...(options?.campaignTypes ?? []).map((c) => ({ value: c, label: c }))],
+    [options?.campaignTypes],
+  );
 
   const range: DateRange | undefined = useMemo(() => {
     if (!value.dateFrom && !value.dateTo) return undefined;
