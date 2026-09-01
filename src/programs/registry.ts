@@ -110,8 +110,8 @@ const DKB_COLUMNS = [
 
 export const kkb: ProgramConfig = {
   id: "kkb",
-  label: "KKB",
-  subtitle: "KKB · voice outreach",
+  label: "Seekers",
+  subtitle: "",
   brandColor: "#7C3AED",
   sheetCsvUrl: "",
   sheetLabel: "KKB master sheet",
@@ -144,8 +144,8 @@ export const kkb: ProgramConfig = {
 
 export const dkb: ProgramConfig = {
   id: "dkb",
-  label: "DKB",
-  subtitle: "DKB · employer job verification",
+  label: "Providers",
+  subtitle: "",
   brandColor: "#6366F1",
   sheetCsvUrl: "",
   sheetLabel: "DKB master sheet",

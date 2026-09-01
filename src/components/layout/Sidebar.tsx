@@ -20,6 +20,7 @@ import { useAuth } from "@/auth/context";
 import { canAccess } from "@/auth/permissions";
 import { listConnections } from "@/lib/connections.functions";
 import { cn } from "@/lib/utils";
+import { registry } from "@/programs/registry";
 import { BlueDotsMark } from "./BlueDotsMark";
 
 type NavItem = {
@@ -34,7 +35,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: "",
     items: [
-      { to: "/user-level-analysis", label: "My Bluedots", icon: Users },
+      { to: "/user-level-analysis", label: "My Purple Dots", icon: Users },
       {
         to: "/",
         label: "Campaign Overview",
@@ -209,7 +210,7 @@ export function Sidebar() {
               key={id}
               onClick={() => setProgramId(id)}
               aria-pressed={programId === id}
-              aria-label={`Show ${id.toUpperCase()} program`}
+              aria-label={`Show ${registry[id].label} program`}
               className={cn(
                 "flex-1 text-xs font-medium py-1.5 rounded-md uppercase tracking-wide transition-colors",
                 programId === id
@@ -217,7 +218,7 @@ export function Sidebar() {
                   : "text-sidebar-foreground/80 hover:text-sidebar-foreground"
               )}
             >
-              {id}
+              {registry[id].label}
             </button>
           ))}
         </div>

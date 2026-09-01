@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { useProgram } from "@/programs/context";
 import { useAuth } from "@/auth/context";
 import { cn } from "@/lib/utils";
+import { registry } from "@/programs/registry";
 
 type NavItem = {
   to: string;
@@ -38,7 +39,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: "",
     items: [
-      { to: "/user-level-analysis", label: "My Bluedots", icon: Users },
+      { to: "/user-level-analysis", label: "My Purple Dots", icon: Users },
       {
         to: "/",
         label: "Campaign Overview",
@@ -209,7 +210,7 @@ export function MobileNav() {
                 key={id}
                 onClick={() => setProgramId(id)}
                 aria-pressed={programId === id}
-                aria-label={`Show ${id.toUpperCase()} program`}
+                aria-label={`Show ${registry[id].label} program`}
                 className={cn(
                   "flex-1 text-xs font-medium py-1.5 rounded-md uppercase tracking-wide transition-colors",
                   programId === id
@@ -217,7 +218,7 @@ export function MobileNav() {
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                {id}
+                {registry[id].label}
               </button>
             ))}
           </div>
