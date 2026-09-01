@@ -121,11 +121,12 @@ export function OverviewFilters({
           );
         })}
       </div>
+      )}
 
       {/* Campaign type segmented control (KKB only) */}
-      {showCampaignType && (
+      {showCampaignType && (options?.campaignTypes.length ?? 0) > 0 && (
         <div className="inline-flex rounded-md border border-border bg-card p-0.5 text-xs">
-          {CAMPAIGN_TYPE_OPTIONS.map((opt) => {
+          {campaignTypeOptions.map((opt) => {
             const active = value.campaignType === opt.value;
             return (
               <button
