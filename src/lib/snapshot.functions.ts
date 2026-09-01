@@ -1046,3 +1046,37 @@ export const fetchKkbCallOutcomes = createServerFn({ method: "GET" })
       return [];
     }
   });
+
+export interface ProgramFilterOptions {
+  cities: string[];
+  campaignTypes: string[];
+  channels: string[];
+}
+
+const toStringArray = (v: unknown): string[] =>
+  Array.isArray(v)
+    ? v.flatMap((x) => (typeof x === "string" && x.trim() ? [x] : []))
+    : [];
+
+export const fetchProgramFilterOptions = createServerFn({ method: "GET" })
+  .inputValidator((d: { program: ProgramId }) => d)
+  .handler(async ({ data }): Promise<ProgramFilterOptions> => {
+    try {
+      const client = await sb();
+      const { data: rpcData, error } = await client.rpc("get_program_filter_options", {
+        _program: data.program,
+      } as never);
+      if (error) throw new Error(error.message);
+      if (!rpcData || typeof rpcData !== "object") {
+        return { cities: [], campaignTypes: [], channels: [] };
+      }
+      const o = rpcData as Record<string, unknown>;
+      return {
+        cities: toStringArray(o.cities),
+        campaignTypes: toStringArray(o.campaignTypes),
+        channels: toStringArray(o.channels),
+      };
+    } catch {
+      return { cities: [], campaignTypes: [], channels: [] };
+    }
+  });
