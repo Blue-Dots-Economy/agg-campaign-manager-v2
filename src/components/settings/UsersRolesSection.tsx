@@ -36,6 +36,7 @@ import {
   setAppUserActive,
   type AppUser,
 } from "@/lib/app-users.functions";
+import { registry } from "@/programs/registry";
 
 const ROLE_OPTIONS = [
   { value: "admin", label: "Admin" },
@@ -273,8 +274,9 @@ export function UsersRolesSection() {
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NONE}>None</SelectItem>
-                  <SelectItem value="KKB">KKB</SelectItem>
-                  <SelectItem value="DKB">DKB</SelectItem>
+                  {Object.values(registry).map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
