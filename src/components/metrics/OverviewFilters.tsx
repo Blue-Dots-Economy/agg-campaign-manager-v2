@@ -100,8 +100,9 @@ export function OverviewFilters({
   return (
     <div className="flex flex-wrap items-center gap-2">
       {/* State segmented control */}
+      {(options?.cities.length ?? 0) > 0 && (
       <div className="inline-flex rounded-md border border-border bg-card p-0.5 text-xs">
-        {STATE_OPTIONS.map((opt) => {
+        {stateOptions.map((opt) => {
           const active = value.state === opt.value;
           return (
             <button
