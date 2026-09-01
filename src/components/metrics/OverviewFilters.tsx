@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
+import { useProgram } from "@/programs/context";
+import { useProgramFilterOptions } from "@/programs/useProgramAggregates";
 
-export type StateValue = "all" | "GZB" | "KA";
-export type CampaignTypeValue = "all" | "normal" | "higher_education";
+export type StateValue = string;
+export type CampaignTypeValue = string;
 export type ChannelValue = "all" | "outbound" | "inbound";
 
 export interface OverviewFilterValue {
@@ -19,17 +21,7 @@ export interface OverviewFilterValue {
   channel: ChannelValue;
 }
 
-const STATE_OPTIONS: { value: StateValue; label: string }[] = [
-  { value: "all", label: "All states" },
-  { value: "GZB", label: "GZB · Ghaziabad" },
-  { value: "KA", label: "KA · Hubli-Dharwad" },
-];
 
-const CAMPAIGN_TYPE_OPTIONS: { value: CampaignTypeValue; label: string }[] = [
-  { value: "all", label: "All types" },
-  { value: "normal", label: "KKB" },
-  { value: "higher_education", label: "Higher Education" },
-];
 
 const CHANNEL_OPTIONS: { value: ChannelValue; label: string }[] = [
   { value: "all", label: "All calls" },
