@@ -1028,6 +1028,7 @@ export type Database = {
         }
         Returns: Json
       }
+      get_program_filter_options: { Args: { _program: string }; Returns: Json }
       get_program_metric_groups: {
         Args: {
           _campaign?: string
