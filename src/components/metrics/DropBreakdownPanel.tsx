@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { DropRow } from "./DropAnalysisTable";
+import { regionsFromRows, type DropRow } from "./DropAnalysisTable";
 import { FUNNEL_REASON_COLORS } from "./FunnelSankey";
 
 const STAGE_ORDER = [
@@ -15,45 +15,47 @@ const fmt = (n: number) => n.toLocaleString();
 
 export function DropBreakdownPanel({
   rows,
-  hideRegion,
+  onlyRegion,
   selectedReason,
   onSelectReason,
 }: {
   rows: DropRow[];
-  hideRegion?: "GZB" | "KA";
+  onlyRegion?: string;
   selectedReason?: string | null;
   onSelectReason?: (reason: string | null) => void;
 }) {
-  const showGzb = hideRegion !== "GZB";
-  const showKa = hideRegion !== "KA";
+  const regions = useMemo(() => regionsFromRows(rows, onlyRegion), [rows, onlyRegion]);
 
-  const valueOf = (r: DropRow) =>
-    hideRegion === "KA" ? r.gzb : hideRegion === "GZB" ? r.ka : r.total;
+  const valueOf = (r: { byRegion: Record<string, number>; total: number }) =>
+    onlyRegion ? (r.byRegion?.[onlyRegion] ?? 0) : r.total;
 
   const { reasonTotals, grandTotal, stageBreakdown } = useMemo(() => {
-    const map = new Map<string, { reason: string; gzb: number; ka: number; total: number }>();
+    type Agg = { key: string; byRegion: Record<string, number>; total: number };
+    const add = (cur: Agg, r: DropRow) => {
+      for (const [k, v] of Object.entries(r.byRegion ?? {})) {
+        cur.byRegion[k] = (cur.byRegion[k] ?? 0) + v;
+      }
+      cur.total += r.total;
+    };
+    const map = new Map<string, Agg>();
     let grand = 0;
     for (const r of rows) {
       const v = valueOf(r);
       if (v <= 0) continue;
       grand += v;
-      const cur = map.get(r.reason) ?? { reason: r.reason, gzb: 0, ka: 0, total: 0 };
-      cur.gzb += r.gzb;
-      cur.ka += r.ka;
-      cur.total += r.total;
+      const cur = map.get(r.reason) ?? { key: r.reason, byRegion: {}, total: 0 };
+      add(cur, r);
       map.set(r.reason, cur);
     }
-    const reasonTotals = Array.from(map.values()).sort((a, b) => valueOf(b as any) - valueOf(a as any));
+    const reasonTotals = Array.from(map.values()).sort((a, b) => valueOf(b) - valueOf(a));
 
-    const stageBreakdown: { stage: string; gzb: number; ka: number; total: number }[] = [];
+    const stageBreakdown: Agg[] = [];
     if (selectedReason) {
-      const byStage = new Map<string, { stage: string; gzb: number; ka: number; total: number }>();
+      const byStage = new Map<string, Agg>();
       for (const r of rows) {
         if (r.reason !== selectedReason) continue;
-        const cur = byStage.get(r.stage) ?? { stage: r.stage, gzb: 0, ka: 0, total: 0 };
-        cur.gzb += r.gzb;
-        cur.ka += r.ka;
-        cur.total += r.total;
+        const cur = byStage.get(r.stage) ?? { key: r.stage, byRegion: {}, total: 0 };
+        add(cur, r);
         byStage.set(r.stage, cur);
       }
       const ordered = STAGE_ORDER.filter((s) => byStage.has(s)).concat(
@@ -62,7 +64,7 @@ export function DropBreakdownPanel({
       for (const s of ordered) stageBreakdown.push(byStage.get(s)!);
     }
     return { reasonTotals, grandTotal: grand, stageBreakdown };
-  }, [rows, hideRegion, selectedReason]);
+  }, [rows, onlyRegion, selectedReason]);
 
   return (
     <div className="flex h-full flex-col">
@@ -95,28 +97,34 @@ export function DropBreakdownPanel({
               <th className="px-3 py-2 text-left font-semibold">
                 {selectedReason ? "Stage" : "Reason"}
               </th>
-              {showGzb && <th className="px-3 py-2 text-right font-semibold w-16">GZB</th>}
-              {showKa && <th className="px-3 py-2 text-right font-semibold w-16">KA</th>}
+              {regions.map((reg) => (
+                <th key={reg} className="px-3 py-2 text-right font-semibold w-16">
+                  {reg}
+                </th>
+              ))}
               <th className="px-3 py-2 text-right font-semibold w-20">Total</th>
             </tr>
           </thead>
           <tbody>
             {selectedReason
               ? stageBreakdown.map((s) => (
-                  <tr key={s.stage} className="border-t border-border hover:bg-muted/40">
-                    <td className="px-3 py-2">{s.stage}</td>
-                    {showGzb && <td className="px-3 py-2 text-right tabular-nums">{fmt(s.gzb)}</td>}
-                    {showKa && <td className="px-3 py-2 text-right tabular-nums">{fmt(s.ka)}</td>}
+                  <tr key={s.key} className="border-t border-border hover:bg-muted/40">
+                    <td className="px-3 py-2">{s.key}</td>
+                    {regions.map((reg) => (
+                      <td key={reg} className="px-3 py-2 text-right tabular-nums">
+                        {fmt(s.byRegion[reg] ?? 0)}
+                      </td>
+                    ))}
                     <td className="px-3 py-2 text-right tabular-nums font-medium">{fmt(s.total)}</td>
                   </tr>
                 ))
               : reasonTotals.map((r) => {
-                  const color = FUNNEL_REASON_COLORS[r.reason] ?? FUNNEL_REASON_COLORS.Other;
-                  const pct = grandTotal > 0 ? (valueOf(r as any) / grandTotal) * 100 : 0;
+                  const color = FUNNEL_REASON_COLORS[r.key] ?? FUNNEL_REASON_COLORS.Other;
+                  const pct = grandTotal > 0 ? (valueOf(r) / grandTotal) * 100 : 0;
                   return (
                     <tr
-                      key={r.reason}
-                      onClick={() => onSelectReason?.(r.reason)}
+                      key={r.key}
+                      onClick={() => onSelectReason?.(r.key)}
                       className="cursor-pointer border-t border-border hover:bg-muted/40"
                     >
                       <td className="px-3 py-2">
@@ -125,14 +133,17 @@ export function DropBreakdownPanel({
                             className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm"
                             style={{ backgroundColor: color }}
                           />
-                          <span className="truncate">{r.reason}</span>
+                          <span className="truncate">{r.key}</span>
                           <span className="ml-auto text-[10px] text-muted-foreground tabular-nums">
                             {pct.toFixed(1)}%
                           </span>
                         </div>
                       </td>
-                      {showGzb && <td className="px-3 py-2 text-right tabular-nums">{fmt(r.gzb)}</td>}
-                      {showKa && <td className="px-3 py-2 text-right tabular-nums">{fmt(r.ka)}</td>}
+                      {regions.map((reg) => (
+                        <td key={reg} className="px-3 py-2 text-right tabular-nums">
+                          {fmt(r.byRegion[reg] ?? 0)}
+                        </td>
+                      ))}
                       <td className="px-3 py-2 text-right tabular-nums font-medium">{fmt(r.total)}</td>
                     </tr>
                   );
@@ -141,30 +152,20 @@ export function DropBreakdownPanel({
           <tfoot>
             <tr className="border-t-2 border-primary/40 bg-primary/10 font-semibold">
               <td className="px-3 py-2">Total</td>
-              {showGzb && (
-                <td className="px-3 py-2 text-right tabular-nums">
+              {regions.map((reg) => (
+                <td key={reg} className="px-3 py-2 text-right tabular-nums">
                   {fmt(
                     (selectedReason ? stageBreakdown : reasonTotals).reduce(
-                      (s, r) => s + (r as any).gzb,
+                      (s, r) => s + (r.byRegion[reg] ?? 0),
                       0,
                     ),
                   )}
                 </td>
-              )}
-              {showKa && (
-                <td className="px-3 py-2 text-right tabular-nums">
-                  {fmt(
-                    (selectedReason ? stageBreakdown : reasonTotals).reduce(
-                      (s, r) => s + (r as any).ka,
-                      0,
-                    ),
-                  )}
-                </td>
-              )}
+              ))}
               <td className="px-3 py-2 text-right tabular-nums">
                 {fmt(
                   (selectedReason ? stageBreakdown : reasonTotals).reduce(
-                    (s, r) => s + (r as any).total,
+                    (s, r) => s + r.total,
                     0,
                   ),
                 )}
