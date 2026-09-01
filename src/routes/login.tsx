@@ -1,11 +1,13 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import logoAsset from "@/assets/purple-dots-logo.png.asset.json";
+import logoDarkAsset from "@/assets/purple-dots-logo-dark.png.asset.json";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/auth/context";
 import { landingFor } from "@/auth/permissions";
 import { AuroraFlow } from "@/components/AuroraFlow";
+import { useTheme, resolveDark } from "@/lib/theme";
 
 
 export const Route = createFileRoute("/login")({
