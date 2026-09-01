@@ -37,13 +37,13 @@ type LinkIn = { source: string; target: string; value: number; color: string; ki
 export function FunnelSankey({
   m,
   rows,
-  hideRegion,
+  onlyRegion,
   selectedReason,
   onSelectReason,
 }: {
   m: KkbMetrics;
   rows: DropRow[];
-  hideRegion?: "GZB" | "KA";
+  onlyRegion?: string;
   selectedReason?: string | null;
   onSelectReason?: (reason: string | null) => void;
 }) {
@@ -60,8 +60,7 @@ export function FunnelSankey({
   }, []);
 
   const { nodes, links, height } = useMemo(() => {
-    const valueOf = (r: DropRow) =>
-      hideRegion === "KA" ? r.gzb : hideRegion === "GZB" ? r.ka : r.total;
+    const valueOf = (r: DropRow) => (onlyRegion ? (r.byRegion?.[onlyRegion] ?? 0) : r.total);
 
     const calls = m.totalCalls;
     const picked = m.answeredCalls;
@@ -149,7 +148,7 @@ export function FunnelSankey({
     });
 
     return { nodes: graph.nodes, links: graph.links, height: h };
-  }, [m, rows, hideRegion, width]);
+  }, [m, rows, onlyRegion, width]);
 
   const isSelectable = (name: string) => name !== "No pickup" && name !== "Did not apply";
 

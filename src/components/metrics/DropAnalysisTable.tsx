@@ -3,8 +3,7 @@ import { Fragment } from "react";
 export type DropRow = {
   stage: string;
   reason: string;
-  gzb: number;
-  ka: number;
+  byRegion: Record<string, number>;
   total: number;
 };
 
@@ -19,15 +18,22 @@ const STAGE_ORDER = [
 
 const fmt = (n: number) => n.toLocaleString();
 
+export function regionsFromRows(rows: DropRow[], onlyRegion?: string): string[] {
+  if (onlyRegion) return [onlyRegion];
+  const set = new Set<string>();
+  for (const r of rows) {
+    for (const k of Object.keys(r.byRegion ?? {})) set.add(k);
+  }
+  return Array.from(set).sort((a, b) => a.localeCompare(b));
+}
+
 export function DropAnalysisTable({
   rows,
-  hideRegion,
+  onlyRegion,
 }: {
   rows: DropRow[];
-  hideRegion?: "GZB" | "KA";
+  onlyRegion?: string;
 }) {
-  const showGzb = hideRegion !== "GZB";
-  const showKa = hideRegion !== "KA";
   if (!rows || rows.length === 0) {
     return (
       <div className="text-sm text-muted-foreground py-8 text-center">
@@ -35,6 +41,8 @@ export function DropAnalysisTable({
       </div>
     );
   }
+
+  const regions = regionsFromRows(rows, onlyRegion);
 
   // Group by stage, in fixed order, then by total desc
   const byStage = new Map<string, DropRow[]>();
@@ -46,9 +54,9 @@ export function DropAnalysisTable({
     Array.from(byStage.keys()).filter((s) => !STAGE_ORDER.includes(s)),
   );
 
-  let grandG = 0,
-    grandK = 0,
-    grandT = 0;
+  const grandByRegion: Record<string, number> = {};
+  for (const reg of regions) grandByRegion[reg] = 0;
+  let grandT = 0;
 
   return (
     <div className="overflow-x-auto rounded-lg border border-border">
@@ -57,19 +65,23 @@ export function DropAnalysisTable({
           <tr className="bg-primary text-primary-foreground">
             <th className="text-left font-semibold px-4 py-2.5">Drop point (stage)</th>
             <th className="text-left font-semibold px-4 py-2.5">Drop reason</th>
-            {showGzb && <th className="text-right font-semibold px-4 py-2.5 w-24">GZB</th>}
-            {showKa && <th className="text-right font-semibold px-4 py-2.5 w-24">KA</th>}
+            {regions.map((reg) => (
+              <th key={reg} className="text-right font-semibold px-4 py-2.5 w-24">
+                {reg}
+              </th>
+            ))}
             <th className="text-right font-semibold px-4 py-2.5 w-28">Total</th>
           </tr>
         </thead>
         <tbody>
           {stages.map((stage) => {
             const reasons = (byStage.get(stage) ?? []).slice().sort((a, b) => b.total - a.total);
-            const sG = reasons.reduce((s, r) => s + r.gzb, 0);
-            const sK = reasons.reduce((s, r) => s + r.ka, 0);
+            const subByRegion: Record<string, number> = {};
+            for (const reg of regions) {
+              subByRegion[reg] = reasons.reduce((s, r) => s + (r.byRegion?.[reg] ?? 0), 0);
+              grandByRegion[reg] += subByRegion[reg];
+            }
             const sT = reasons.reduce((s, r) => s + r.total, 0);
-            grandG += sG;
-            grandK += sK;
             grandT += sT;
             return (
               <Fragment key={stage}>
@@ -82,16 +94,22 @@ export function DropAnalysisTable({
                       {i === 0 ? <span className="font-medium text-foreground">{stage}</span> : ""}
                     </td>
                     <td className="px-4 py-2">{r.reason}</td>
-                    {showGzb && <td className="px-4 py-2 text-right tabular-nums">{fmt(r.gzb)}</td>}
-                    {showKa && <td className="px-4 py-2 text-right tabular-nums">{fmt(r.ka)}</td>}
+                    {regions.map((reg) => (
+                      <td key={reg} className="px-4 py-2 text-right tabular-nums">
+                        {fmt(r.byRegion?.[reg] ?? 0)}
+                      </td>
+                    ))}
                     <td className="px-4 py-2 text-right tabular-nums font-medium">{fmt(r.total)}</td>
                   </tr>
                 ))}
                 <tr className="border-t border-border bg-primary/5 font-semibold">
                   <td className="px-4 py-2">{stage}</td>
                   <td className="px-4 py-2 text-muted-foreground">Subtotal</td>
-                  {showGzb && <td className="px-4 py-2 text-right tabular-nums">{fmt(sG)}</td>}
-                  {showKa && <td className="px-4 py-2 text-right tabular-nums">{fmt(sK)}</td>}
+                  {regions.map((reg) => (
+                    <td key={reg} className="px-4 py-2 text-right tabular-nums">
+                      {fmt(subByRegion[reg] ?? 0)}
+                    </td>
+                  ))}
                   <td className="px-4 py-2 text-right tabular-nums">{fmt(sT)}</td>
                 </tr>
               </Fragment>
@@ -101,8 +119,11 @@ export function DropAnalysisTable({
             <td className="px-4 py-2.5" colSpan={2}>
               Total drops
             </td>
-            {showGzb && <td className="px-4 py-2.5 text-right tabular-nums">{fmt(grandG)}</td>}
-            {showKa && <td className="px-4 py-2.5 text-right tabular-nums">{fmt(grandK)}</td>}
+            {regions.map((reg) => (
+              <td key={reg} className="px-4 py-2.5 text-right tabular-nums">
+                {fmt(grandByRegion[reg] ?? 0)}
+              </td>
+            ))}
             <td className="px-4 py-2.5 text-right tabular-nums">{fmt(grandT)}</td>
           </tr>
         </tbody>

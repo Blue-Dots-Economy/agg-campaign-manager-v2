@@ -180,11 +180,14 @@ export function intentDistribution(rows: CallRow[]) {
   return Object.entries(buckets).map(([score, count]) => ({ score: `${score}`, count }));
 }
 
-export function regionSplit(rows: CallRow[]) {
-  const ka = rows.filter((r) => r.city_campaign === "Hubli-Dharwad").length;
-  const gzb = rows.filter((r) => r.city_campaign === "Ghaziabad").length;
-  return [
-    { region: "KA", count: ka },
-    { region: "GZB", count: gzb },
-  ];
+export function regionSplit(rows: CallRow[]): Array<{ region: string; count: number }> {
+  const counts = new Map<string, number>();
+  for (const r of rows) {
+    const raw = typeof r.city_campaign === "string" ? r.city_campaign.trim() : "";
+    const region = raw || "Unknown";
+    counts.set(region, (counts.get(region) ?? 0) + 1);
+  }
+  return Array.from(counts, ([region, count]) => ({ region, count })).sort((a, b) =>
+    a.region.localeCompare(b.region),
+  );
 }

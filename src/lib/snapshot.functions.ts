@@ -475,7 +475,12 @@ export interface ProgramAggregates {
   jobStatus: Array<{ status: string; count: number }>;
   outcomes: Array<{ outcome: string; count: number }>;
   dkbIntents: Array<{ score: string; count: number }>;
-  dropAnalysis: Array<{ stage: string; reason: string; gzb: number; ka: number; total: number }>;
+  dropAnalysis: Array<{
+    stage: string;
+    reason: string;
+    byRegion: Record<string, number>;
+    total: number;
+  }>;
 }
 
 function emptyAggregates(): ProgramAggregates {
@@ -512,7 +517,27 @@ function normalizeAggregates(value: unknown): ProgramAggregates {
     jobStatus: Array.isArray(raw.jobStatus) ? raw.jobStatus : [],
     outcomes: Array.isArray(raw.outcomes) ? raw.outcomes : [],
     dkbIntents: Array.isArray(raw.dkbIntents) ? raw.dkbIntents : [],
-    dropAnalysis: Array.isArray(raw.dropAnalysis) ? raw.dropAnalysis : [],
+    dropAnalysis: Array.isArray(raw.dropAnalysis)
+      ? (raw.dropAnalysis as unknown[]).flatMap((entry) => {
+          if (!entry || typeof entry !== "object") return [];
+          const e = entry as Record<string, unknown>;
+          const byRegion: Record<string, number> = {};
+          if (e.byRegion && typeof e.byRegion === "object") {
+            for (const [k, v] of Object.entries(e.byRegion as Record<string, unknown>)) {
+              if (typeof v === "number" && Number.isFinite(v)) byRegion[k] = v;
+            }
+          }
+          const total = typeof e.total === "number" && Number.isFinite(e.total) ? e.total : 0;
+          return [
+            {
+              stage: typeof e.stage === "string" ? e.stage : String(e.stage ?? ""),
+              reason: typeof e.reason === "string" ? e.reason : String(e.reason ?? ""),
+              byRegion,
+              total,
+            },
+          ];
+        })
+      : [],
   };
 }
 

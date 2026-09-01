@@ -19,15 +19,14 @@ const fmt = (n: number) => n.toLocaleString();
 
 export function DropStackedBars({
   rows,
-  hideRegion,
+  onlyRegion,
 }: {
   rows: DropRow[];
-  hideRegion?: "GZB" | "KA";
+  onlyRegion?: string;
 }) {
   if (!rows || rows.length === 0) return null;
 
-  const valueOf = (r: DropRow) =>
-    hideRegion === "KA" ? r.gzb : hideRegion === "GZB" ? r.ka : r.total;
+  const valueOf = (r: DropRow) => (onlyRegion ? (r.byRegion?.[onlyRegion] ?? 0) : r.total);
 
   // Group rows by stage with reason→count
   const stageMap = new Map<string, { reason: string; value: number }[]>();
