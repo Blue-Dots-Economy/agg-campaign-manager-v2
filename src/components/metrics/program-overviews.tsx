@@ -271,10 +271,10 @@ export function KkbOverviewMetrics({
                 trend={series(perDay, (p) => safeDiv(p.engaged, p.rows) * 100)}
               />
               <MetricCard
-                label="High Intent Seekers"
-                value={m.highIntentCalls}
-                sub={previous ? undefined : "Intent score ≥ 5"}
-                previous={prev(previous, "highIntentCalls")}
+                label="High value"
+                value={m.highIntentSeekers}
+                sub={previous ? undefined : "Value score ≥ 5"}
+                previous={prev(previous, "highIntentSeekers")}
                 comparisonLabel={comparisonLabel}
                 trend={series(perDay, (p) => p.high_intent)}
               />
