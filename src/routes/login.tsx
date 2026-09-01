@@ -41,8 +41,7 @@ function LoginPage() {
           <div className="h-11 w-11 rounded-lg bg-gradient-to-br from-[#7C3AED] to-[#6D28D9] text-primary-foreground flex items-center justify-center">
             <Briefcase className="h-5 w-5" />
           </div>
-          <h1 className="mt-4 text-lg font-semibold text-foreground">Operation Rozgar</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Sign in to Mission Control</p>
+          <h1 className="mt-4 text-lg font-semibold text-foreground">Purple Dots</h1>
         </div>
 
         <form onSubmit={onSubmit} className="mt-6 space-y-4">
@@ -75,7 +74,6 @@ function LoginPage() {
             <p id="login-error" role="alert" className="text-xs text-rose-600">Not an authorised email, or wrong admin password.</p>
           )}
           <Button type="submit" className="w-full">Sign in</Button>
-          <p className="text-xs text-muted-foreground text-center">Reviewers: sign in with your own email and leave the password blank. The password is only for the admin account — please don't use it to review calls.</p>
         </form>
       </div>
     </div>
