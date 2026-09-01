@@ -1,11 +1,13 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import logoAsset from "@/assets/purple-dots-logo.png.asset.json";
+import logoDarkAsset from "@/assets/purple-dots-logo-dark.png.asset.json";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/auth/context";
 import { landingFor } from "@/auth/permissions";
 import { AuroraFlow } from "@/components/AuroraFlow";
+import { useTheme, resolveDark } from "@/lib/theme";
 
 
 export const Route = createFileRoute("/login")({
@@ -15,6 +17,8 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const { theme } = useTheme();
+  const isDark = resolveDark(theme);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(false);
@@ -38,7 +42,7 @@ function LoginPage() {
       <div className="relative z-10 w-full max-w-sm rounded-2xl border border-border bg-card/90 backdrop-blur-sm p-8 shadow-sm">
 
         <div className="flex flex-col items-center text-center">
-          <img src={logoAsset.url} alt="Purple Dots" className="h-24 w-auto" />
+          <img src={isDark ? logoDarkAsset.url : logoAsset.url} alt="Purple Dots" className="h-24 w-auto" />
           <h1 className="sr-only">Purple Dots</h1>
         </div>
 
