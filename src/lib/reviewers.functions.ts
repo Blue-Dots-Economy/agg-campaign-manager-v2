@@ -7,15 +7,6 @@ async function sb() {
   const { sbForAuth } = await import("@/lib/db.server");
   return sbForAuth();
 }
-const ADMIN_CREDENTIALS: Record<string, string> = {
-  "admin@bluedots.com": "456789",
-  "sanketika@bluedots.com": "456789",
-  "aggregator-coordinator@bluedots.com": "456789",
-  "aggregator-owner@bluedots.com": "456789",
-};
-const ECOSYSTEM_CREDENTIALS: Record<string, string> = {
-  "ecosystem@bluedots.com": "456789",
-};
 
 export const resolveLogin = createServerFn({ method: "POST" })
   .inputValidator((d: { email: string; password?: string }) => d)
