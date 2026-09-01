@@ -205,7 +205,7 @@ export function Sidebar() {
           aria-label="Select program"
           className="mt-5 inline-flex rounded-lg bg-sidebar-accent p-1 w-full"
         >
-          {(["kkb", "dkb"] as const).map((id) => (
+          {(["seekers", "providers"] as const).map((id) => (
             <button
               key={id}
               onClick={() => setProgramId(id)}

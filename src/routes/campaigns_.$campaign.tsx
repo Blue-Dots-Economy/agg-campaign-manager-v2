@@ -138,7 +138,7 @@ function CampaignReviewDetail() {
         </div>
       </div>
 
-      {config.id === "kkb" && (
+      {config.id === "seekers" && (
         <>
           <CampaignSuccess
             campaign={current.campaignType}
@@ -155,7 +155,7 @@ function CampaignReviewDetail() {
         </>
       )}
 
-      {config.id === "dkb" && (
+      {config.id === "providers" && (
         <>
           <CampaignSuccessDkb
             campaign={current.campaignType}

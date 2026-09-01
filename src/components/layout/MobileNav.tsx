@@ -205,7 +205,7 @@ export function MobileNav() {
             aria-label="Select program"
             className="inline-flex rounded-lg bg-muted p-1 w-full"
           >
-            {(["kkb", "dkb"] as const).map((id) => (
+            {(["seekers", "providers"] as const).map((id) => (
               <button
                 key={id}
                 onClick={() => setProgramId(id)}

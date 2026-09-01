@@ -83,16 +83,16 @@ export function ConnectionsSection() {
         </div>
       </Panel>
 
-      <Tabs defaultValue="kkb">
+      <Tabs defaultValue="seekers">
         <TabsList>
-          <TabsTrigger value="kkb">KKB sheets</TabsTrigger>
-          <TabsTrigger value="dkb">DKB sheets</TabsTrigger>
+          <TabsTrigger value="seekers">KKB sheets</TabsTrigger>
+          <TabsTrigger value="providers">DKB sheets</TabsTrigger>
         </TabsList>
-        <TabsContent value="kkb" className="mt-4">
-          <ProgramConnections program="kkb" />
+        <TabsContent value="seekers" className="mt-4">
+          <ProgramConnections program="seekers" />
         </TabsContent>
-        <TabsContent value="dkb" className="mt-4">
-          <ProgramConnections program="dkb" />
+        <TabsContent value="providers" className="mt-4">
+          <ProgramConnections program="providers" />
         </TabsContent>
       </Tabs>
     </div>

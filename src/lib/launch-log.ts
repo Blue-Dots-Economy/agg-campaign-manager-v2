@@ -2,7 +2,7 @@
 // can surface batches launched from the wizard.
 export interface LaunchLogEntry {
   date: string; // ISO
-  program: "kkb" | "dkb";
+  program: "seekers" | "providers";
   file: string;
   rows: number;
   status: "appended" | "queued" | "failed";
