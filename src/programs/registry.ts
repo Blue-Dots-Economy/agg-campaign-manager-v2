@@ -108,7 +108,7 @@ const DKB_COLUMNS = [
   "intent_score_reasoning",
 ];
 
-export const kkb: ProgramConfig = {
+export const seekers: ProgramConfig = {
   id: "seekers",
   label: "Seekers",
   subtitle: "",
@@ -142,7 +142,7 @@ export const kkb: ProgramConfig = {
   ],
 };
 
-export const dkb: ProgramConfig = {
+export const providers: ProgramConfig = {
   id: "providers",
   label: "Providers",
   subtitle: "",
@@ -176,5 +176,5 @@ export const dkb: ProgramConfig = {
   ],
 };
 
-export const registry: Record<"seekers" | "providers", ProgramConfig> = { kkb, dkb };
+export const registry: Record<"seekers" | "providers", ProgramConfig> = { seekers, providers };
 export type ProgramId = keyof typeof registry;
