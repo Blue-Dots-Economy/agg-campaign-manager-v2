@@ -10,19 +10,31 @@ export interface ServiceAccountJson {
 export const DEFAULT_SA_EMAIL = "blue-dots-admin@blue-dots-project.iam.gserviceaccount.com";
 
 function parseServiceAccount(): ServiceAccountJson {
-  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  let raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON?.trim();
   if (!raw) throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON is not set");
+  // Tolerate base64-encoded or quote-wrapped values.
+  if (!raw.startsWith("{")) {
+    try {
+      const decoded = Buffer.from(raw, "base64").toString("utf8").trim();
+      if (decoded.startsWith("{")) raw = decoded;
+    } catch {
+      /* ignore */
+    }
+  }
   let json: ServiceAccountJson;
   try {
     json = JSON.parse(raw);
   } catch {
-    throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON");
+    throw new Error(
+      "GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON — paste the full service-account JSON file contents (starting with '{').",
+    );
   }
   if (!json.client_email || !json.private_key) {
     throw new Error("Service account JSON missing client_email or private_key");
   }
   return json;
 }
+
 
 const tokenCache = new Map<string, { token: string; expiresAt: number }>();
 
