@@ -11,8 +11,10 @@ import {
   type AggregatePayload,
   type KkbDropAnalysisPayload,
   fetchKkbCallOutcomes,
+  fetchProgramFilterOptions,
   type CampaignListItem,
   type CallOutcomeCount,
+  type ProgramFilterOptions,
 } from "@/lib/snapshot.functions";
 import {
   fetchReviewCalls,
@@ -289,6 +291,22 @@ export function useReviewers() {
     queryFn: () => fn({}),
     staleTime: 60_000,
     gcTime: 5 * 60_000,
+    placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    retry: 1,
+    retryDelay: 1500,
+  });
+}
+
+export function useProgramFilterOptions(config: ProgramConfig) {
+  const fn = useServerFn(fetchProgramFilterOptions);
+  return useQuery<ProgramFilterOptions>({
+    queryKey: ["program-filter-options", config.id],
+    queryFn: () => fn({ data: { program: config.id } }),
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
     placeholderData: keepPreviousData,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
