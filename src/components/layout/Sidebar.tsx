@@ -45,7 +45,7 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
           { to: "/review", label: "Transcripts & Call Review", icon: Headphones },
         ],
       },
-      { to: "/launch", label: "Launch A Campaign", icon: Rocket },
+      { to: "/launch", label: "Launch a campaign", icon: Rocket },
       { to: "/ecosystem-view", label: "Ecosystem View", icon: Briefcase, sub: "Coming soon" },
     ],
   },

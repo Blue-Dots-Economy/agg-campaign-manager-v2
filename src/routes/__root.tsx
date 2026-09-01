@@ -83,8 +83,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:title", content: "Purple Dots" },
       { property: "og:description", content: "Master Operations Dashboard for Voice-AI Campaigns" },
       { name: "twitter:description", content: "Master Operations Dashboard for Voice-AI Campaigns" },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/45a59886-eca6-4cd9-b8f4-b02c1a06aae8/id-preview-bde7329d--013d57c2-a89d-4925-a75d-31db897b263f.lovable.app-1782117420656.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/45a59886-eca6-4cd9-b8f4-b02c1a06aae8/id-preview-bde7329d--013d57c2-a89d-4925-a75d-31db897b263f.lovable.app-1782117420656.png" },
       { name: "twitter:card", content: "summary_large_image" },
       { property: "og:type", content: "website" },
     ],

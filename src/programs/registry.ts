@@ -22,7 +22,6 @@ export interface ProgramConfig {
   subtitle: string;
   brandColor: string;
   sheetCsvUrl: string;
-  sheetLabel: string;
   rayaAgentId: string;
   columns: string[];
   kpis: KpiDef[];
@@ -114,7 +113,6 @@ export const seekers: ProgramConfig = {
   subtitle: "",
   brandColor: "#7C3AED",
   sheetCsvUrl: "",
-  sheetLabel: "KKB master sheet",
   rayaAgentId: "",
   columns: KKB_COLUMNS,
   successMetric: "applications",
@@ -148,7 +146,6 @@ export const providers: ProgramConfig = {
   subtitle: "",
   brandColor: "#6366F1",
   sheetCsvUrl: "",
-  sheetLabel: "DKB master sheet",
   rayaAgentId: "",
   columns: DKB_COLUMNS,
   successMetric: "interviews",
@@ -178,3 +175,7 @@ export const providers: ProgramConfig = {
 
 export const registry: Record<"seekers" | "providers", ProgramConfig> = { seekers, providers };
 export type ProgramId = keyof typeof registry;
+
+export function sheetLabelFor(config: ProgramConfig): string {
+  return `${config.label} master sheet`;
+}
