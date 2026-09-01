@@ -188,13 +188,13 @@ export function KkbOverviewMetrics({
   const [view, setView] = useState<"hybrid" | "calls" | "seekers">("hybrid");
   const callsByStage: Record<string, number> = {
     calls: m.totalCalls, picked: m.answeredCalls, engaged: m.engagedCalls,
-    profile: m.profileCapturedCalls, needs: m.needsCapturedCalls,
-    found: m.providersFoundCalls, connected: m.providersConnectedCalls,
+    profile: (m.profileCapturedCalls ?? 0), needs: (m.needsCapturedCalls ?? 0),
+    found: (m.providersFoundCalls ?? 0), connected: (m.providersConnectedCalls ?? 0),
   };
   const seekersByStage: Record<string, number> = {
     calls: m.seekers, picked: m.answeredSeekers, engaged: m.engagedSeekers,
-    profile: m.profileCapturedSeekers, needs: m.needsCapturedSeekers,
-    found: m.providersFoundSeekers, connected: m.providersConnectedSeekers,
+    profile: (m.profileCapturedSeekers ?? 0), needs: (m.needsCapturedSeekers ?? 0),
+    found: (m.providersFoundSeekers ?? 0), connected: (m.providersConnectedSeekers ?? 0),
   };
   const seekerStageKeys = new Set(["engaged", "profile", "needs", "found", "connected"]);
   const dimOf = (key: string): "calls" | "seekers" =>
