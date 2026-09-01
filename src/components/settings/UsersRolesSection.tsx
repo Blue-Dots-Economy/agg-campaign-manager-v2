@@ -36,6 +36,7 @@ import {
   setAppUserActive,
   type AppUser,
 } from "@/lib/app-users.functions";
+import { registry } from "@/programs/registry";
 
 const ROLE_OPTIONS = [
   { value: "admin", label: "Admin" },
