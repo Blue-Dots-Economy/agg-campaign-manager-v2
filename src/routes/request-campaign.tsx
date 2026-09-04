@@ -209,7 +209,7 @@ function RequestCampaignForm() {
               </div>
             </Panel>
 
-            <Panel title="Which seekers" description="Pick the audience from your Blue Dots">
+            <Panel title="Which seekers" description="Pick the audience from your Purple Dots">
               {intent === "drive" ? (
                 <div>
                   <Label className="text-xs">Profile status · select one or more</Label>
@@ -248,7 +248,7 @@ function RequestCampaignForm() {
               )}
               <div className="mt-4 flex items-baseline gap-2 border-t border-border pt-3">
                 {loading ? (
-                  <span className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading your Blue Dots…</span>
+                  <span className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading your Purple Dots…</span>
                 ) : (
                   <>
                     <span className="text-2xl font-semibold tabular-nums">{cohortContacts.length.toLocaleString("en-IN")}</span>
