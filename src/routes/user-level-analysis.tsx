@@ -483,13 +483,13 @@ function UserLevelAnalysis() {
                 {appliedRange?.from ? (
                   appliedRange.to ? (
                     <>
-                      Applied: {format(appliedRange.from, "LLL d, y")} – {format(appliedRange.to, "LLL d, y")}
+                      Connected: {format(appliedRange.from, "LLL d, y")} – {format(appliedRange.to, "LLL d, y")}
                     </>
                   ) : (
-                    <>Applied: {format(appliedRange.from, "LLL d, y")}</>
+                    <>Connected: {format(appliedRange.from, "LLL d, y")}</>
                   )
                 ) : (
-                  <span>Applied: Any date</span>
+                  <span>Connected: Any date</span>
                 )}
                 {appliedRange?.from && (
                   <span
