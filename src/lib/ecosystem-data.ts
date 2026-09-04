@@ -266,3 +266,113 @@ export const actionGap = (matching: number, connections: number) =>
 
 export const demandSupplyGap = (matching: number, supply: number) =>
   Math.max(0, matching - supply);
+
+/* ---------- onboarding ---------- */
+
+export interface RegistrationLink {
+  id: string;
+  name: string;
+  description: string;
+  slug: string;
+  domain: "Seeker" | "Provider";
+  active: boolean;
+  registrations: number;
+  verified: number;
+  lastUsed: string;
+}
+
+export interface FlaggedProfile {
+  id: string;
+  name: string;
+  type: "Seeker" | "Provider";
+  issue: string;
+  uploadDate: string;
+  daysFlagged: number;
+}
+
+export interface OnboardingHealth {
+  totalRegistered: number;
+  verified: number;
+  unverified: number;
+}
+
+const ONBOARDING_HEALTH: OnboardingHealth = {
+  totalRegistered: 24,
+  verified: 18,
+  unverified: 6,
+};
+
+const REGISTRATION_LINKS: RegistrationLink[] = [
+  {
+    id: "lnk-1",
+    name: "Lucknow field drive — Apr 2026",
+    description: "Door-to-door outreach by the field team across Lucknow district",
+    slug: "lucknow-field-apr26",
+    domain: "Seeker",
+    active: true,
+    registrations: 412,
+    verified: 389,
+    lastUsed: "Last used 2 hours ago",
+  },
+  {
+    id: "lnk-2",
+    name: "WhatsApp broadcast — Lucknow",
+    description: "Shared via community WhatsApp groups in Lucknow",
+    slug: "wa-lucknow-seekers",
+    domain: "Seeker",
+    active: true,
+    registrations: 231,
+    verified: 198,
+    lastUsed: "Last used 1 day ago",
+  },
+  {
+    id: "lnk-3",
+    name: "Provider onboarding — Lucknow",
+    description: "Direct outreach to service providers in Lucknow",
+    slug: "provider-lkw-rehab",
+    domain: "Provider",
+    active: true,
+    registrations: 87,
+    verified: 74,
+    lastUsed: "Last used 3 days ago",
+  },
+];
+
+const FLAGGED_PROFILES: FlaggedProfile[] = [
+  {
+    id: "flg-1",
+    name: "Raj Rehabilitation Centre",
+    type: "Provider",
+    issue: "Missing: service category",
+    uploadDate: "10 Mar 2026",
+    daysFlagged: 21,
+  },
+  {
+    id: "flg-2",
+    name: "Sharma Assistive Devices",
+    type: "Provider",
+    issue: "Missing: mobile number",
+    uploadDate: "05 Mar 2026",
+    daysFlagged: 26,
+  },
+  {
+    id: "flg-3",
+    name: "Kiran Vision Care",
+    type: "Provider",
+    issue: "Format error: email",
+    uploadDate: "01 Mar 2026",
+    daysFlagged: 30,
+  },
+];
+
+export function getOnboardingHealth(_region: EcosystemRegion): OnboardingHealth {
+  return { ...ONBOARDING_HEALTH };
+}
+
+export function getRegistrationLinks(_region: EcosystemRegion): RegistrationLink[] {
+  return REGISTRATION_LINKS.map((l) => ({ ...l }));
+}
+
+export function getFlaggedProfiles(_region: EcosystemRegion): FlaggedProfile[] {
+  return FLAGGED_PROFILES.map((p) => ({ ...p }));
+}
