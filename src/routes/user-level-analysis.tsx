@@ -409,9 +409,9 @@ function UserLevelAnalysis() {
       {/* Header */}
       <div className="space-y-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">My Bluedots</h1>
+          <h1 className="text-3xl font-bold tracking-tight">My Purpledots</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Activity &amp; Status of the Bluedots
+            Activity &amp; Status of the Purpledots
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
