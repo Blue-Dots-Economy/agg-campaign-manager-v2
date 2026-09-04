@@ -375,7 +375,7 @@ function UserLevelAnalysis() {
     {
       label: "Active",
       value: stats.byStatus.Active,
-      description: "Last applied ≤ 30 days",
+      description: "Last connection requested ≤ 30 days",
       icon: Users,
       accent: "from-blue-50 to-white",
       iconBg: "bg-card border border-blue-500/30",
@@ -385,7 +385,7 @@ function UserLevelAnalysis() {
     {
       label: "At Risk",
       value: stats.byStatus["At Risk"],
-      description: "Profile > 7d, last applied 31–90d",
+      description: "Profile > 7d, last connection requested 31–90d",
       icon: AlertTriangle,
       accent: "from-amber-50 to-white",
       iconBg: "bg-card border border-amber-500/30",
@@ -395,7 +395,7 @@ function UserLevelAnalysis() {
     {
       label: "Inactive",
       value: stats.byStatus.Inactive,
-      description: "Last applied > 90 days or never",
+      description: "Last connection requested > 90 days or never",
       icon: PauseCircle,
       accent: "from-rose-50 to-white",
       iconBg: "bg-card border border-rose-500/30",
@@ -483,13 +483,13 @@ function UserLevelAnalysis() {
                 {appliedRange?.from ? (
                   appliedRange.to ? (
                     <>
-                      Applied: {format(appliedRange.from, "LLL d, y")} – {format(appliedRange.to, "LLL d, y")}
+                      Connected: {format(appliedRange.from, "LLL d, y")} – {format(appliedRange.to, "LLL d, y")}
                     </>
                   ) : (
-                    <>Applied: {format(appliedRange.from, "LLL d, y")}</>
+                    <>Connected: {format(appliedRange.from, "LLL d, y")}</>
                   )
                 ) : (
-                  <span>Applied: Any date</span>
+                  <span>Connected: Any date</span>
                 )}
                 {appliedRange?.from && (
                   <span
@@ -570,7 +570,7 @@ function UserLevelAnalysis() {
               <Search className="h-5 w-5" />
             </div>
             <div>
-              <div className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Avg Job Search Radius</div>
+              <div className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Avg Search Radius</div>
               <div className="text-xl font-semibold text-muted-foreground">Coming soon</div>
             </div>
           </div>
@@ -579,7 +579,7 @@ function UserLevelAnalysis() {
               <Send className="h-5 w-5" />
             </div>
             <div>
-              <div className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Avg Job Application Radius</div>
+              <div className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">Avg Connection Radius</div>
               <div className="text-xl font-semibold text-muted-foreground">Coming soon</div>
             </div>
           </div>
@@ -633,7 +633,7 @@ function UserLevelAnalysis() {
               Icon={CheckCircle2}
             />
             <MetricTile
-              label="Applications"
+              label="Connections requested"
               value={stats.withApps.toLocaleString()}
               description={`${stats.pctProfilesWithApps}% of all profiles`}
               Icon={Send}
@@ -656,7 +656,7 @@ function UserLevelAnalysis() {
               Icon={TrendingUp}
             />
             <MetricTile
-              label="Users with ≥1 Application"
+              label="Users with ≥1 Connection Requested"
               value={stats.usersWithAppsCount.toLocaleString()}
               description={`${stats.pctUsersWithApps}% of all users`}
               Icon={Activity}
