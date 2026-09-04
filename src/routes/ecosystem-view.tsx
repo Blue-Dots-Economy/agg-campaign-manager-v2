@@ -29,6 +29,7 @@ import {
 import { Panel } from "@/components/Panel";
 import { MetricCard } from "@/components/metrics/MetricCard";
 import { RegionSelector, type RegionValue } from "@/components/ecosystem/RegionSelector";
+import { OnboardingTab } from "@/components/ecosystem/OnboardingTab";
 import { REGION_TREE } from "@/lib/ecosystem-config";
 import {
   actionGap,
@@ -166,9 +167,7 @@ function EcosystemView() {
       </TabsContent>
 
       <TabsContent value="onboarding" className="space-y-6 mt-0">
-        <Panel title="Onboarding" description="Onboarding funnel for seekers and providers.">
-          <p className="text-sm text-muted-foreground">Coming in the next pass</p>
-        </Panel>
+        <OnboardingTab region={region} />
       </TabsContent>
     </Tabs>
   );
