@@ -68,6 +68,8 @@ import { useProgram } from "@/programs/context";
 import {
   getProviderParticipants,
   getProviderSummary,
+  getSeekerParticipants,
+  getSeekerSummary,
   getUserMetrics,
   type Lifecycle,
   type Participant,
@@ -183,11 +185,10 @@ function MetricTile({
   Icon,
 }: {
   label: string;
-  value: string | null;
+  value: string;
   description: string;
   Icon: typeof Users;
 }) {
-  const empty = value === null;
   return (
     <div className="rounded-xl border border-border bg-card p-5">
       <div className="flex items-start gap-3">
@@ -196,26 +197,12 @@ function MetricTile({
         </div>
         <div className="text-sm font-medium leading-tight">{label}</div>
       </div>
-      <div className="mt-4 text-3xl font-semibold tracking-tight">{empty ? "—" : value}</div>
+      <div className="mt-4 text-3xl font-semibold tracking-tight">{value}</div>
       <div className="mt-1 text-xs text-muted-foreground">
-        {empty ? "No data source yet" : description}
+        {description}
       </div>
     </div>
   );
-}
-
-function seekerToParticipant(s: Seeker): Participant {
-  return {
-    id: s.id,
-    name: s.name || "Unnamed profile",
-    joined: s.createdOn,
-    lastSeen:
-      s.lastAppliedAge != null ? `${s.lastAppliedAge}d ago` : "—",
-    profileCompletion: s.profileCompletion,
-    initiated: s.applications,
-    received: 0,
-    lifecycle: s.status,
-  };
 }
 
 function UserLevelAnalysis() {
@@ -277,8 +264,8 @@ function UserLevelAnalysis() {
   };
 
   const participants = useMemo<Participant[]>(
-    () => (isProviders ? getProviderParticipants() : seekers.map(seekerToParticipant)),
-    [isProviders, seekers],
+    () => (isProviders ? getProviderParticipants() : getSeekerParticipants()),
+    [isProviders],
   );
 
   const fieldCompletion = useMemo(() => {
@@ -297,15 +284,9 @@ function UserLevelAnalysis() {
   }, [seekers]);
 
   const summary = useMemo(() => {
-    if (isProviders) {
-      const s = getProviderSummary();
-      return { registered: s.profilesRegistered, complete: s.profilesComplete };
-    }
-    return {
-      registered: seekers.length,
-      complete: seekers.filter((s) => s.profileStatus === "Complete").length,
-    };
-  }, [isProviders, seekers]);
+    const s = isProviders ? getProviderSummary() : getSeekerSummary();
+    return { registered: s.profilesRegistered, complete: s.profilesComplete };
+  }, [isProviders]);
 
   const userMetrics = getUserMetrics(config.id, participants);
 
@@ -452,7 +433,7 @@ function UserLevelAnalysis() {
             />
             <MetricTile
               label="Received Connections"
-              value={userMetrics.receivedConnections?.toLocaleString() ?? null}
+              value={userMetrics.receivedConnections.toLocaleString()}
               description="Profiles with submissions"
               Icon={Send}
             />
@@ -465,19 +446,19 @@ function UserLevelAnalysis() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <MetricTile
               label={`Total ${entityLabel}`}
-              value={userMetrics.totalAccountHolders?.toLocaleString() ?? null}
+              value={userMetrics.totalAccountHolders.toLocaleString()}
               description="Unique account holders"
               Icon={Users}
             />
             <MetricTile
               label="Avg Profiles per User"
-              value={userMetrics.avgProfilesPerUser === null ? null : String(userMetrics.avgProfilesPerUser)}
+              value={String(userMetrics.avgProfilesPerUser)}
               description="Profiles managed each"
               Icon={TrendingUp}
             />
             <MetricTile
               label="Avg Actions per User"
-              value={userMetrics.avgActionsPerUser === null ? null : String(userMetrics.avgActionsPerUser)}
+              value={String(userMetrics.avgActionsPerUser)}
               description="Recorded interactions"
               Icon={Activity}
             />
@@ -649,8 +630,13 @@ function UserLevelAnalysis() {
             </TableBody>
           </Table>
         </div>
-        {filtered.length > 0 && (
+        {!isProviders && (
           <div className="pt-3 text-xs text-muted-foreground">
+            Showing sample data. Uploaded CSV is used for profile-status analysis only.
+          </div>
+        )}
+        {filtered.length > 0 && (
+          <div className="pt-1 text-xs text-muted-foreground">
             Showing 1–{visible.length.toLocaleString()} of {filtered.length.toLocaleString()}
           </div>
         )}
