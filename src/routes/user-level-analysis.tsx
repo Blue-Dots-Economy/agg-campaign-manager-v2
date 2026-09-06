@@ -181,10 +181,11 @@ function MetricTile({
   Icon,
 }: {
   label: string;
-  value: string;
+  value: string | null;
   description: string;
   Icon: typeof Users;
 }) {
+  const empty = value === null;
   return (
     <div className="rounded-xl border border-border bg-card p-5">
       <div className="flex items-start gap-3">
@@ -193,8 +194,10 @@ function MetricTile({
         </div>
         <div className="text-sm font-medium leading-tight">{label}</div>
       </div>
-      <div className="mt-4 text-3xl font-semibold tracking-tight">{value}</div>
-      <div className="mt-1 text-xs text-muted-foreground">{description}</div>
+      <div className="mt-4 text-3xl font-semibold tracking-tight">{empty ? "—" : value}</div>
+      <div className="mt-1 text-xs text-muted-foreground">
+        {empty ? "No data source yet" : description}
+      </div>
     </div>
   );
 }
