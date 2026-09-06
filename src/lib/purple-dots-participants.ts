@@ -70,17 +70,30 @@ export function getProviderSummary(): ParticipantSummary {
   return { ...PROVIDER_SUMMARY };
 }
 
-export function getStaticUserMetrics(
-  _programId: "seekers" | "providers",
-): Pick<
-  ParticipantSummary,
-  "receivedConnections" | "totalAccountHolders" | "avgProfilesPerUser" | "avgActionsPerUser"
-> {
-  const {
-    receivedConnections,
-    totalAccountHolders,
-    avgProfilesPerUser,
-    avgActionsPerUser,
-  } = PROVIDER_SUMMARY;
-  return { receivedConnections, totalAccountHolders, avgProfilesPerUser, avgActionsPerUser };
+export interface UserMetrics {
+  receivedConnections: number | null;
+  totalAccountHolders: number | null;
+  avgProfilesPerUser: number | null;
+  avgActionsPerUser: number | null;
+}
+
+export function getUserMetrics(
+  programId: "seekers" | "providers",
+  participants: Participant[],
+): UserMetrics {
+  if (programId === "providers") {
+    const {
+      receivedConnections,
+      totalAccountHolders,
+      avgProfilesPerUser,
+      avgActionsPerUser,
+    } = PROVIDER_SUMMARY;
+    return { receivedConnections, totalAccountHolders, avgProfilesPerUser, avgActionsPerUser };
+  }
+  return {
+    receivedConnections: participants.reduce((sum, p) => sum + p.received, 0),
+    totalAccountHolders: participants.length,
+    avgProfilesPerUser: null,
+    avgActionsPerUser: null,
+  };
 }
