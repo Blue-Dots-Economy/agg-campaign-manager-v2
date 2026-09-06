@@ -18,6 +18,7 @@ import {
   Upload,
   RotateCcw,
   SlidersHorizontal,
+  Info,
   Network,
 } from "lucide-react";
 import { Panel } from "@/components/Panel";
@@ -31,6 +32,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -66,7 +68,7 @@ import { useProgram } from "@/programs/context";
 import {
   getProviderParticipants,
   getProviderSummary,
-  getStaticUserMetrics,
+  getUserMetrics,
   type Lifecycle,
   type Participant,
 } from "@/lib/purple-dots-participants";
@@ -227,6 +229,7 @@ function UserLevelAnalysis() {
   const [isFetching, setIsFetching] = useState(false);
   const [search, setSearch] = useState("");
   const [lifecycleFilter, setLifecycleFilter] = useState<string>("all");
+  const [minCompletion, setMinCompletion] = useState<number>(0);
   const [profileInfoOpen, setProfileInfoOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
@@ -304,7 +307,7 @@ function UserLevelAnalysis() {
     };
   }, [isProviders, seekers]);
 
-  const userMetrics = getStaticUserMetrics(config.id);
+  const userMetrics = getUserMetrics(config.id, participants);
 
   const byLifecycle = useMemo(() => {
     const counts: Record<Lifecycle, number> = { New: 0, Active: 0, "At Risk": 0, Inactive: 0 };
@@ -316,10 +319,11 @@ function UserLevelAnalysis() {
     const q = search.trim().toLowerCase();
     return participants.filter((p) => {
       if (lifecycleFilter !== "all" && p.lifecycle !== lifecycleFilter) return false;
+      if (p.profileCompletion < minCompletion) return false;
       if (q && !(p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q))) return false;
       return true;
     });
-  }, [participants, search, lifecycleFilter]);
+  }, [participants, search, lifecycleFilter, minCompletion]);
 
   const visible = filtered.slice(0, 200);
   const maxInitiated = Math.max(1, ...participants.map((p) => p.initiated));
@@ -448,7 +452,7 @@ function UserLevelAnalysis() {
             />
             <MetricTile
               label="Received Connections"
-              value={userMetrics.receivedConnections.toLocaleString()}
+              value={userMetrics.receivedConnections?.toLocaleString() ?? null}
               description="Profiles with submissions"
               Icon={Send}
             />
@@ -461,19 +465,19 @@ function UserLevelAnalysis() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <MetricTile
               label={`Total ${entityLabel}`}
-              value={userMetrics.totalAccountHolders.toLocaleString()}
+              value={userMetrics.totalAccountHolders?.toLocaleString() ?? null}
               description="Unique account holders"
               Icon={Users}
             />
             <MetricTile
               label="Avg Profiles per User"
-              value={String(userMetrics.avgProfilesPerUser)}
+              value={userMetrics.avgProfilesPerUser === null ? null : String(userMetrics.avgProfilesPerUser)}
               description="Profiles managed each"
               Icon={TrendingUp}
             />
             <MetricTile
               label="Avg Actions per User"
-              value={String(userMetrics.avgActionsPerUser)}
+              value={userMetrics.avgActionsPerUser === null ? null : String(userMetrics.avgActionsPerUser)}
               description="Recorded interactions"
               Icon={Activity}
             />
@@ -509,10 +513,44 @@ function UserLevelAnalysis() {
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="outline" className="gap-2" onClick={() => setProfileInfoOpen(true)}>
-              <SlidersHorizontal className="h-4 w-4" />
-              All filters
-            </Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <SlidersHorizontal className="h-4 w-4" />
+                  All filters
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-64 space-y-3">
+                <div className="space-y-1.5">
+                  <div className="text-xs font-medium text-muted-foreground">Profile completion</div>
+                  <Select
+                    value={String(minCompletion)}
+                    onValueChange={(v) => setMinCompletion(Number(v))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="All" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">All</SelectItem>
+                      <SelectItem value="50">50% and above</SelectItem>
+                      <SelectItem value="75">75% and above</SelectItem>
+                      <SelectItem value="100">100% only</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setSearch("");
+                    setLifecycleFilter("all");
+                    setMinCompletion(0);
+                  }}
+                >
+                  Clear all filters
+                </Button>
+              </PopoverContent>
+            </Popover>
           </div>
         }
       >
@@ -525,7 +563,20 @@ function UserLevelAnalysis() {
                 </TableHead>
                 <TableHead className="text-xs uppercase tracking-wider">Participant</TableHead>
                 <TableHead className="text-xs uppercase tracking-wider">Joined</TableHead>
-                <TableHead className="text-xs uppercase tracking-wider">Profile Status</TableHead>
+                <TableHead className="text-xs uppercase tracking-wider">
+                  <span className="inline-flex items-center gap-1">
+                    Profile Status
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5"
+                      aria-label="How profile status is calculated"
+                      onClick={() => setProfileInfoOpen(true)}
+                    >
+                      <Info className="h-3.5 w-3.5" />
+                    </Button>
+                  </span>
+                </TableHead>
                 <TableHead className="text-xs uppercase tracking-wider">Initiated</TableHead>
                 <TableHead className="text-xs uppercase tracking-wider">Received</TableHead>
                 <TableHead className="text-xs uppercase tracking-wider">Status</TableHead>
