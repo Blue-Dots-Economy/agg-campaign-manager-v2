@@ -21,6 +21,7 @@ import {
   Info,
   Network,
 } from "lucide-react";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Panel } from "@/components/Panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -70,6 +71,8 @@ import {
   getProviderSummary,
   getSeekerParticipants,
   getSeekerSummary,
+  sumBreakdown,
+  type ConnectionBreakdown,
   getUserMetrics,
   type Lifecycle,
   type Participant,
@@ -165,6 +168,68 @@ function initials(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean);
   if (!words.length) return "?";
   return (words[0][0] + (words[1]?.[0] ?? "")).toUpperCase();
+}
+
+const SEGMENTS = [
+  { key: "requested" as const, label: "Requested", color: "bg-brand" },
+  { key: "accepted" as const, label: "Accepted", color: "bg-emerald-500" },
+  { key: "declined" as const, label: "Declined", color: "bg-rose-500" },
+  { key: "cancelled" as const, label: "Cancelled", color: "bg-muted-foreground/40" },
+];
+
+function SegmentedBar({ breakdown, max }: { breakdown: ConnectionBreakdown; max: number }) {
+  const total = sumBreakdown(breakdown);
+  const fill = max > 0 ? Math.max(0, Math.min(100, (total / max) * 100)) : 0;
+  return (
+    <div className="h-1.5 w-20 rounded-full bg-muted overflow-hidden">
+      {total > 0 && (
+        <div className="flex h-full" style={{ width: `${fill}%` }}>
+          {SEGMENTS.map((s) => {
+            const v = breakdown[s.key];
+            if (!v) return null;
+            return (
+              <div key={s.key} className={`h-full ${s.color}`} style={{ width: `${(v / total) * 100}%` }} />
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ConnectionCell({
+  breakdown,
+  max,
+}: {
+  breakdown: ConnectionBreakdown;
+  max: number;
+}) {
+  const total = sumBreakdown(breakdown);
+  return (
+    <HoverCard openDelay={150} closeDelay={100}>
+      <HoverCardTrigger asChild>
+        <div className="flex items-center gap-2 cursor-default outline-none" tabIndex={0}>
+          <span className="tabular-nums">{total}</span>
+          <SegmentedBar breakdown={breakdown} max={max} />
+        </div>
+      </HoverCardTrigger>
+      <HoverCardContent className="w-52">
+        <div className="space-y-1.5 text-xs">
+          {SEGMENTS.map((s) => (
+            <div key={s.key} className="flex items-center gap-2">
+              <span className={`h-2 w-2 rounded-full ${s.color}`} />
+              <span className="text-muted-foreground">{s.label}</span>
+              <span className="ml-auto tabular-nums">{breakdown[s.key]}</span>
+            </div>
+          ))}
+          <div className="border-t border-border pt-1.5 flex items-center">
+            <span className="font-medium">Total</span>
+            <span className="ml-auto font-medium tabular-nums">{total}</span>
+          </div>
+        </div>
+      </HoverCardContent>
+    </HoverCard>
+  );
 }
 
 function Bar({ pct }: { pct: number }) {
@@ -599,16 +664,10 @@ function UserLevelAnalysis() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-2">
-                      <span className="tabular-nums">{p.initiated}</span>
-                      <Bar pct={(p.initiated / maxInitiated) * 100} />
-                    </div>
+                    <ConnectionCell breakdown={p.initiatedBreakdown} max={maxInitiated} />
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-2">
-                      <span className="tabular-nums">{p.received}</span>
-                      <Bar pct={(p.received / maxReceived) * 100} />
-                    </div>
+                    <ConnectionCell breakdown={p.receivedBreakdown} max={maxReceived} />
                   </TableCell>
                   <TableCell>
                     <Badge
