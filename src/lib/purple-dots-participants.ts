@@ -78,7 +78,7 @@ const SEEKERS: Participant[] = [
   { id: "5b7f8a20-9e13-4c62-b48d-1f7c3a9e6d54", name: "Anil Kumar", joined: "2026-05-14", lastSeen: "45d ago", profileCompletion: 67, initiated: 1, received: 0, lifecycle: "At Risk" },
   { id: "a4c6e832-7b15-49df-8e02-3d5f9c1b7a68", name: "Sunita Devi", joined: "2026-04-22", lastSeen: "61d ago", profileCompletion: 50, initiated: 1, received: 1, lifecycle: "At Risk" },
   { id: "9d2f7b64-3a08-4c15-9e7b-8f4a6c2d5013", name: "Lakshmi Narayan", joined: "2026-02-10", lastSeen: "4mo ago", profileCompletion: 67, initiated: 1, received: 0, lifecycle: "Inactive" },
-  { id: "6e83a1d9-5c47-4b20-8f36-2a9d7e4c1ب05".replace("ب","b"), name: "Vikram Singh", joined: "2026-01-27", lastSeen: "6mo ago", profileCompletion: 33, initiated: 0, received: 0, lifecycle: "Inactive" },
+  { id: "6e83a1d9-5c47-4b20-8f36-2a9d7e4c1b05", name: "Vikram Singh", joined: "2026-01-27", lastSeen: "6mo ago", profileCompletion: 33, initiated: 0, received: 0, lifecycle: "Inactive" },
 ];
 
 const SEEKER_SUMMARY: ParticipantSummary = {
