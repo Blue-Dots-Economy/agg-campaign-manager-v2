@@ -279,10 +279,10 @@ export function KkbOverviewMetrics({
                 trend={series(perDay, (p) => p.high_intent)}
               />
               <MetricCard
-                label="Application rate"
+                label="Connected"
                 value={appRate}
                 format="percent"
-                sub={previous ? undefined : "Applied / answered seekers"}
+                sub={previous ? undefined : "Seekers connected to at least one provider"}
                 previous={prevAppRate}
                 comparisonLabel={comparisonLabel}
                 trend={series(perDay, (p) => safeDiv(p.converted, p.answered) * 100)}

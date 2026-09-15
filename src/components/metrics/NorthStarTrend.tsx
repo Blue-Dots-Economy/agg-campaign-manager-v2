@@ -36,8 +36,8 @@ export interface NorthStarTrendPoint {
 }
 
 const SERIES = [
-  { key: "pickup_to_app", name: "Pickup → Application", color: "var(--color-chart-1)" },
-  { key: "highintent_to_app", name: "High-Intent → Application", color: "var(--color-chart-2)" },
+  { key: "pickup_to_app", name: "Pickup → Connection", color: "var(--color-chart-1)" },
+  { key: "highintent_to_app", name: "High-Intent → Connection", color: "var(--color-chart-2)" },
   { key: "pickup_to_highintent", name: "Pickup → High-Intent", color: "var(--color-chart-3)" },
 ] as const;
 
