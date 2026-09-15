@@ -8,7 +8,7 @@ const nf = new Intl.NumberFormat();
 const STAGE_LABEL_DISPLAY: Record<string, string> = {
   "jobs shown": "Update Profile",
   "extra job shown": "Providers Identified",
-  "job deliberation": "Provider Deliberation",
+  "job deliberation": "Consent to Share Info",
   "apply": "Connection Request Sent",
 };
 
