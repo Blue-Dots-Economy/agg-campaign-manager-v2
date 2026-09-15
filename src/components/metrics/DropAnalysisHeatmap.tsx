@@ -46,7 +46,7 @@ export function DropAnalysisHeatmap({ data }: { data?: KkbDropAnalysisPayload })
         <div className="px-2 py-1">Drop reason</div>
         {stages.map((s) => (
           <div key={s.key} className="px-2 py-1 text-center leading-tight">
-            {s.label}
+            {stageLabel(s.label)}
           </div>
         ))}
         <div className="px-2 py-1 text-right">Total</div>
