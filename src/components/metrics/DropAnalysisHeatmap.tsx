@@ -3,6 +3,18 @@ import type { KkbDropAnalysisPayload } from "@/lib/snapshot.functions";
 
 const nf = new Intl.NumberFormat();
 
+// UI-only display names for drop stages. Keys are the lower-cased labels returned
+// by the backend; the underlying stage keys and numbers are never touched.
+const STAGE_LABEL_DISPLAY: Record<string, string> = {
+  "jobs shown": "Update Profile",
+  "extra job shown": "Providers Identified",
+  "job deliberation": "Provider Deliberation",
+  "apply": "Connection Request Sent",
+};
+
+const stageLabel = (label: string) =>
+  STAGE_LABEL_DISPLAY[label?.trim().toLowerCase() ?? ""] ?? label;
+
 function cellBg(value: number, maxCell: number): string {
   if (!value || value <= 0 || maxCell <= 0) return "var(--color-muted)";
   const opacity = 0.14 + 0.86 * Math.sqrt(value / maxCell);
