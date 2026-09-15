@@ -448,7 +448,7 @@ export function ProgramAnalytics({
                     <Legend wrapperStyle={{ fontSize: 12 }} />
                     <Line type="monotone" dataKey="answered" stroke="var(--color-chart-1)" strokeWidth={2} dot={false} />
                     <Line type="monotone" dataKey="engaged" stroke="var(--color-chart-2)" strokeWidth={2} strokeDasharray="6 3" dot={false} />
-                    <Line type="monotone" dataKey="converted" name={config.successMetric} stroke="var(--color-chart-3)" strokeWidth={2} strokeDasharray="2 2" dot={false} />
+                    <Line type="monotone" dataKey="converted" name={config.successMetric === "applications" ? "connections" : config.successMetric} stroke="var(--color-chart-3)" strokeWidth={2} strokeDasharray="2 2" dot={false} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -495,7 +495,7 @@ export function ProgramAnalytics({
               </div>
             </Panel>
 
-            <Panel title="Region split" description="KA vs GZB">
+            <Panel title="Region split">
               <div className="h-64">
                 <ResponsiveContainer>
                   <BarChart data={regions} layout="vertical" margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>

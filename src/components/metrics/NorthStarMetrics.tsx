@@ -9,10 +9,10 @@ import { cn } from "@/lib/utils";
 
 type Def = { key: string; label: string; num: string; den: string };
 const KKB_DEFS: Def[] = [
-  { key: "pickup_to_app", label: "Pickup → Application", num: "applicationsTotal", den: "answeredCalls" },
-  { key: "highintent_to_app", label: "High-Intent → Application", num: "applicationsTotal", den: "highIntentCalls" },
+  { key: "pickup_to_app", label: "Pickup → Connection", num: "applicationsTotal", den: "answeredCalls" },
+  { key: "highintent_to_app", label: "High-Intent → Connection", num: "applicationsTotal", den: "highIntentCalls" },
   { key: "pickup_to_highintent", label: "Pickup → High-Intent", num: "highIntentCalls", den: "answeredCalls" },
-  { key: "jobsshown_to_app", label: "Jobs shown → Application", num: "applicationsTotal", den: "jobsShownCalls" },
+  { key: "jobsshown_to_app", label: "Jobs shown → Connection", num: "applicationsTotal", den: "jobsShownCalls" },
 ];
 
 function statusColor(value: number | null, threshold: number | null): string {
