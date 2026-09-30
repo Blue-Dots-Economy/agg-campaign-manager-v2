@@ -5,7 +5,7 @@ const REASON_PALETTE = [
   "var(--chart-4)",
   "var(--chart-5)",
   "var(--brand-muted)",
-];
+] as const;
 
 const MUTED_REASON = "color-mix(in srgb, var(--muted-foreground) 45%, transparent)";
 
