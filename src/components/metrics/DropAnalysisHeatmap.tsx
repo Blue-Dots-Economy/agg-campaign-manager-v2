@@ -35,6 +35,8 @@ export function DropAnalysisHeatmap({ data }: { data?: KkbDropAnalysisPayload })
     );
   }
 
+  const safeguarding = data.safeguardingFlagged ?? 0;
+
   const { stages, buckets, maxCell, grandTotal } = data;
   // grid: bucket label | one col per stage | total
   const gridTemplate = `minmax(180px, 1.4fr) repeat(${stages.length}, minmax(96px, 1fr)) minmax(80px, 0.8fr)`;
