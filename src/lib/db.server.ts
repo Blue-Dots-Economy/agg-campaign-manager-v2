@@ -3,7 +3,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { getRequest } from "@tanstack/react-start/server";
 
-const SWITCH_EMAILS = new Set(["aryan@purpledots.com"]);
+const SWITCH_EMAILS = new Set(["vineela@purpledots.com"]);
 const AUTH_COOKIE = "rozgar_auth";
 const OPTS = { auth: { persistSession: false, autoRefreshToken: false } } as const;
 
