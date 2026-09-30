@@ -1,19 +1,5 @@
 import type { DropRow } from "./DropAnalysisTable";
-
-const REASON_COLORS: Record<string, string> = {
-  "Hung up / disengaged": "#3b82f6",
-  "Not interested / declined": "#fb7185",
-  "No / unclear audio": "#f59e0b",
-  "Bot / tech difficulty": "#8b5cf6",
-  "Language barrier": "#ec4899",
-  "Profile friction": "#a78bfa",
-  "No matching jobs": "#9333ea",
-  "Job mismatch (salary/location)": "#6b7280",
-  "Apply failure (API)": "#ef4444",
-  Other: "#cbd5e1",
-};
-const FALLBACK = "#cbd5e1";
-const colorFor = (reason: string) => REASON_COLORS[reason] ?? FALLBACK;
+import { reasonColor } from "./reasonColors";
 
 const fmt = (n: number) => n.toLocaleString();
 
@@ -30,11 +16,11 @@ export function DropStackedBars({
 
   // Group rows by stage with reason→count
   const stageMap = new Map<string, { reason: string; value: number }[]>();
-  const reasonsUsed = new Set<string>();
+  const reasonTotals = new Map<string, number>();
   for (const r of rows) {
     const v = valueOf(r);
     if (v <= 0) continue;
-    reasonsUsed.add(r.reason);
+    reasonTotals.set(r.reason, (reasonTotals.get(r.reason) ?? 0) + v);
     if (!stageMap.has(r.stage)) stageMap.set(r.stage, []);
     stageMap.get(r.stage)!.push({ reason: r.reason, value: v });
   }
@@ -52,9 +38,9 @@ export function DropStackedBars({
 
   const max = Math.max(...stages.map((s) => s.total));
 
-  // Legend in a stable order: spec order, but only reasons actually present.
-  const legendOrder = Object.keys(REASON_COLORS).filter((r) => reasonsUsed.has(r));
-  for (const r of reasonsUsed) if (!legendOrder.includes(r)) legendOrder.push(r);
+  const legendOrder = Array.from(reasonTotals.entries())
+    .sort(([reasonA, valueA], [reasonB, valueB]) => valueB - valueA || reasonA.localeCompare(reasonB))
+    .map(([reason]) => reason);
 
   return (
     <div className="space-y-4">
@@ -63,7 +49,7 @@ export function DropStackedBars({
           <div key={reason} className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <span
               className="h-2.5 w-2.5 rounded-sm"
-              style={{ background: colorFor(reason) }}
+              style={{ background: reasonColor(reason) }}
               aria-hidden
             />
             {reason}
@@ -90,7 +76,7 @@ export function DropStackedBars({
                       <div
                         key={it.reason}
                         className="h-full"
-                        style={{ width: `${segPct}%`, background: colorFor(it.reason) }}
+                        style={{ width: `${segPct}%`, background: reasonColor(it.reason) }}
                         title={`${it.reason}: ${fmt(it.value)}`}
                       />
                     );

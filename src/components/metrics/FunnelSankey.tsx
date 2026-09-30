@@ -2,31 +2,22 @@ import { useMemo, useRef, useState, useEffect } from "react";
 import { sankey, sankeyLinkHorizontal, sankeyJustify } from "d3-sankey";
 import type { DropRow } from "./DropAnalysisTable";
 import type { KkbMetrics } from "./program-overviews";
+import { reasonColor } from "./reasonColors";
 
-const REASON_COLORS: Record<string, string> = {
-  "Hung up / disengaged": "#378ADD",
-  "Not interested / declined": "#D85A30",
-  "No / unclear audio": "#EF9F27",
-  "Bot / tech difficulty": "#7F77DD",
-  "Language barrier": "#D4537E",
-  "Profile friction": "#1D9E75",
-  "No matching jobs": "#639922",
-  "Job mismatch (salary/location)": "#A98F5D",
-  "Apply failure (API)": "#E24B4A",
-  Other: "#B6B3AC",
-};
-const SINK_GREY = "#888780";
-const TRUNK = "#7C3AED"; // brand violet
-const TRUNK_END = "#6D28D9";
+const SINK_GREY = "var(--muted-foreground)";
+const TRUNK = "var(--brand)";
+const TRUNK_END = "color-mix(in srgb, var(--brand) 82%, var(--foreground))";
 
 // Which trunk node a drop stage peels off from
 const STAGE_SOURCE: Record<string, string> = {
-  "Before / at greeting": "Picked up",
-  "Mid-call": "Picked up",
-  "Profile collection": "Engaged",
-  "Job matching": "Engaged",
-  "After jobs shown": "Jobs shown",
-  "Apply step": "High-intent",
+  "Profile fetch & name confirmation": "Picked up",
+  "Profile completion & verification": "Engaged",
+  "Identify disability type": "Profile captured",
+  "Needs & challenges evaluation": "Profile captured",
+  "Options delivery & decision making": "Needs captured",
+  "Summary & profile update": "Needs captured",
+  "Match provider": "Needs captured",
+  "Connect to provider": "Providers found",
 };
 
 const fmt = (n: number) => n.toLocaleString();
@@ -59,17 +50,38 @@ export function FunnelSankey({
     return () => ro.disconnect();
   }, []);
 
-  const { nodes, links, height } = useMemo(() => {
+  const { nodes, links, height, unmappedStageCount } = useMemo(() => {
     const valueOf = (r: DropRow) => (onlyRegion ? (r.byRegion?.[onlyRegion] ?? 0) : r.total);
 
     const calls = m.totalCalls;
     const picked = m.answeredCalls;
     const engaged = m.engagedCalls;
-    const jobs = m.jobsShownCalls;
-    const intent = m.highIntentCalls;
-    const applied = m.applicationsTotal;
-    const submitted = m.applicationsSubmitted;
-    const blocked = m.applicationsBlocked;
+    const profileCaptured = m.profileCapturedCalls;
+    const needsCaptured = m.needsCapturedCalls;
+    const providersFound = m.providersFoundCalls;
+    const providersConnected = m.providersConnectedCalls;
+
+    const trunk = [
+      { name: "Calls made", value: calls },
+      { name: "Picked up", value: picked },
+      { name: "Engaged", value: engaged },
+      { name: "Profile captured", value: profileCaptured },
+      { name: "Needs captured", value: needsCaptured },
+      { name: "Providers found", value: providersFound },
+      { name: "Providers connected", value: providersConnected },
+    ];
+    const survivingTrunk = trunk.filter((node, index) => index === 0 || node.value > 0);
+    const survivingNames = new Set(survivingTrunk.map((node) => node.name));
+    const trunkIndex = new Map(trunk.map((node, index) => [node.name, index]));
+    const nearestSurviving = (name: string) => {
+      const start = trunkIndex.get(name);
+      if (start === undefined) return survivingTrunk[survivingTrunk.length - 1]?.name ?? "Calls made";
+      for (let index = start; index >= 0; index -= 1) {
+        const candidate = trunk[index]?.name;
+        if (candidate && survivingNames.has(candidate)) return candidate;
+      }
+      return "Calls made";
+    };
 
     const nodeMap = new Map<string, NodeIn>();
     const addNode = (name: string, kind: "trunk" | "sink", color: string) => {
@@ -81,16 +93,14 @@ export function FunnelSankey({
       ll.push({ source: s, target: t, value: v, color, kind });
     };
 
-    ["Calls made", "Picked up", "Engaged", "Jobs shown", "High-intent", "Applied", "Submitted"].forEach((n) =>
-      addNode(n, "trunk", TRUNK),
-    );
-
-    addLink("Calls made", "Picked up", picked, TRUNK, "trunk");
-    addLink("Picked up", "Engaged", engaged, TRUNK, "trunk");
-    addLink("Engaged", "Jobs shown", jobs, TRUNK, "trunk");
-    addLink("Jobs shown", "High-intent", intent, TRUNK, "trunk");
-    addLink("High-intent", "Applied", applied, TRUNK, "trunk");
-    addLink("Applied", "Submitted", submitted, TRUNK_END, "trunk");
+    survivingTrunk.forEach((node) => addNode(node.name, "trunk", TRUNK));
+    for (let index = 1; index < survivingTrunk.length; index += 1) {
+      const source = survivingTrunk[index - 1];
+      const target = survivingTrunk[index];
+      if (!source || !target) continue;
+      const color = index === survivingTrunk.length - 1 ? TRUNK_END : TRUNK;
+      addLink(source.name, target.name, target.value, color, "trunk");
+    }
 
     const noPickup = Math.max(0, calls - picked);
     if (noPickup > 0) {
@@ -98,37 +108,34 @@ export function FunnelSankey({
       addLink("Calls made", "No pickup", noPickup, SINK_GREY, "leak");
     }
 
+    const unmappedStages = new Set<string>();
     for (const r of rows) {
       const v = valueOf(r);
       if (v <= 0) continue;
-      const source = STAGE_SOURCE[r.stage];
-      if (!source) continue;
-      const color = REASON_COLORS[r.reason] ?? REASON_COLORS.Other;
+      const mappedSource = STAGE_SOURCE[r.stage];
+      if (!mappedSource) unmappedStages.add(r.stage);
+      const source = mappedSource
+        ? nearestSurviving(mappedSource)
+        : (survivingTrunk[survivingTrunk.length - 1]?.name ?? "Calls made");
+      const color = reasonColor(r.reason);
       const sinkName = r.reason;
       addNode(sinkName, "sink", color);
       addLink(source, sinkName, v, color, "leak");
     }
 
-    const didNotApply = Math.max(0, intent - applied);
-    if (didNotApply > 0) {
-      addNode("Did not apply", "sink", SINK_GREY);
-      addLink("High-intent", "Did not apply", didNotApply, SINK_GREY, "leak");
-    }
-
-    if (blocked > 0) {
-      addNode("Apply failure", "sink", REASON_COLORS["Apply failure (API)"]);
-      addLink("Applied", "Apply failure", blocked, REASON_COLORS["Apply failure (API)"], "leak");
+    const notConnected = Math.max(0, providersFound - providersConnected);
+    if (notConnected > 0) {
+      addNode("Not connected", "sink", SINK_GREY);
+      addLink(nearestSurviving("Providers found"), "Not connected", notConnected, SINK_GREY, "leak");
     }
 
     const nodeArr = Array.from(nodeMap.values()).map((n) => ({ ...n }));
     const nameToIdx = new Map(nodeArr.map((n, i) => [n.name, i]));
-    const linkArr = ll
-      .map((l) => ({
-        ...l,
-        source: nameToIdx.get(l.source)!,
-        target: nameToIdx.get(l.target)!,
-      }))
-      .filter((l) => l.source !== undefined && l.target !== undefined);
+    const linkArr = ll.flatMap((link) => {
+      const source = nameToIdx.get(link.source);
+      const target = nameToIdx.get(link.target);
+      return source === undefined || target === undefined ? [] : [{ ...link, source, target }];
+    });
 
     const sinkCount = nodeArr.filter((n) => n.kind === "sink").length;
     const h = Math.max(420, sinkCount * 36 + 80);
@@ -147,10 +154,10 @@ export function FunnelSankey({
       links: linkArr.map((l) => ({ ...l })),
     });
 
-    return { nodes: graph.nodes, links: graph.links, height: h };
+    return { nodes: graph.nodes, links: graph.links, height: h, unmappedStageCount: unmappedStages.size };
   }, [m, rows, onlyRegion, width]);
 
-  const isSelectable = (name: string) => name !== "No pickup" && name !== "Did not apply";
+  const isSelectable = (name: string) => name !== "No pickup" && name !== "Not connected";
 
   return (
     <div ref={containerRef} className="w-full">
@@ -218,7 +225,6 @@ export function FunnelSankey({
                   textAnchor={anchor}
                   fontSize={11}
                   fontWeight={n.name === selectedReason ? 700 : 500}
-                  fill="hsl(var(--foreground))"
                   style={{ fill: "currentColor" }}
                   className="text-foreground"
                 >
@@ -237,8 +243,11 @@ export function FunnelSankey({
           })}
         </g>
       </svg>
+      {unmappedStageCount > 0 ? (
+        <p className="mt-2 text-xs text-muted-foreground">
+          {unmappedStageCount} drop {unmappedStageCount === 1 ? "stage" : "stages"} not mapped to a funnel step
+        </p>
+      ) : null}
     </div>
   );
 }
-
-export { REASON_COLORS as FUNNEL_REASON_COLORS };

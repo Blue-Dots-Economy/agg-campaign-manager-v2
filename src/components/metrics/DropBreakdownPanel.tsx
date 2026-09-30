@@ -1,15 +1,6 @@
 import { useMemo } from "react";
 import { regionsFromRows, type DropRow } from "./DropAnalysisTable";
-import { FUNNEL_REASON_COLORS } from "./FunnelSankey";
-
-const STAGE_ORDER = [
-  "Before / at greeting",
-  "Profile collection",
-  "Job matching",
-  "After jobs shown",
-  "Apply step",
-  "Mid-call",
-];
+import { reasonColor } from "./reasonColors";
 
 const fmt = (n: number) => n.toLocaleString();
 
@@ -58,10 +49,7 @@ export function DropBreakdownPanel({
         add(cur, r);
         byStage.set(r.stage, cur);
       }
-      const ordered = STAGE_ORDER.filter((s) => byStage.has(s)).concat(
-        Array.from(byStage.keys()).filter((s) => !STAGE_ORDER.includes(s)),
-      );
-      for (const s of ordered) stageBreakdown.push(byStage.get(s)!);
+      for (const stage of byStage.values()) stageBreakdown.push(stage);
     }
     return { reasonTotals, grandTotal: grand, stageBreakdown };
   }, [rows, onlyRegion, selectedReason]);
@@ -119,7 +107,7 @@ export function DropBreakdownPanel({
                   </tr>
                 ))
               : reasonTotals.map((r) => {
-                  const color = FUNNEL_REASON_COLORS[r.key] ?? FUNNEL_REASON_COLORS.Other;
+                  const color = reasonColor(r.key);
                   const pct = grandTotal > 0 ? (valueOf(r) / grandTotal) * 100 : 0;
                   return (
                     <tr
