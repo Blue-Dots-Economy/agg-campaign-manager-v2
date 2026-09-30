@@ -7,15 +7,6 @@ export type DropRow = {
   total: number;
 };
 
-const STAGE_ORDER = [
-  "Before / at greeting",
-  "Profile collection",
-  "Job matching",
-  "After jobs shown",
-  "Apply step",
-  "Mid-call",
-];
-
 const fmt = (n: number) => n.toLocaleString();
 
 export function regionsFromRows(rows: DropRow[], onlyRegion?: string): string[] {
@@ -44,15 +35,13 @@ export function DropAnalysisTable({
 
   const regions = regionsFromRows(rows, onlyRegion);
 
-  // Group by stage, in fixed order, then by total desc
+  // Group by stage in backend arrival order, then by total desc
   const byStage = new Map<string, DropRow[]>();
   for (const r of rows) {
     if (!byStage.has(r.stage)) byStage.set(r.stage, []);
     byStage.get(r.stage)!.push(r);
   }
-  const stages = STAGE_ORDER.filter((s) => byStage.has(s)).concat(
-    Array.from(byStage.keys()).filter((s) => !STAGE_ORDER.includes(s)),
-  );
+  const stages = Array.from(byStage.keys());
 
   const grandByRegion: Record<string, number> = {};
   for (const reg of regions) grandByRegion[reg] = 0;

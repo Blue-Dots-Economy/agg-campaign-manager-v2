@@ -8,3 +8,5 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+- Drop-reason visuals must use the shared deterministic `reasonColor` helper so colours stay stable across filtered views.
