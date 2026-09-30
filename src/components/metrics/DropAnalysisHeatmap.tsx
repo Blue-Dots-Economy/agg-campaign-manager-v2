@@ -66,22 +66,7 @@ export function DropAnalysisHeatmap({ data }: { data?: KkbDropAnalysisPayload })
 
   return (
     <div className="space-y-3">
-      {safeguarding > 0 && (
-        <div
-          role="alert"
-          className="flex items-start gap-2 rounded-md border border-red-500/40 bg-red-500/15 p-4 text-sm text-red-700 dark:text-red-400"
-        >
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>
-            <strong className="font-semibold">
-              {safeguarding === 1
-                ? "1 call flagged for severe distress."
-                : `${nf.format(safeguarding)} calls flagged for severe distress.`}
-            </strong>{" "}
-            Excluded from the breakdown below and needs human follow-up.
-          </span>
-        </div>
-      )}
+      <SafeguardingAlert count={safeguarding} />
 
       {/* Header row */}
       <div
