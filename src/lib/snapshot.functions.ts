@@ -846,6 +846,7 @@ export const fetchDkbDropAnalysis = createServerFn({ method: "GET" })
         buckets: Array.isArray(p.buckets) ? p.buckets : [],
         maxCell: Number(p.maxCell ?? 0) || 0,
         grandTotal: Number(p.grandTotal ?? 0) || 0,
+        safeguardingFlagged: p.safeguardingFlagged != null ? Number(p.safeguardingFlagged) || 0 : undefined,
       };
     } catch {
       return empty;
