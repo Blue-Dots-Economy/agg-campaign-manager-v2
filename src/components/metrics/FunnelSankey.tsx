@@ -98,7 +98,10 @@ export function FunnelSankey({
       const source = survivingTrunk[index - 1];
       const target = survivingTrunk[index];
       if (!source || !target) continue;
-      const color = index === survivingTrunk.length - 1 ? TRUNK_END : TRUNK;
+      const color =
+        survivingTrunk[survivingTrunk.length - 1]?.name === "Providers connected" && index === survivingTrunk.length - 1
+          ? TRUNK_END
+          : TRUNK;
       addLink(source.name, target.name, target.value, color, "trunk");
     }
 
@@ -186,7 +189,7 @@ export function FunnelSankey({
                 className={`sk-link ${clickable ? "sk-clickable" : ""}`}
                 d={d}
                 fill="none"
-                stroke={l.color}
+                style={{ stroke: l.color }}
                 strokeOpacity={dim}
                 strokeWidth={Math.max(1, l.width ?? 1)}
                 onClick={clickable ? () => onSelectReason?.(targetName === selectedReason ? null : targetName) : undefined}
@@ -217,7 +220,7 @@ export function FunnelSankey({
                 className={clickable ? "sk-clickable" : undefined}
                 onClick={clickable ? () => onSelectReason?.(n.name === selectedReason ? null : n.name) : undefined}
               >
-                <rect x={x} y={y} width={w} height={h} fill={n.color} rx={2} />
+                <rect x={x} y={y} width={w} height={h} style={{ fill: n.color }} rx={2} />
                 <text
                   x={labelX}
                   y={labelY}
