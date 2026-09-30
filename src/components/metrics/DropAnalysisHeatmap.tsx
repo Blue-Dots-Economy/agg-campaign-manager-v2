@@ -43,6 +43,23 @@ export function DropAnalysisHeatmap({ data }: { data?: KkbDropAnalysisPayload })
 
   return (
     <div className="space-y-3">
+      {safeguarding > 0 && (
+        <div
+          role="alert"
+          className="flex items-start gap-2 rounded-md border border-red-500/40 bg-red-500/15 p-4 text-sm text-red-700 dark:text-red-400"
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            <strong className="font-semibold">
+              {safeguarding === 1
+                ? "1 call flagged for severe distress."
+                : `${nf.format(safeguarding)} calls flagged for severe distress.`}
+            </strong>{" "}
+            Excluded from the breakdown below and needs human follow-up.
+          </span>
+        </div>
+      )}
+
       {/* Header row */}
       <div
         className="grid items-end gap-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
@@ -123,7 +140,7 @@ export function DropAnalysisHeatmap({ data }: { data?: KkbDropAnalysisPayload })
                               className="h-full"
                               style={{
                                 width: `${Math.max(2, (r.count / maxRaw) * 100)}%`,
-                                background: "rgba(216, 90, 48, 0.75)",
+                                background: "color-mix(in srgb, var(--brand) 75%, transparent)",
                               }}
                             />
                           </div>
@@ -147,7 +164,7 @@ export function DropAnalysisHeatmap({ data }: { data?: KkbDropAnalysisPayload })
           <span>fewer</span>
           <div className="flex h-3 w-32 overflow-hidden rounded">
             {[0.1, 0.25, 0.4, 0.55, 0.7, 0.85, 1].map((t) => (
-              <div key={t} className="flex-1" style={{ background: `rgba(216,90,48,${t})` }} />
+              <div key={t} className="flex-1" style={{ background: `color-mix(in srgb, var(--brand) ${Math.round(t * 100)}%, transparent)` }} />
             ))}
           </div>
           <span>more drops</span>
