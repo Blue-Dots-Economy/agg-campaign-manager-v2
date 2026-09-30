@@ -3,28 +3,33 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { getRequest } from "@tanstack/react-start/server";
 
-const SWITCH_EMAILS = new Set(["vineela@bluedots.com"]);
+const SWITCH_EMAILS = new Set(["aryan@purpledots.com"]);
 const AUTH_COOKIE = "rozgar_auth";
 const OPTS = { auth: { persistSession: false, autoRefreshToken: false } } as const;
 
-// Global cutover flag. When ROZGAR_CUTOVER is truthy AND the new project's env is present,
+// Global cutover flag. When PURPLE_CUTOVER is truthy AND the new project's env is present,
 // ALL traffic routes to the new project (not just pilot emails). Absent/false => current
-// behavior (pilot-only). Flip = set the ROZGAR_CUTOVER secret; rollback = unset it.
+// behavior (pilot-only). Flip = set the PURPLE_CUTOVER secret; rollback = unset it.
 function cutoverOn(): boolean {
-  const v = (process.env.ROZGAR_CUTOVER || "").trim().toLowerCase();
+  const v = (process.env.PURPLE_CUTOVER || "").trim().toLowerCase();
   return v === "1" || v === "true" || v === "yes" || v === "on";
 }
 function newEnvPresent(): boolean {
-  return !!(process.env.NEW_SUPABASE_URL && process.env.NEW_SUPABASE_SERVICE_ROLE_KEY);
+  return !!(process.env.PURPLE_SUPABASE_URL && process.env.PURPLE_SUPABASE_SERVICE_ROLE_KEY);
 }
 
 function currentClient(): SupabaseClient {
   return createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, OPTS);
 }
 function secondClient(): SupabaseClient | null {
-  const url = process.env.NEW_SUPABASE_URL;
-  const key = process.env.NEW_SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return null;
+  const url = process.env.PURPLE_SUPABASE_URL;
+  const key = process.env.PURPLE_SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    if (!!url !== !!key) {
+      console.warn("[db.server] PURPLE_SUPABASE_* partially configured — falling back to the current project");
+    }
+    return null;
+  }
   return createClient(url, key, OPTS);
 }
 function actorEmail(): string | null {
@@ -46,7 +51,10 @@ export function usesSecondProject(): boolean {
     if (cutoverOn()) return true;
     const email = actorEmail();
     return !!(email && SWITCH_EMAILS.has(email));
-  } catch { return false; }
+  } catch (e) {
+    console.error("[db.server] usesSecondProject failed, falling back to current project:", e);
+    return false;
+  }
 }
 /** Admin Supabase client for the current actor. Default = CURRENT project. */
 export function sbFor(): SupabaseClient {
@@ -55,8 +63,14 @@ export function sbFor(): SupabaseClient {
       const second = secondClient();
       if (second) return second;
     }
-  } catch { /* fall through to current */ }
+  } catch (e) {
+    console.error("[db.server] sbFor failed, falling back to current project:", e);
+  }
   return currentClient();
+}
+/** Which project the current actor reads. For diagnostics — never use to gate security. */
+export function activeSource(): "purple" | "current" {
+  return usesSecondProject() ? "purple" : "current";
 }
 /** Project selector for AUTH/LOGIN paths (no actor cookie exists yet), so it must be
  *  flag-based only. New project when cutover is ON and its env is present; else current. */
