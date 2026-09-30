@@ -1,10 +1,13 @@
 import { useState } from "react";
+import { AlertTriangle } from "lucide-react";
 import type { KkbDropAnalysisPayload } from "@/lib/snapshot.functions";
 
 const nf = new Intl.NumberFormat();
 
-// UI-only display names for drop stages. Keys are the lower-cased labels returned
-// by the backend; the underlying stage keys and numbers are never touched.
+// UI-only display names for the legacy stage labels. Still required: sessions pointed at the
+// pre-migration database return the old labels and need remapping. Sessions on the migrated
+// database return real stage names, which fall through this map untouched. Safe to delete only
+// once every session is on the migrated database.
 const STAGE_LABEL_DISPLAY: Record<string, string> = {
   "jobs shown": "Update Profile",
   "extra job shown": "Providers Identified",
@@ -17,8 +20,8 @@ const stageLabel = (label: string) =>
 
 function cellBg(value: number, maxCell: number): string {
   if (!value || value <= 0 || maxCell <= 0) return "var(--color-muted)";
-  const opacity = 0.14 + 0.86 * Math.sqrt(value / maxCell);
-  return `rgba(216, 90, 48, ${opacity.toFixed(3)})`;
+  const intensity = 0.14 + 0.86 * Math.sqrt(value / maxCell);
+  return `color-mix(in srgb, var(--brand) ${Math.round(intensity * 100)}%, transparent)`;
 }
 
 export function DropAnalysisHeatmap({ data }: { data?: KkbDropAnalysisPayload }) {
@@ -32,12 +35,31 @@ export function DropAnalysisHeatmap({ data }: { data?: KkbDropAnalysisPayload })
     );
   }
 
+  const safeguarding = data.safeguardingFlagged ?? 0;
+
   const { stages, buckets, maxCell, grandTotal } = data;
   // grid: bucket label | one col per stage | total
   const gridTemplate = `minmax(180px, 1.4fr) repeat(${stages.length}, minmax(96px, 1fr)) minmax(80px, 0.8fr)`;
 
   return (
     <div className="space-y-3">
+      {safeguarding > 0 && (
+        <div
+          role="alert"
+          className="flex items-start gap-2 rounded-md border border-red-500/40 bg-red-500/15 p-4 text-sm text-red-700 dark:text-red-400"
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            <strong className="font-semibold">
+              {safeguarding === 1
+                ? "1 call flagged for severe distress."
+                : `${nf.format(safeguarding)} calls flagged for severe distress.`}
+            </strong>{" "}
+            Excluded from the breakdown below and needs human follow-up.
+          </span>
+        </div>
+      )}
+
       {/* Header row */}
       <div
         className="grid items-end gap-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
@@ -118,7 +140,7 @@ export function DropAnalysisHeatmap({ data }: { data?: KkbDropAnalysisPayload })
                               className="h-full"
                               style={{
                                 width: `${Math.max(2, (r.count / maxRaw) * 100)}%`,
-                                background: "rgba(216, 90, 48, 0.75)",
+                                background: "color-mix(in srgb, var(--brand) 75%, transparent)",
                               }}
                             />
                           </div>
@@ -142,7 +164,7 @@ export function DropAnalysisHeatmap({ data }: { data?: KkbDropAnalysisPayload })
           <span>fewer</span>
           <div className="flex h-3 w-32 overflow-hidden rounded">
             {[0.1, 0.25, 0.4, 0.55, 0.7, 0.85, 1].map((t) => (
-              <div key={t} className="flex-1" style={{ background: `rgba(216,90,48,${t})` }} />
+              <div key={t} className="flex-1" style={{ background: `color-mix(in srgb, var(--brand) ${Math.round(t * 100)}%, transparent)` }} />
             ))}
           </div>
           <span>more drops</span>

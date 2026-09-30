@@ -787,6 +787,8 @@ export interface KkbDropAnalysisPayload {
   }>;
   maxCell: number;
   grandTotal: number;
+  /** Calls flagged for severe distress / suicidal ideation — excluded from the matrix. Optional while the field is absent. */
+  safeguardingFlagged?: number;
 }
 
 export const fetchKkbDropAnalysis = createServerFn({ method: "GET" })
@@ -813,6 +815,7 @@ export const fetchKkbDropAnalysis = createServerFn({ method: "GET" })
         buckets: Array.isArray(p.buckets) ? p.buckets : [],
         maxCell: Number(p.maxCell ?? 0) || 0,
         grandTotal: Number(p.grandTotal ?? 0) || 0,
+        safeguardingFlagged: p.safeguardingFlagged != null ? Number(p.safeguardingFlagged) || 0 : undefined,
       };
     } catch {
       return empty;
@@ -843,6 +846,7 @@ export const fetchDkbDropAnalysis = createServerFn({ method: "GET" })
         buckets: Array.isArray(p.buckets) ? p.buckets : [],
         maxCell: Number(p.maxCell ?? 0) || 0,
         grandTotal: Number(p.grandTotal ?? 0) || 0,
+        safeguardingFlagged: p.safeguardingFlagged != null ? Number(p.safeguardingFlagged) || 0 : undefined,
       };
     } catch {
       return empty;
