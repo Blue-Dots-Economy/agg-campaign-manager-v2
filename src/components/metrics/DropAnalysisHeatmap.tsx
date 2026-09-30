@@ -1,10 +1,13 @@
 import { useState } from "react";
+import { AlertTriangle } from "lucide-react";
 import type { KkbDropAnalysisPayload } from "@/lib/snapshot.functions";
 
 const nf = new Intl.NumberFormat();
 
-// UI-only display names for drop stages. Keys are the lower-cased labels returned
-// by the backend; the underlying stage keys and numbers are never touched.
+// UI-only display names for the legacy stage labels. Still required: sessions pointed at the
+// pre-migration database return the old labels and need remapping. Sessions on the migrated
+// database return real stage names, which fall through this map untouched. Safe to delete only
+// once every session is on the migrated database.
 const STAGE_LABEL_DISPLAY: Record<string, string> = {
   "jobs shown": "Update Profile",
   "extra job shown": "Providers Identified",
@@ -17,8 +20,8 @@ const stageLabel = (label: string) =>
 
 function cellBg(value: number, maxCell: number): string {
   if (!value || value <= 0 || maxCell <= 0) return "var(--color-muted)";
-  const opacity = 0.14 + 0.86 * Math.sqrt(value / maxCell);
-  return `rgba(216, 90, 48, ${opacity.toFixed(3)})`;
+  const intensity = 0.14 + 0.86 * Math.sqrt(value / maxCell);
+  return `color-mix(in srgb, var(--brand) ${Math.round(intensity * 100)}%, transparent)`;
 }
 
 export function DropAnalysisHeatmap({ data }: { data?: KkbDropAnalysisPayload }) {
