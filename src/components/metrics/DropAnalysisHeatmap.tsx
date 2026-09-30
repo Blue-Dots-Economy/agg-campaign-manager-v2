@@ -24,18 +24,41 @@ function cellBg(value: number, maxCell: number): string {
   return `color-mix(in srgb, var(--brand) ${Math.round(intensity * 100)}%, transparent)`;
 }
 
+function SafeguardingAlert({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <div
+      role="alert"
+      className="flex items-start gap-2 rounded-md border border-red-500/40 bg-red-500/15 p-4 text-sm text-red-700 dark:text-red-400"
+    >
+      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+      <span>
+        <strong className="font-semibold">
+          {count === 1
+            ? "1 call flagged for severe distress."
+            : `${nf.format(count)} calls flagged for severe distress.`}
+        </strong>{" "}
+        Excluded from the breakdown below and needs human follow-up.
+      </span>
+    </div>
+  );
+}
+
 export function DropAnalysisHeatmap({ data }: { data?: KkbDropAnalysisPayload }) {
   const [open, setOpen] = useState<string | null>(null);
 
+  const safeguarding = data?.safeguardingFlagged ?? 0;
+
   if (!data || !data.stages.length || !data.buckets.length) {
     return (
-      <div className="rounded-lg border bg-muted/30 p-6 text-sm text-muted-foreground">
-        No drop data for the current filters.
+      <div className="space-y-3">
+        <SafeguardingAlert count={safeguarding} />
+        <div className="rounded-lg border bg-muted/30 p-6 text-sm text-muted-foreground">
+          No drop data for the current filters.
+        </div>
       </div>
     );
   }
-
-  const safeguarding = data.safeguardingFlagged ?? 0;
 
   const { stages, buckets, maxCell, grandTotal } = data;
   // grid: bucket label | one col per stage | total
