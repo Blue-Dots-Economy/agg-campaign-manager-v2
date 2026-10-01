@@ -109,6 +109,12 @@ export function TopBar() {
             </Link>
           </>
         )}
+        {/* TEMPORARY ROUTING DIAGNOSTIC — remove once the routing issue is resolved. */}
+        {showDiag && diag && (
+          <span className="font-mono text-[11px] text-muted-foreground border border-border rounded px-2 py-0.5">
+            {diag}
+          </span>
+        )}
         <AccountMenu />
       </div>
     </header>
