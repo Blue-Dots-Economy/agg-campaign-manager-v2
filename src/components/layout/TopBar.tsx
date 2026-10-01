@@ -71,22 +71,21 @@ export function TopBar() {
             >
               {isSyncing ? "Updating…" : `Updated ${ago}`}
             </span>
-            {sourceIsPurple ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => sync.mutate({ force: true })}
+              disabled={isSyncing || sourceIsPurple}
+              title={`Last synced ${ago}`}
+            >
+              <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
+              {isSyncing ? "Syncing…" : "Refresh"}
+            </Button>
+            {sourceIsPurple && (
               <span className="text-xs text-muted-foreground max-w-[220px] leading-snug">
                 Campaign records load from the upstream pipeline — sheet sync does not apply.
               </span>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5"
-                onClick={() => sync.mutate({ force: true })}
-                disabled={isSyncing}
-                title={`Last synced ${ago}`}
-              >
-                <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
-                {isSyncing ? "Syncing…" : "Refresh"}
-              </Button>
             )}
             {canDirectLaunch && (
               <Link to="/launch">
