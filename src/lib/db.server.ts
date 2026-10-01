@@ -33,24 +33,37 @@ function secondClient(): SupabaseClient | null {
   return createClient(url, key, OPTS);
 }
 function actorEmail(): string | null {
+  // TEMPORARY ROUTING DIAGNOSTIC — the [routing-diag] logs below are to be
+  // removed once the pilot routing issue is resolved. They log cookie NAMES
+  // only, never values (a value may be a session token).
   try {
-    const cookie = getRequest()?.headers?.get("cookie");
-    if (!cookie) return null;
+    const req = getRequest();
+    const cookie = req?.headers?.get("cookie");
+    if (!cookie) {
+      console.log(`[routing-diag] actorEmail: hasRequest=${!!req} hasCookie=false email=null`);
+      return null;
+    }
     // Parsing here is deliberately lenient: a failed parse does not throw — it
     // silently sends the session to the default database with no error
     // anywhere. The Cookie header is only required to separate pairs with
     // ";" (the usual serialisation adds a space, and proxies/runtimes may
     // normalise it away), so split on ";" + optional whitespace and trim each
     // segment before testing the prefix.
-    const m = cookie
-      .split(/;\s*/)
-      .map((c) => c.trim())
-      .find((c) => c.startsWith(AUTH_COOKIE + "="));
-    if (!m) return null;
+    const segments = cookie.split(/;\s*/).map((c) => c.trim());
+    const names = segments.map((c) => c.split("=")[0]);
+    const m = segments.find((c) => c.startsWith(AUTH_COOKIE + "="));
+    if (!m) {
+      console.log(`[routing-diag] actorEmail: hasRequest=true hasCookie=true segments=${segments.length} cookieNames=[${names.join(",")}] authCookieFound=false email=null`);
+      return null;
+    }
     const raw = decodeURIComponent(m.split("=").slice(1).join("="));
     const email = String(JSON.parse(raw)?.email ?? "").trim().toLowerCase();
+    console.log(`[routing-diag] actorEmail: hasRequest=true hasCookie=true segments=${segments.length} cookieNames=[${names.join(",")}] authCookieFound=true jsonParsed=true email=${email || "null"}`);
     return email || null;
-  } catch { return null; }
+  } catch (e) {
+    console.log(`[routing-diag] actorEmail: parse failed (${e instanceof Error ? e.message : String(e)}) email=null`);
+    return null;
+  }
 }
 /** True when the current actor should read/write the second project:
  *  cutover ON (everyone) OR a pilot email — and only if the new env is present. */
