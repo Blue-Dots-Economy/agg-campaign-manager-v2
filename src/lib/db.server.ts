@@ -68,11 +68,16 @@ function actorEmail(): string | null {
 /** True when the current actor should read/write the second project:
  *  cutover ON (everyone) OR a pilot email — and only if the new env is present. */
 export function usesSecondProject(): boolean {
+  // TEMPORARY ROUTING DIAGNOSTIC — the [routing-diag] log below is to be
+  // removed once the pilot routing issue is resolved.
   try {
-    if (!newEnvPresent()) return false;
-    if (cutoverOn()) return true;
-    const email = actorEmail();
-    return !!(email && SWITCH_EMAILS.has(email));
+    const envOk = newEnvPresent();
+    const cutover = cutoverOn();
+    const email = envOk && !cutover ? actorEmail() : null;
+    const pilot = !!(email && SWITCH_EMAILS.has(email));
+    const result = envOk && (cutover || pilot);
+    console.log(`[routing-diag] usesSecondProject: envPresent=${envOk} cutover=${cutover} pilotMatch=${pilot} result=${result}`);
+    return result;
   } catch (e) {
     console.error("[db.server] usesSecondProject failed, falling back to current project:", e);
     return false;
