@@ -1,3 +1,5 @@
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { Upload, Rocket, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useProgram } from "@/programs/context";
@@ -10,6 +12,7 @@ import {
   useProgramAggregates,
   useAutoFreshness,
 } from "@/programs/useProgramAggregates";
+import { fetchActiveSource } from "@/lib/snapshot.functions";
 import { ConcurrencyChip } from "@/components/ConcurrencyChip";
 
 export function TopBar() {
@@ -21,6 +24,14 @@ export function TopBar() {
   const sync = useSyncProgram(config.id);
   const query = useProgramAggregates(config);
   const lastSynced = query.data?.lastSyncedAt ?? null;
+
+  const getActiveSource = useServerFn(fetchActiveSource);
+  const { data: activeSource } = useQuery({
+    queryKey: ["active-source"],
+    queryFn: () => getActiveSource(),
+    staleTime: Infinity,
+  });
+  const sourceIsPurple = activeSource?.source === "purple";
 
   // On-load freshness: kick off a silent background sync if the snapshot is stale.
   const autoSync = useAutoFreshness(config.id, lastSynced);
@@ -65,12 +76,17 @@ export function TopBar() {
               size="sm"
               className="gap-1.5"
               onClick={() => sync.mutate({ force: true })}
-              disabled={isSyncing}
+              disabled={isSyncing || sourceIsPurple}
               title={`Last synced ${ago}`}
             >
               <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
               {isSyncing ? "Syncing…" : "Refresh"}
             </Button>
+            {sourceIsPurple && (
+              <span className="text-xs text-muted-foreground max-w-[220px] leading-snug">
+                Campaign records load from the upstream pipeline — sheet sync does not apply.
+              </span>
+            )}
             {canDirectLaunch && (
               <Link to="/launch">
                 <Button variant="outline" size="sm" className="gap-1.5">
