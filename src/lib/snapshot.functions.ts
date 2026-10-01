@@ -488,9 +488,11 @@ export const syncProgramSnapshot = createServerFn({ method: "POST" })
 
 /** Which database the current session reads ("purple" = upstream pipeline, "current" = sheets).
  *  Server-only routing for the client — db.server.ts must never be imported client-side. */
+// TEMPORARY ROUTING DIAGNOSTIC — can be removed once the routing issue is resolved.
+// Returns booleans only; never the PURPLE_SUPABASE_URL or service-role key values.
 export const fetchActiveSource = createServerFn({ method: "GET" }).handler(async () => {
-  const { activeSource } = await import("@/lib/db.server");
-  return { source: activeSource() };
+  const { activeSource, diagnosticRouting } = await import("@/lib/db.server");
+  return { source: activeSource(), ...diagnosticRouting() };
 });
 
 export interface CampaignRollup {
