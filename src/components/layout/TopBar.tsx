@@ -28,7 +28,7 @@ export function TopBar() {
   const diagParam =
     typeof rawSearch === "string"
       ? new URLSearchParams(rawSearch).get("diag")
-      : (rawSearch as Record<string, unknown> | null)?.diag;
+      : (rawSearch as unknown as Record<string, unknown> | null)?.diag;
   const showDiag = diagParam === "1";
   const sync = useSyncProgram(config.id);
   const query = useProgramAggregates(config);
