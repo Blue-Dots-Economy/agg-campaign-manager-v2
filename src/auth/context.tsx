@@ -50,16 +50,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!raw) raw = readCookie(COOKIE_KEY);
         if (raw) {
           const parsed = JSON.parse(raw);
-          if (parsed?.email && parsed.role === "user") {
-            // Only reviewer sessions auto-restore (their own email, low risk).
+          if (parsed?.email && parsed.role && parsed.role !== "admin") {
+            // Non-admin sessions restore normally. The rozgar_auth cookie must
+            // survive reloads: the server reads it to identify the actor and
+            // decide which database the session reads.
             setSession(parsed);
             // Re-sync both stores so whichever was missing gets refilled.
             try { window.localStorage.setItem(STORAGE_KEY, raw); } catch { /* ignore */ }
             writeCookie(COOKIE_KEY, raw);
           } else {
-            // Never silently restore an admin (or unknown) session — admin must
-            // log in explicitly every time so a shared browser can't leave the
-            // next person signed in as admin. Clear the stale stored session.
+            // Admin requires an explicit login every time so a shared browser
+            // can't leave the next person signed in as admin. Malformed or
+            // role-less values take the same path. Clearing the query cache
+            // too, so a previous user's cached data never shows to the next.
             try { window.localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
             clearCookie(COOKIE_KEY);
             queryClient.clear();
