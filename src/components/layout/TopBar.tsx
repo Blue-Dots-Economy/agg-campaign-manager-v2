@@ -24,7 +24,7 @@ export function TopBar() {
   // TEMPORARY ROUTING DIAGNOSTIC — remove once the routing issue is resolved.
   // location.search is normally a parsed object in TanStack Router, but be
   // tolerant of a raw query string too so the chip cannot silently never render.
-  const rawSearch = useRouterState({ select: (s) => s.location.search as unknown });
+  const rawSearch = useRouterState({ select: (s) => (s.location as { search: unknown }).search });
   const diagParam =
     typeof rawSearch === "string"
       ? new URLSearchParams(rawSearch).get("diag")
