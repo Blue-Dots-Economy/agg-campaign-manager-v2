@@ -11,8 +11,8 @@ import {
   useSyncProgram,
   useProgramAggregates,
   useAutoFreshness,
-  fetchActiveSource,
-} from "@/lib/snapshot.functions";
+} from "@/programs/useProgramAggregates";
+import { fetchActiveSource } from "@/lib/snapshot.functions";
 import { ConcurrencyChip } from "@/components/ConcurrencyChip";
 
 export function TopBar() {
