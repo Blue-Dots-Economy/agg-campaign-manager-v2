@@ -108,8 +108,7 @@ export const recordLaunchedBatch = createServerFn({ method: "POST" })
         })
         .filter(Boolean);
       if (rows.length > 0) {
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { error: inputError } = await supabaseAdmin
+        const { error: inputError } = await sb()
           .from("launched_batch_inputs")
           .upsert(rows as any[], { onConflict: "batch_id,normalized_phone" });
         if (inputError) throw new Error(inputError.message);

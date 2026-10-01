@@ -783,8 +783,7 @@ export const exportBatchToStaging = createServerFn({ method: "POST" })
       agentName: (lb as any)?.agent_name ?? data.agentName ?? null,
     };
     if (!(lb as any)?.batch_id || !(lb as any)?.campaign_day || !(lb as any)?.campaign_type) {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { error: metaError } = await supabaseAdmin.from("launched_batches").upsert({
+      const { error: metaError } = await c.from("launched_batches").upsert({
         batch_id: data.batchId,
         program: data.program,
         agent_name: launchMeta.agentName,
@@ -802,8 +801,7 @@ export const exportBatchToStaging = createServerFn({ method: "POST" })
 
     const inputByPhone = new Map<string, InputRow>();
     try {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { data: inputRows } = await supabaseAdmin
+      const { data: inputRows } = await c
         .from("launched_batch_inputs")
         .select("normalized_phone,contact_name,recommendations,user_intent,raw")
         .eq("batch_id", data.batchId);
