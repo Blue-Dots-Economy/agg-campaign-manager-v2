@@ -22,8 +22,14 @@ export function TopBar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isUserOverview = pathname === "/user-level-analysis";
   // TEMPORARY ROUTING DIAGNOSTIC — remove once the routing issue is resolved.
-  const search = useRouterState({ select: (s) => s.location.search as Record<string, unknown> });
-  const showDiag = search?.diag === "1";
+  // location.search is normally a parsed object in TanStack Router, but be
+  // tolerant of a raw query string too so the chip cannot silently never render.
+  const rawSearch = useRouterState({ select: (s) => (s.location as { search: unknown }).search });
+  const diagParam =
+    typeof rawSearch === "string"
+      ? new URLSearchParams(rawSearch).get("diag")
+      : (rawSearch as unknown as Record<string, unknown> | null)?.diag;
+  const showDiag = diagParam === "1";
   const sync = useSyncProgram(config.id);
   const query = useProgramAggregates(config);
   const lastSynced = query.data?.lastSyncedAt ?? null;
