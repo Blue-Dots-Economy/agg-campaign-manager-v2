@@ -25,6 +25,14 @@ export function TopBar() {
   const query = useProgramAggregates(config);
   const lastSynced = query.data?.lastSyncedAt ?? null;
 
+  const getActiveSource = useServerFn(fetchActiveSource);
+  const { data: activeSource } = useQuery({
+    queryKey: ["active-source"],
+    queryFn: () => getActiveSource(),
+    staleTime: Infinity,
+  });
+  const sourceIsPurple = activeSource?.source === "purple";
+
   // On-load freshness: kick off a silent background sync if the snapshot is stale.
   const autoSync = useAutoFreshness(config.id, lastSynced);
   const isSyncing = sync.isPending || autoSync.isPending;
