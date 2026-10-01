@@ -132,10 +132,26 @@ export interface SyncResult {
 const inflight = new Map<ProgramId, Promise<SyncResult>>();
 
 export async function performSync(program: ProgramId, opts?: { force?: boolean }): Promise<SyncResult> {
-  const { usesSecondProject } = await import("@/lib/db.server");
-  if (usesSecondProject()) {
-    // Pilot user's data comes from the Raya pipeline in the second project; call_rows is a read-only view there.
-    return { ok: true, skipped: true } as any;
+  // When the session reads the second (upstream-pipeline) database, call_rows is a
+  // read-only view fed by the pipeline — sheet sync does not apply. Return the normal
+  // error-shaped result so the UI surfaces the message instead of a low-level DB error.
+  const { activeSource } = await import("@/lib/db.server");
+  if (activeSource() === "purple") {
+    return {
+      ok: false,
+      program,
+      rowCount: 0,
+      connectionCount: 0,
+      errors: [
+        {
+          id: "_source",
+          name: "Sync disabled",
+          message:
+            "Sync is disabled for this data source. Campaign records are loaded directly by the upstream pipeline, not from Google Sheets.",
+        },
+      ],
+      lastSyncedAt: new Date().toISOString(),
+    };
   }
   const existing = inflight.get(program);
   if (existing && !opts?.force) return existing;
