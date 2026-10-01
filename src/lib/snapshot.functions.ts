@@ -486,6 +486,13 @@ export const syncProgramSnapshot = createServerFn({ method: "POST" })
   .inputValidator((d: { program: ProgramId; force?: boolean }) => d)
   .handler(async ({ data }) => performSync(data.program, { force: data.force }));
 
+/** Which database the current session reads ("purple" = upstream pipeline, "current" = sheets).
+ *  Server-only routing for the client — db.server.ts must never be imported client-side. */
+export const fetchActiveSource = createServerFn({ method: "GET" }).handler(async () => {
+  const { activeSource } = await import("@/lib/db.server");
+  return { source: activeSource() };
+});
+
 export interface CampaignRollup {
   day: string;
   date: string;
