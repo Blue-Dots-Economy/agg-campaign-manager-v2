@@ -72,6 +72,26 @@ export function sbFor(): SupabaseClient {
 export function activeSource(): "purple" | "current" {
   return usesSecondProject() ? "purple" : "current";
 }
+
+// TEMPORARY ROUTING DIAGNOSTIC — remove once the pilot routing issue is resolved.
+// Exposes booleans (never the env values themselves — the service role key must not
+// leave the server) for each condition of usesSecondProject().
+export function diagnosticRouting(): {
+  hasUrl: boolean;
+  hasKey: boolean;
+  cutover: boolean;
+  actor: string | null;
+  pilotMatch: boolean;
+} {
+  const actor = actorEmail();
+  return {
+    hasUrl: !!process.env.PURPLE_SUPABASE_URL,
+    hasKey: !!process.env.PURPLE_SUPABASE_SERVICE_ROLE_KEY,
+    cutover: cutoverOn(),
+    actor,
+    pilotMatch: !!(actor && SWITCH_EMAILS.has(actor)),
+  };
+}
 /** Project selector for AUTH/LOGIN paths (no actor cookie exists yet), so it must be
  *  flag-based only. New project when cutover is ON and its env is present; else current. */
 export function sbForAuth(): SupabaseClient {
