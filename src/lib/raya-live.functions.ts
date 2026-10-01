@@ -1,16 +1,13 @@
 // Live campaign reads from Raya. Sequential + delayed to respect the rate limit.
 
 import { createServerFn } from "@tanstack/react-start";
-import { createClient } from "@supabase/supabase-js";
+import { sbFor } from "./db.server";
 import { delay, rayaFetch } from "./raya-api";
 import type { ProgramId } from "@/programs/registry";
 
+// Per-request client: sbFor() picks the database for the current actor.
 function sb() {
-  return createClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } },
-  );
+  return sbFor();
 }
 
 export interface LiveBatch {

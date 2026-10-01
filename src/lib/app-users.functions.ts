@@ -1,10 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
-import { createClient } from "@supabase/supabase-js";
+import { sbFor } from "./db.server";
 
+// Per-request client: sbFor() picks the database for the current actor.
 function sb() {
-  return createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  return sbFor();
 }
 
 export interface AppUser {
