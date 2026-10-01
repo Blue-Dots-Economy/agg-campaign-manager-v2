@@ -21,6 +21,9 @@ export function TopBar() {
   const canDirectLaunch = session?.role === "admin" || session?.role === "jfc";
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isUserOverview = pathname === "/user-level-analysis";
+  // TEMPORARY ROUTING DIAGNOSTIC — remove once the routing issue is resolved.
+  const search = useRouterState({ select: (s) => s.location.search as Record<string, unknown> });
+  const showDiag = search?.diag === "1";
   const sync = useSyncProgram(config.id);
   const query = useProgramAggregates(config);
   const lastSynced = query.data?.lastSyncedAt ?? null;
@@ -32,6 +35,11 @@ export function TopBar() {
     staleTime: Infinity,
   });
   const sourceIsPurple = activeSource?.source === "purple";
+  // TEMPORARY ROUTING DIAGNOSTIC — remove once the routing issue is resolved.
+  // Chip shows only with ?diag=1; never exposes URL/key values, booleans only.
+  const diag =
+    activeSource &&
+    `source=${activeSource.source} hasUrl=${activeSource.hasUrl} hasKey=${activeSource.hasKey} cutover=${activeSource.cutover} actor=${activeSource.actor ?? "null"} pilot=${activeSource.pilotMatch}`;
 
   // On-load freshness: kick off a silent background sync if the snapshot is stale.
   const autoSync = useAutoFreshness(config.id, lastSynced);
