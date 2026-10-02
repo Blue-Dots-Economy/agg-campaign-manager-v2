@@ -142,7 +142,8 @@ export function TopBar() {
               title={`Last synced ${ago}`}
             >
               <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
-              {isSyncing ? "Syncing…" : "Refresh"}
+              {/* Pipeline source refetches — "sync" only describes the sheet path. */}
+              {isSyncing ? (sourceIsPurple ? "Refreshing…" : "Syncing…") : "Refresh"}
             </Button>
             {canDirectLaunch && (
               <Link to="/launch">
