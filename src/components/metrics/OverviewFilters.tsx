@@ -116,30 +116,6 @@ export function OverviewFilters({
       </div>
       )}
 
-      {/* Campaign type segmented control (KKB only) */}
-      {showCampaignType && (options?.campaignTypes.length ?? 0) > 0 && (
-        <div className="inline-flex rounded-md border border-border bg-card p-0.5 text-xs">
-          {campaignTypeOptions.map((opt) => {
-            const active = value.campaignType === opt.value;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => onChange({ ...value, campaignType: opt.value })}
-                className={cn(
-                  "px-3 py-1.5 rounded transition-colors",
-                  active
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
       {/* Channel segmented control (KKB only) */}
       {showChannel && (
         <div className="inline-flex rounded-md border border-border bg-card p-0.5 text-xs">
