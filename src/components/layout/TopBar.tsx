@@ -83,11 +83,11 @@ export function TopBar() {
       await qc.invalidateQueries({
         predicate: (q) => DASHBOARD_KEYS.has(String(q.queryKey[0])),
       });
-      const after = callsOf(
-        qc.getQueryData<AggregatePayload>([
-          "program-aggregates", config.id, "all", null, null, "all", null, "all",
-        ]),
-      );
+      // Read the fresh count from this query's own refetch result instead of
+      // reconstructing its cache key by hand — a key-shape change would
+      // otherwise make getQueryData return undefined and the toast lie.
+      const { data: fresh } = await query.refetch();
+      const after = callsOf(fresh);
       const n = after.toLocaleString();
       if (after > before) toast.success(`Refreshed · ${(after - before).toLocaleString()} new calls`);
       else if (after === before) toast.success(`Up to date · ${n} calls`);
