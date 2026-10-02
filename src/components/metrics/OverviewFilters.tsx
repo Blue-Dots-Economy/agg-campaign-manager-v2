@@ -40,12 +40,10 @@ const parseLocal = (s: string): Date => {
 export function OverviewFilters({
   value,
   onChange,
-  showCampaignType = false,
   showChannel = false,
 }: {
   value: OverviewFilterValue;
   onChange: (next: OverviewFilterValue) => void;
-  showCampaignType?: boolean;
   showChannel?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -54,10 +52,6 @@ export function OverviewFilters({
   const stateOptions = useMemo(
     () => [{ value: "all", label: "All states" }, ...(options?.cities ?? []).map((c) => ({ value: c, label: c }))],
     [options?.cities],
-  );
-  const campaignTypeOptions = useMemo(
-    () => [{ value: "all", label: "All types" }, ...(options?.campaignTypes ?? []).map((c) => ({ value: c, label: c }))],
-    [options?.campaignTypes],
   );
 
   const range: DateRange | undefined = useMemo(() => {
@@ -94,7 +88,6 @@ export function OverviewFilters({
     value.dateFrom ||
     value.dateTo ||
     value.state !== "all" ||
-    (showCampaignType && value.campaignType !== "all") ||
     (showChannel && value.channel !== "all");
 
   return (
