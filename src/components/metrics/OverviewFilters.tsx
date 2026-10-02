@@ -40,12 +40,10 @@ const parseLocal = (s: string): Date => {
 export function OverviewFilters({
   value,
   onChange,
-  showCampaignType = false,
   showChannel = false,
 }: {
   value: OverviewFilterValue;
   onChange: (next: OverviewFilterValue) => void;
-  showCampaignType?: boolean;
   showChannel?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -54,10 +52,6 @@ export function OverviewFilters({
   const stateOptions = useMemo(
     () => [{ value: "all", label: "All states" }, ...(options?.cities ?? []).map((c) => ({ value: c, label: c }))],
     [options?.cities],
-  );
-  const campaignTypeOptions = useMemo(
-    () => [{ value: "all", label: "All types" }, ...(options?.campaignTypes ?? []).map((c) => ({ value: c, label: c }))],
-    [options?.campaignTypes],
   );
 
   const range: DateRange | undefined = useMemo(() => {
@@ -94,7 +88,6 @@ export function OverviewFilters({
     value.dateFrom ||
     value.dateTo ||
     value.state !== "all" ||
-    (showCampaignType && value.campaignType !== "all") ||
     (showChannel && value.channel !== "all");
 
   return (
@@ -121,30 +114,6 @@ export function OverviewFilters({
           );
         })}
       </div>
-      )}
-
-      {/* Campaign type segmented control (KKB only) */}
-      {showCampaignType && (options?.campaignTypes.length ?? 0) > 0 && (
-        <div className="inline-flex rounded-md border border-border bg-card p-0.5 text-xs">
-          {campaignTypeOptions.map((opt) => {
-            const active = value.campaignType === opt.value;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => onChange({ ...value, campaignType: opt.value })}
-                className={cn(
-                  "px-3 py-1.5 rounded transition-colors",
-                  active
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
-        </div>
       )}
 
       {/* Channel segmented control (KKB only) */}
