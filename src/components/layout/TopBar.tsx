@@ -1,4 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import type { AggregatePayload } from "@/lib/snapshot.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { Upload, Rocket, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -49,7 +52,52 @@ export function TopBar() {
 
   // On-load freshness: kick off a silent background sync if the snapshot is stale.
   const autoSync = useAutoFreshness(config.id, lastSynced);
-  const isSyncing = sync.isPending || autoSync.isPending;
+  const qc = useQueryClient();
+  const [isRefetching, setIsRefetching] = useState(false);
+  const isSyncing = sync.isPending || autoSync.isPending || isRefetching;
+
+  // Pipeline source: sheet sync does not apply, so Refresh refetches the
+  // dashboard's cached queries instead. Does NOT touch last_synced_at — that
+  // timestamp records pipeline arrivals, not button presses.
+  const DASHBOARD_KEYS = new Set([
+    "program-aggregates",
+    "kkb-drop-analysis",
+    "kkb-call-outcomes",
+    "dkb-drop-analysis",
+    "funnel-durations",
+    "campaign-list",
+    "campaign-causes",
+    "dkb-campaign-causes",
+    "north-star",
+    "program-filter-options",
+    "program-rows",
+  ]);
+  const callsOf = (d: AggregatePayload | undefined) => {
+    const v = d?.metrics?.totalCalls;
+    return typeof v === "number" ? v : (d?.totalRows ?? 0);
+  };
+  const refetchFromPipeline = async () => {
+    const before = callsOf(query.data);
+    setIsRefetching(true);
+    try {
+      await qc.invalidateQueries({
+        predicate: (q) => DASHBOARD_KEYS.has(String(q.queryKey[0])),
+      });
+      const after = callsOf(
+        qc.getQueryData<AggregatePayload>([
+          "program-aggregates", config.id, "all", null, null, "all", null, "all",
+        ]),
+      );
+      const n = after.toLocaleString();
+      if (after > before) toast.success(`Refreshed · ${(after - before).toLocaleString()} new calls`);
+      else if (after === before) toast.success(`Up to date · ${n} calls`);
+      else toast.success(`Refreshed · ${n} calls`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Refresh failed");
+    } finally {
+      setIsRefetching(false);
+    }
+  };
 
   const ageMs = lastSynced ? Date.now() - new Date(lastSynced).getTime() : null;
   const stale = ageMs !== null && ageMs > 60 * 60_000; // > 1 hour
@@ -89,18 +137,13 @@ export function TopBar() {
               variant="outline"
               size="sm"
               className="gap-1.5"
-              onClick={() => sync.mutate({ force: true })}
-              disabled={isSyncing || sourceIsPurple}
+              onClick={() => (sourceIsPurple ? void refetchFromPipeline() : sync.mutate({ force: true }))}
+              disabled={isSyncing}
               title={`Last synced ${ago}`}
             >
               <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
               {isSyncing ? "Syncing…" : "Refresh"}
             </Button>
-            {sourceIsPurple && (
-              <span className="text-xs text-muted-foreground max-w-[220px] leading-snug">
-                Campaign records load from the upstream pipeline — sheet sync does not apply.
-              </span>
-            )}
             {canDirectLaunch && (
               <Link to="/launch">
                 <Button variant="outline" size="sm" className="gap-1.5">
