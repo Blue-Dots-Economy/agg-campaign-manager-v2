@@ -18,9 +18,10 @@
 #                    dependency coverage.
 #   * image-scan   - SKIPPED: no image-refs passed. The image is scanned in
 #                    build-images.yaml instead.
-#   * gitleaks     - git-history secret scan. Expected to report two `jwt`
-#                    findings in the tracked `.env` (SUPABASE_PUBLISHABLE_KEY and
-#                    its VITE_ twin), as in the sibling repo. The names say these are Supabase publishable keys,
+#   * gitleaks     - git-history secret scan. It reports two
+#                    `generic-api-key` findings in the tracked `.env`
+#                    (SUPABASE_PUBLISHABLE_KEY and its VITE_ twin; confirmed on
+#                    the first run). The names say these are Supabase publishable keys,
 #                    which are meant to ship to browsers, but that is inferred
 #                    from the names and not verified; confirm the key role in
 #                    Supabase. Either way `.env` should not be tracked.
