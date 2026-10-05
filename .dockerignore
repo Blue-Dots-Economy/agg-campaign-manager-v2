@@ -1,0 +1,18 @@
+# Keep the build context small and stop host artefacts leaking into the image.
+.git
+.github
+node_modules
+dist
+.output
+.vinxi
+.wrangler
+.tanstack
+.nitro
+*.log
+.DS_Store
+.vscode
+.idea
+
+# NOT ignored on purpose: `.env`. The client bundle's VITE_SUPABASE_* values are
+# read from it at build time (see Dockerfile). It never reaches the runtime stage,
+# which receives only .output.
