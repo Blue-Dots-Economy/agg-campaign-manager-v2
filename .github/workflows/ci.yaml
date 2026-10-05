@@ -153,6 +153,18 @@ jobs:
           echo "container uid: ${uid}"
           [ "${uid}" != "0" ] || { echo "::error::the container runs as root"; exit 1; }
 
+          # The image's own HEALTHCHECK must pass too: curl from outside cannot see
+          # a check that is broken inside the container (the runtime image has no
+          # shell, so a shell-form HEALTHCHECK fails every time). The first check
+          # runs one interval (30s) after start.
+          for i in $(seq 1 24); do
+            health=$(docker inspect cm --format '{{.State.Health.Status}}')
+            [ "${health}" != "starting" ] && break
+            sleep 5
+          done
+          echo "container health: ${health}"
+          [ "${health}" = "healthy" ] || { echo "::error::the container's HEALTHCHECK reports ${health}, expected healthy"; exit 1; }
+
       - name: Explain the skip
         if: env.DOCKERHUB_TOKEN == ''
         run: |
