@@ -1,0 +1,41 @@
+# Environment overrides for the campaign-manager chart.
+# Layered over campaign-manager/values.yaml. Committed with PLACEHOLDERS only —
+# real values live in a gitignored *.local file or a pre-created Secret
+# referenced by secrets.existingSecret.
+#
+#   helm upgrade --install campaign-manager ./campaign-manager \
+#     -n campaign-manager -f global-overrides.yaml
+
+ingress:
+  enabled: true
+  className: kong                      # UPDATE: ingress class installed on your cluster (kubectl get ingressclass), e.g. kong or nginx
+  host: campaign-manager.example.com   # UPDATE: your FQDN; its DNS record must point at the ingress controller's load balancer
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod   # UPDATE: your ClusterIssuer name (kubectl get clusterissuer); remove if you do not use cert-manager
+  tls:
+    enabled: true                      # UPDATE: set false if TLS is terminated elsewhere
+    secretName: campaign-manager-tls   # certificate Secret; created by cert-manager, or create it yourself
+
+image:
+  repository: ghcr.io/blue-dots-economy/agg-campaign-manager-v2   # UPDATE: image repository for your registry
+  tag: sha-43620d8                                                # UPDATE: image tag to deploy
+
+# Non-secret env -> ConfigMap
+config:
+  SUPABASE_URL: "<supabase-url>"                  # UPDATE: Supabase project URL
+  PURPLE_SUPABASE_URL: "<purple-supabase-url>"    # UPDATE: Purple Dots Supabase project URL
+  PURPLE_CUTOVER: ""                              # UPDATE: cutover flag value for your environment
+
+# Secret env -> Secret. UPDATE: every value below; never commit real values.
+# Alternatively leave these out and set secrets.existingSecret to a Secret you
+# created, carrying the same keys.
+secrets:
+  SUPABASE_PUBLISHABLE_KEY: "<changeme>"
+  SUPABASE_SERVICE_ROLE_KEY: "<changeme>"
+  PURPLE_SUPABASE_SERVICE_ROLE_KEY: "<changeme>"
+  LOVABLE_CRON_SECRET: "<changeme>"
+  LOVABLE_CRON_SECRET_PREVIOUS: "<changeme>"
+  RAYA_API_KEY: "<changeme>"
+  GOOGLE_SHEETS_API_KEY: "<changeme>"
+  LOVABLE_API_KEY: "<changeme>"
+  GOOGLE_SERVICE_ACCOUNT_JSON: "<changeme>"   # service-account JSON, as a single string
