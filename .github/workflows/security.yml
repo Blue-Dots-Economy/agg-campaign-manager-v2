@@ -1,0 +1,77 @@
+# Security scanning (Sec-Audit A2 - Blue-Dots-Economy/signals-dpg#300)
+#
+# Thin caller. All scanning logic lives once in bluedots-automation so the repos
+# can't drift apart; see that repo's .github/workflows/security-scan.yml.
+#
+# What runs here (language: ts, no image-refs, gitleaks on):
+#   * trivy-fs     - dependency CVEs, Dockerfile/IaC misconfig and filesystem
+#                    secret detection -> SARIF. THIS IS THE ONLY DEPENDENCY
+#                    SCANNER THAT WORKS HERE: the repo is Bun (bun.lock), which
+#                    the Trivy this workflow pins (0.70.0) reads. The dependency
+#                    findings for this repo have not been measured yet; see the
+#                    first run's Security > Code scanning results.
+#   * deps-audit   - A NO-OP. For `ts` it runs `pnpm audit`, which fails here with
+#                    ERR_PNPM_AUDIT_NO_LOCKFILE ("No pnpm-lock.yaml found"), and
+#                    the shared workflow turns that into the warning "pnpm audit
+#                    reported advisories". That wording is MISLEADING: no audit
+#                    ran and nothing was reported. Its green tick is not
+#                    dependency coverage.
+#   * image-scan   - SKIPPED: no image-refs passed. The image is scanned in
+#                    build-images.yaml instead.
+#   * gitleaks     - git-history secret scan. It reports two
+#                    `generic-api-key` findings in the tracked `.env`
+#                    (SUPABASE_PUBLISHABLE_KEY and its VITE_ twin; confirmed on
+#                    the first run). The names say these are Supabase publishable keys,
+#                    which are meant to ship to browsers, but that is inferred
+#                    from the names and not verified; confirm the key role in
+#                    Supabase. Either way `.env` should not be tracked.
+#   * workflow-lint - zizmor over this repo's own workflows.
+#
+# Report-only (`block: false`): findings land in Security > Code scanning and the
+# job still passes. Green means "the scan ran", NOT "nothing found". That also
+# means the two `.env` findings above are reported, not blocking. `block` is one
+# switch covering gitleaks AND trivy-fs, and flipping it makes trivy-fs fail on
+# HIGH/CRITICAL, so check what the first run reports before ever enabling it.
+#
+# Pinned to the same reusable-workflow commit as signals-dpg, aggregator-dpg,
+# signals-search, notification-service and ai-diffusion-dpg so they move together.
+# That commit is on bluedots-automation's `feature` branch but not yet on `main`;
+# repin to @main once it is promoted.
+#
+# No develop/feature integration branch here, and Lovable commits straight to
+# main, so pull_request is unfiltered and push is main-only.
+
+name: security
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  # Monthly sweep: new CVEs get published against code nobody has touched.
+  schedule:
+    - cron: "0 3 1 * *"
+  workflow_dispatch:
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege by default; the one job below asks for exactly what it needs.
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    # Declared here as well as in the reusable workflow: a called workflow cannot
+    # escalate beyond what the caller grants, so without security-events: write
+    # the SARIF upload fails with a 403 on repos whose default token is read-only.
+    permissions:
+      contents: read
+      security-events: write # upload SARIF to Security > Code scanning
+      packages: read # pull image-refs from GHCR (none are passed here)
+    uses: Blue-Dots-Economy/bluedots-automation/.github/workflows/security-scan.yml@d6a39c5b22be14b4b4aeaa78fc1d86c1f67bb555 # feature 2026-09-25 -- repin to @main once promoted
+    with:
+      language: ts
+      node-version: "24"
+      run-gitleaks: true
+      block: false

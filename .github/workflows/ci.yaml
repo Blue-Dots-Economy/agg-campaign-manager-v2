@@ -1,0 +1,306 @@
+name: CI
+# This repo had no CI. It is a Lovable-synced TanStack Start app: all 179 of its
+# commits are from the Lovable bot (178 gpt-engineer-app[bot], 1 Lovable) pushed
+# straight to `main`, so this runs on every one of them as well as on pull
+# requests.
+#
+# What gates and what does not, measured on the untouched repo:
+#   * typecheck  BLOCKING  - 0 errors today
+#   * build      BLOCKING  - passes today with no secrets or env
+#   * lint       ADVISORY  - 2,696 problems today, so a blocking gate would be red
+#                            on day one. 2,536 are Prettier formatting (the bot does
+#                            not run Prettier, so its commits are unformatted by
+#                            construction) and 135 are real ESLint errors, mostly
+#                            `no-explicit-any`. Advisory jobs report through
+#                            annotations and the run summary rather than turning
+#                            green silently.
+#   * smoke-image BLOCKING - builds the Dockerfile WITHOUT pushing, boots it and
+#                            probes it. Exercises the image on every PR so a broken
+#                            Dockerfile is caught in review, not when a release tag
+#                            is cut. Publishing is build-images.yaml, tags only.
+#                            Skips itself when only non-image files changed
+#                            (Helm chart, docs, Supabase config, other workflows).
+#   * sonar      ADVISORY  - skips until SONAR_TOKEN is set on the repository.
+#
+# There are NO tests in this repo (no test files, no runner, no test script), so
+# there is no test job and Sonar has no coverage to report. Add a runner first.
+#
+# Bun, not npm or pnpm: the lockfile is bun.lock and bunfig.toml carries a 24h
+# supply-chain guard. `--frozen-lockfile` refuses to resolve anything fresh, so CI
+# installs exactly what is committed.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  # Cancel superseded PR runs, but never a push to main: the Lovable bot commits
+  # in bursts, and cancelling the earlier runs would leave those commits with no
+  # result at all, which hides a red one. cancel-in-progress: false alone is not
+  # enough for that: GitHub keeps only ONE pending run per group and cancels the
+  # older pending one when a third arrives. So pushes get a group per commit,
+  # which also keeps build-images.yaml's verify-ci able to find a run for every
+  # commit a release tag might be cut from.
+  group: ci-${{ github.ref }}-${{ github.event_name == 'push' && github.sha || 'pr' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # 1.4.2 is the version the baseline above was measured with.
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.4.2"
+
+      - run: bun install --frozen-lockfile
+
+      # No `typecheck` script exists in package.json and it is deliberately not
+      # added: package.json is Lovable-managed, and an edit there can be
+      # overwritten by the next sync.
+      - name: tsc --noEmit
+        run: bun x tsc --noEmit
+
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.4.2"
+
+      - run: bun install --frozen-lockfile
+
+      # Needs no secrets or environment variables, so fork and Dependabot pull
+      # requests can build too. The default output is a Cloudflare Worker bundle
+      # (Nitro's default preset), which is exactly what `vite build` produces for
+      # Lovable's own publishing, so this checks the artefact that actually ships.
+      - run: bun run build
+
+  smoke-image:
+    name: smoke-image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Job-level so the step `if:`s below can read it: the `secrets` context is not
+    # available in a step conditional.
+    env:
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # Full history, so the diff below can reach the PR base or the previous
+          # push. The repo is small; this costs a second or two.
+          fetch-depth: 0
+
+      # The slowest job in the workflow, so skip it when nothing that goes into
+      # the image changed (Helm chart, docs, Supabase config, other workflows).
+      # Done inside the job, not with workflow-level `paths:`, so the job still
+      # reports green and every commit keeps a ci.yaml run for build-images.yaml's
+      # verify-ci. Fails OPEN: any doubt about the diff base (first push, force
+      # push, manual run) builds the image.
+      - name: Did anything that goes into the image change?
+        id: changes
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          base=""
+          case "${EVENT}" in
+            pull_request) base="${PR_BASE}" ;;
+            push) base="${PUSH_BEFORE}" ;;
+          esac
+          if [ -z "${base}" ] || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+            echo "No usable diff base (${EVENT}); building the image."
+            echo "image=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Paths that are never image input. Anything else changed => build.
+          not_input='^(campaign-manager/|global-overrides\.yaml$|supabase/|\.lovable/|sonar-project\.properties$|\.github/workflows/(security\.yml|build-images\.yaml)$|.*\.md$)'
+          relevant=$(git diff --name-only "${base}" HEAD | grep -Ev "${not_input}" || true)
+          if [ -n "${relevant}" ]; then
+            echo "Image inputs changed:"; while IFS= read -r f; do echo "  ${f}"; done <<< "${relevant}"
+            echo "image=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice title=smoke-image skipped::No image input changed since ${base}."
+            echo "image=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # docker-container driver: required for the gha layer cache below.
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        if: steps.changes.outputs.image == 'true' && env.DOCKERHUB_TOKEN != ''
+
+      # The base images live on dhi.io, which refuses anonymous pulls, so the build
+      # cannot reach the first FROM without this. GitHub withholds repo secrets
+      # from fork and Dependabot pull requests, so every step here is gated on the
+      # token being present rather than failing: an ungated build would turn those
+      # PRs red for a missing credential, not a real defect.
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        if: steps.changes.outputs.image == 'true' && env.DOCKERHUB_TOKEN != ''
+        with:
+          registry: dhi.io
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build the image (no push)
+        if: steps.changes.outputs.image == 'true' && env.DOCKERHUB_TOKEN != ''
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          load: true # into the local image store, so it can be run below
+          push: false
+          tags: agg-campaign-manager-v2:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # The app answers 200 on `/` and `/login` with no secrets or environment,
+      # so a real boot-and-probe is possible; a build alone would miss a bad CMD,
+      # a missing file in .output, or a crash at startup.
+      - name: Boot the image and probe it
+        if: steps.changes.outputs.image == 'true' && env.DOCKERHUB_TOKEN != ''
+        run: |
+          set -euo pipefail
+          docker run -d --name cm -p 3000:3000 agg-campaign-manager-v2:ci
+          trap 'docker logs cm || true; docker rm -f cm >/dev/null 2>&1 || true' EXIT
+
+          for i in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://127.0.0.1:3000/; then break; fi
+            if [ "$i" = 30 ]; then echo "::error::the container did not answer on :3000 within 30s"; exit 1; fi
+            sleep 1
+          done
+
+          for path in / /login; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:3000${path}")
+            echo "GET ${path} -> ${code}"
+            [ "${code}" = "200" ] || { echo "::error::GET ${path} returned ${code}, expected 200"; exit 1; }
+          done
+
+          # The image is meant to run unprivileged. Asked of Node, because the
+          # hardened runtime image has no `id` binary.
+          uid=$(docker exec cm node -p 'process.getuid()')
+          echo "container uid: ${uid}"
+          [ "${uid}" != "0" ] || { echo "::error::the container runs as root"; exit 1; }
+
+          # The image's own HEALTHCHECK must pass too: curl from outside cannot see
+          # a check that is broken inside the container (the runtime image has no
+          # shell, so a shell-form HEALTHCHECK fails every time). The first check
+          # runs one interval (30s) after start.
+          for i in $(seq 1 24); do
+            health=$(docker inspect cm --format '{{.State.Health.Status}}')
+            [ "${health}" != "starting" ] && break
+            sleep 5
+          done
+          echo "container health: ${health}"
+          [ "${health}" = "healthy" ] || { echo "::error::the container's HEALTHCHECK reports ${health}, expected healthy"; exit 1; }
+
+      - name: Explain the skip
+        if: steps.changes.outputs.image == 'true' && env.DOCKERHUB_TOKEN == ''
+        run: |
+          echo "::warning title=smoke-image skipped::No dhi.io credential on this run (fork or Dependabot PR, or DOCKERHUB_TOKEN is not set). The image build is still covered on the release-tag path in build-images.yaml."
+
+  lint:
+    name: lint (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.4.2"
+
+      - run: bun install --frozen-lockfile
+
+      # Formatting is switched off here and checked separately below, so the
+      # ESLint number means "real problems" and is not buried under 2,536 style
+      # findings that --fix would remove in one pass.
+      - name: ESLint (all rules except formatting)
+        id: eslint
+        continue-on-error: true
+        run: |
+          bun x eslint . --rule 'prettier/prettier: off'
+
+      - name: Prettier check
+        id: prettier
+        continue-on-error: true
+        run: bun x prettier --check .
+
+      # A step that fails under continue-on-error leaves the job green, which is
+      # how an advisory check quietly becomes a check nobody looks at. Say it out
+      # loud instead.
+      - name: Report
+        if: always()
+        env:
+          ESLINT: ${{ steps.eslint.outcome }}
+          PRETTIER: ${{ steps.prettier.outcome }}
+        run: |
+          {
+            echo "### Lint (advisory - does not fail the build)"
+            echo
+            echo "| Check | Result |"
+            echo "| --- | --- |"
+            echo "| ESLint, excluding formatting | ${ESLINT} |"
+            echo "| Prettier | ${PRETTIER} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "${ESLINT}" = "failure" ]; then
+            echo "::warning title=ESLint reports problems::Advisory only. Baseline is 135 errors (127 no-explicit-any) and 25 warnings. See the ESLint step log."
+          fi
+          if [ "${PRETTIER}" = "failure" ]; then
+            echo "::warning title=Prettier would reformat files::Advisory only. Lovable commits are not Prettier-formatted, so this is expected on bot commits."
+          fi
+
+  sonar:
+    name: sonar
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Job-level, not step-level: a step's own `env:` is not in scope for its own
+    # `if:`, and the `secrets` context is unavailable in a step conditional.
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # A shallow clone leaves Sonar unable to attribute new code to commits.
+          fetch-depth: 0
+
+      # Two guards, for two different failure modes:
+      #   `if:`               - no token. Fork and Dependabot PRs never get repo
+      #                         secrets, and the token is not configured yet.
+      #   `continue-on-error` - token present but the scan fails (outage, expired
+      #                         token, quality gate). That must not redden CI.
+      - name: SonarCloud scan
+        id: scan
+        if: env.SONAR_TOKEN != ''
+        uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f # v8.2.1
+        continue-on-error: true
+
+      # continue-on-error would otherwise report a failed scan as a green step.
+      - name: Flag a failed scan
+        if: steps.scan.outcome == 'failure'
+        run: |
+          echo "::warning title=SonarCloud scan failed::The scan step failed but is advisory, so CI stays green. Read the SonarCloud scan step log. A common cause is Automatic Analysis being enabled on the project, which cannot run alongside CI analysis."
+
+      - name: Explain the skip
+        if: env.SONAR_TOKEN == ''
+        run: |
+          echo "::warning title=SonarCloud scan skipped::SONAR_TOKEN is not set on this repository. The SonarCloud project (key Blue-Dots-Economy_agg-campaign-manager-v2, org blue-dots-economy) already exists with Automatic Analysis off, so adding the secret is all that is needed."
