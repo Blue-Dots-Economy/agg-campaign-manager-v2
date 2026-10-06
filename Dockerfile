@@ -13,19 +13,28 @@
 # CI workflow that builds it needs a dhi.io login step.
 ARG BUILD_IMAGE=dhi.io/node:24-alpine-dev
 ARG RUNTIME_IMAGE=dhi.io/node:24-alpine
+# Bun is the package manager (bun.lock). Pinned to the version CI uses, so the
+# image and CI resolve identically.
+ARG BUN_IMAGE=dhi.io/bun:1.4.2-alpine-dev
+
+# Named stage so the COPY --from below can take the image from a build arg.
+FROM ${BUN_IMAGE} AS bun
 
 FROM ${BUILD_IMAGE} AS build
 WORKDIR /app
 
-# Bun is the package manager (bun.lock). Pinned to the version CI uses, so the
-# image and CI resolve identically. Installed through npm to avoid piping an
-# installer script into a shell.
-RUN npm install --global bun@1.4.2
+# The Bun binary from the hardened Bun image, rather than `npm install -g bun`:
+# no npm registry round-trip, same supply chain as the base images. It is a musl
+# build whose only shared libraries (libstdc++, libgcc_s) Node needs too.
+COPY --from=bun /usr/bin/bun /usr/local/bin/bun
 
 # Manifests first so the dependency layer is reused when only source changes.
-# bunfig.toml carries the repo's 24h supply-chain guard.
+# bunfig.toml carries the repo's 24h supply-chain guard. The cache mount keeps
+# Bun's package cache across builds, so a lockfile change re-downloads only what
+# changed instead of all ~470 packages.
 COPY package.json bun.lock bunfig.toml ./
-RUN bun install --frozen-lockfile
+RUN --mount=type=cache,target=/root/.bun/install/cache \
+    bun install --frozen-lockfile
 
 COPY . .
 
