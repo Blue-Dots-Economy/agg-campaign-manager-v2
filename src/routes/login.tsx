@@ -1,7 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
-import logoAsset from "@/assets/purple-dots-logo.png.asset.json";
-import logoDarkAsset from "@/assets/purple-dots-logo-dark.png.asset.json";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/auth/context";
@@ -9,6 +7,11 @@ import { landingFor } from "@/auth/permissions";
 import { AuroraFlow } from "@/components/AuroraFlow";
 import { useTheme, resolveDark } from "@/lib/theme";
 
+
+// Served from public/, so they exist in every build. The old .asset.json pointers
+// resolved to Lovable's own storage, which a self-hosted container does not have.
+const LOGO = "/purple-dots-logo.png";
+const LOGO_DARK = "/purple-dots-logo-dark.png";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -42,7 +45,7 @@ function LoginPage() {
       <div className="relative z-10 w-full max-w-sm rounded-2xl border border-border bg-card/90 backdrop-blur-sm p-8 shadow-sm">
 
         <div className="flex flex-col items-center text-center">
-          <img src={isDark ? logoDarkAsset.url : logoAsset.url} alt="Purple Dots" className="h-12 w-auto" />
+          <img src={isDark ? LOGO_DARK : LOGO} alt="Purple Dots" className="h-12 w-auto" />
           <h1 className="sr-only">Purple Dots</h1>
         </div>
 
