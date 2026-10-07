@@ -65,6 +65,7 @@ None of this SQL exists in either repo: `supabase/` holds only `config.toml` in 
 | D9 | The loader is a separate plan; this doc owns the table contract it must keep |
 | D10 | One-time cutover with a write freeze (first launch) |
 | D11 | Build order: database foundation → auth → data port → remaining services → deploy |
+| D12 | The database is named `campaign-manager-purpledots` in every environment |
 
 ## 1. Architecture
 
@@ -79,7 +80,7 @@ campaign-manager container (one image, node-server build, in cluster)
         │  2. requireRole([...]): role allowed for this function?
         ▼
      src/server/db/       Drizzle + pg  ──►  Postgres (Signals' server, own database)
-                                              database: campaign_manager_purpledots
+                                              database: campaign-manager-purpledots
                                               users: migrator / cm_app / purple_loader
      src/server/sheets    Google Sheets (service account)
      src/server/storage   S3 (UP seekers cache)
@@ -196,6 +197,8 @@ Changing a password does not end other devices' sessions (D3). Deactivation does
 | `cm_app` | `select, insert, update, delete` on the 11 app tables; `select` on `purple_dots_calls`, `purple_dots_connections`, `call_rows`; `execute` on the dashboard functions and `pd_norm_stage` |
 | `purple_loader` | `select, insert, update` on the 2 `purple_dots_*` tables. Nothing else |
 
+The database is named **`campaign-manager-purpledots` in every environment** (D12). The hyphen is fine in connection URLs, `psql -d` and `current_database()`, but SQL must double-quote it: `CREATE DATABASE "campaign-manager-purpledots"`, `GRANT CONNECT ON DATABASE "campaign-manager-purpledots" TO ...`.
+
 The database and the three users are created once by a bootstrap script (`db/bootstrap.sql`) run by whoever administers the Signals Postgres server, because `migrator` cannot create roles.
 
 ### 3.4 Porting the app
@@ -290,7 +293,7 @@ Log in as each role; open each page that role may open; confirm a page outside t
 
 ## Open items
 
-1. Who runs `db/bootstrap.sql` on the Signals Postgres server in each environment, and the database name per environment.
+1. Who runs `db/bootstrap.sql` on the Signals Postgres server in each environment.
 2. The S3 bucket for the UP seekers cache, and how the pod gets credentials.
 3. Grant the Google service account read access to the UP seekers spreadsheet.
 4. Confirm the `channel` values (§3.2) before applying the fix.
