@@ -45,6 +45,12 @@ COPY . .
 ENV NITRO_PRESET=node-server
 RUN bun run build
 
+# The migrator, bundled to one plain-Node file (drizzle-orm and pg inlined) so the
+# runtime image can run migrations without bun or the TypeScript source. It finds
+# its SQL at ./migrations relative to itself, so the folder is copied next to it.
+RUN bun build src/server/db/migrate.ts --target=node --outfile=/app/migrate/migrate.mjs \
+ && cp -R src/server/db/migrations /app/migrate/migrations
+
 
 FROM ${RUNTIME_IMAGE} AS runtime
 WORKDIR /app
@@ -58,6 +64,10 @@ ENV NODE_ENV=production \
 # Only the build output: Nitro traces its own runtime dependencies into
 # .output/server/node_modules, so no node_modules, source or toolchain ships.
 COPY --from=build --chown=node:node /app/.output ./.output
+
+# Migrations (SQL + meta/_journal.json) and the bundled migrator, for the
+# deployment's migrate Job: `node migrate/migrate.mjs` with MIGRATOR_DATABASE_URL.
+COPY --from=build --chown=node:node /app/migrate ./migrate
 
 # The Node images ship a non-root `node` user (uid 1000).
 USER node

@@ -262,6 +262,25 @@ jobs:
           echo "container health: ${health}"
           [ "${health}" = "healthy" ] || { echo "::error::the container's HEALTHCHECK reports ${health}, expected healthy"; exit 1; }
 
+      # The deployment runs migrations from this image (`node migrate/migrate.mjs`).
+      # No database here, so check what can fail at build time: the journal is in
+      # the image, and the bundle starts under plain node and refuses to run
+      # without MIGRATOR_DATABASE_URL. Applying the SQL is covered by the
+      # `migrations` job.
+      - name: Migrator is in the image
+        if: steps.changes.outputs.image == 'true' && env.DOCKERHUB_TOKEN != ''
+        run: |
+          set -euo pipefail
+          docker run --rm agg-campaign-manager-v2:ci node -e "require('fs').statSync('migrate/migrations/meta/_journal.json')" \
+            || { echo "::error::migrate/migrations/meta/_journal.json is missing from the image"; exit 1; }
+          set +e
+          out=$(docker run --rm agg-campaign-manager-v2:ci node migrate/migrate.mjs 2>&1)
+          code=$?
+          set -e
+          echo "${out}"
+          [ "${code}" != "0" ] && echo "${out}" | grep -q "MIGRATOR_DATABASE_URL is not set" \
+            || { echo "::error::node migrate/migrate.mjs did not start as expected"; exit 1; }
+
       - name: Explain the skip
         if: steps.changes.outputs.image == 'true' && env.DOCKERHUB_TOKEN == ''
         run: |
