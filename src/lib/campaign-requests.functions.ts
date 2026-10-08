@@ -1,9 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
-
-async function sb() {
-  const { sbFor } = await import("@/lib/db.server");
-  return sbFor();
-}
+import { and, desc, eq } from "drizzle-orm";
+import { requireRole } from "@/auth/middleware";
+import { FN_ROLES } from "@/auth/roles";
+import { getDb } from "@/server/db/client.server";
+import { fromSqlNames, sqlNamed } from "@/server/db/columns";
+import { campaignRequests } from "@/server/db/schema";
 
 export interface CampaignRequestInput {
   program: string;
@@ -31,12 +32,12 @@ export interface CampaignRequestInput {
 }
 
 export const submitCampaignRequest = createServerFn({ method: "POST" })
+  .middleware([requireRole(FN_ROLES.requestCampaign)])
   .inputValidator((data: { request: CampaignRequestInput }) => data)
   .handler(async ({ data }): Promise<{ ok: boolean; id: string | null }> => {
     const r = data.request;
     if (!r.agent_id) throw new Error("Missing agent.");
     if (!r.contacts?.length) throw new Error("No contacts to request.");
-    const client = await sb();
     const row = {
       program: r.program, agent_id: r.agent_id, agent_name: r.agent_name ?? null,
       batch_name: r.batch_name, campaign_day: r.campaign_day ?? null, campaign_date: r.campaign_date ?? null,
@@ -48,45 +49,52 @@ export const submitCampaignRequest = createServerFn({ method: "POST" })
       selected_statuses: r.selected_statuses ?? null, requested_by: r.requested_by ?? null, status: "pending",
       note: r.note ?? null,
     };
-    const { data: ins, error } = await client.from("campaign_requests").insert(row).select("id").single();
-    if (error) throw new Error(error.message);
-    return { ok: true, id: (ins as { id: string }).id };
+    const [ins] = await getDb()
+      .insert(campaignRequests)
+      .values(fromSqlNames(campaignRequests, row) as typeof campaignRequests.$inferInsert)
+      .returning({ id: campaignRequests.id });
+    return { ok: true, id: ins.id };
   });
 
 export const listCampaignRequests = createServerFn({ method: "GET" })
+  .middleware([requireRole(FN_ROLES.launch)])
   .inputValidator((data: { status?: string; program?: string }) => data)
   .handler(async ({ data }) => {
-    const client = await sb();
-    let q = client.from("campaign_requests").select("*").order("created_at", { ascending: false });
-    if (data?.status) q = q.eq("status", data.status);
-    if (data?.program) q = q.eq("program", data.program);
-    const { data: rows, error } = await q;
-    if (error) throw new Error(error.message);
-    return rows ?? [];
+    return getDb()
+      .select(sqlNamed(campaignRequests))
+      .from(campaignRequests)
+      .where(
+        and(
+          data?.status ? eq(campaignRequests.status, data.status) : undefined,
+          data?.program ? eq(campaignRequests.program, data.program) : undefined,
+        ),
+      )
+      .orderBy(desc(campaignRequests.createdAt));
   });
 
 export const updateCampaignRequest = createServerFn({ method: "POST" })
+  .middleware([requireRole(FN_ROLES.launch)])
   .inputValidator((data: { id: string; patch: Record<string, unknown> }) => data)
   .handler(async ({ data }): Promise<{ ok: boolean }> => {
-    const client = await sb();
     const allowed = ["schedule", "concurrency", "max_retries", "retry_after_hrs", "selected_statuses", "batch_name", "campaign_day", "campaign_date"];
     const patch: Record<string, unknown> = {};
     for (const k of allowed) if (k in data.patch) patch[k] = (data.patch as Record<string, unknown>)[k];
     patch["updated_at"] = new Date().toISOString();
-    const { error } = await client.from("campaign_requests").update(patch).eq("id", data.id).eq("status", "pending");
-    if (error) throw new Error(error.message);
+    await getDb()
+      .update(campaignRequests)
+      .set(fromSqlNames(campaignRequests, patch))
+      .where(and(eq(campaignRequests.id, data.id), eq(campaignRequests.status, "pending")));
     return { ok: true };
   });
 
 export const setCampaignRequestStatus = createServerFn({ method: "POST" })
+  .middleware([requireRole(FN_ROLES.launch)])
   .inputValidator((data: { id: string; status: string; reviewer_email?: string; batch_id?: string; decline_reason?: string }) => data)
   .handler(async ({ data }): Promise<{ ok: boolean }> => {
-    const client = await sb();
     const patch: Record<string, unknown> = { status: data.status, updated_at: new Date().toISOString() };
     if (data.reviewer_email) patch["reviewer_email"] = data.reviewer_email;
     if (data.batch_id) patch["batch_id"] = data.batch_id;
     if (data.decline_reason) patch["decline_reason"] = data.decline_reason;
-    const { error } = await client.from("campaign_requests").update(patch).eq("id", data.id);
-    if (error) throw new Error(error.message);
+    await getDb().update(campaignRequests).set(fromSqlNames(campaignRequests, patch)).where(eq(campaignRequests.id, data.id));
     return { ok: true };
   });

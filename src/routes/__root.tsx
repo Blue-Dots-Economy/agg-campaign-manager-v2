@@ -140,20 +140,24 @@ function AuthGate({ children }: { children: ReactNode }) {
   const { isAuthenticated, hydrated, session } = useAuth();
   const navigate = useNavigate();
   const isLogin = pathname === "/login";
+  const isChangePassword = pathname === "/change-password";
   const role = session?.role;
+  const mustChange = !!session?.mustChangePassword;
   const allowed = isLogin || canAccess(role, pathname);
 
   useEffect(() => {
     if (!hydrated) return;
     if (!isAuthenticated && !isLogin) navigate({ to: "/login" });
+    else if (mustChange && !isChangePassword) navigate({ to: "/change-password" });
     else if (isAuthenticated && isLogin) navigate({ to: landingFor(role) });
     else if (isAuthenticated && !allowed) navigate({ to: landingFor(role) });
-  }, [hydrated, isAuthenticated, isLogin, allowed, role, navigate]);
+  }, [hydrated, isAuthenticated, isLogin, isChangePassword, mustChange, allowed, role, navigate]);
 
   if (!hydrated) return null;
   if (isLogin) return <>{children}</>;
   if (!isAuthenticated) return null;
-  if (!allowed) return null;
+  if (isChangePassword) return <>{children}</>;
+  if (mustChange || !allowed) return null;
   return <AppShell>{children}</AppShell>;
 }
 

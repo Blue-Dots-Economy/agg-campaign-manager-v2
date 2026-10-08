@@ -275,8 +275,7 @@ export function MobileNav() {
           <button
             onClick={() => {
               setOpen(false);
-              logout();
-              navigate({ to: "/login" });
+              void logout().then(() => navigate({ to: "/login" }));
             }}
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >

@@ -21,9 +21,7 @@ name: CI
 #                            Skips itself when only non-image files changed
 #                            (Helm chart, docs, Supabase config, other workflows).
 #   * sonar      ADVISORY  - skips until SONAR_TOKEN is set on the repository.
-#
-# There are NO tests in this repo (no test files, no runner, no test script), so
-# there is no test job and Sonar has no coverage to report. Add a runner first.
+#   * migrations BLOCKING  - bootstrap, migrations, schema drift, `bun test tests`.
 #
 # Bun, not npm or pnpm: the lockfile is bun.lock and bunfig.toml carries a 24h
 # supply-chain guard. `--frozen-lockfile` refuses to resolve anything fresh, so CI
@@ -91,6 +89,52 @@ jobs:
       # (Nitro's default preset), which is exactly what `vite build` produces for
       # Lovable's own publishing, so this checks the artefact that actually ships.
       - run: bun run build
+
+  migrations:
+    name: migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 2s --health-timeout 2s --health-retries 15
+    env:
+      MIGRATOR_DATABASE_URL: postgresql://migrator:migrator@localhost:5432/campaign-manager-purpledots
+      CM_APP_DATABASE_URL: postgresql://cm_app:cm_app@localhost:5432/campaign-manager-purpledots
+      PURPLE_LOADER_DATABASE_URL: postgresql://purple_loader:purple_loader@localhost:5432/campaign-manager-purpledots
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.4.2"
+
+      - run: bun install --frozen-lockfile
+
+      - name: Bootstrap the database and users
+        run: >-
+          psql "postgresql://postgres:postgres@localhost:5432/postgres" -v ON_ERROR_STOP=1
+          -v migrator_password=migrator -v cm_app_password=cm_app
+          -v purple_loader_password=purple_loader -f db/bootstrap.sql
+
+      - run: bun run db:migrate
+
+      - name: Schema drift
+        run: |
+          bun x drizzle-kit generate
+          if [ -n "$(git status --porcelain src/server/db)" ]; then
+            git status --porcelain src/server/db
+            echo "::error::schema.ts differs from the migrations. Run 'bun run db:generate' and commit the result."
+            exit 1
+          fi
+
+      - run: bun test tests
 
   smoke-image:
     name: smoke-image

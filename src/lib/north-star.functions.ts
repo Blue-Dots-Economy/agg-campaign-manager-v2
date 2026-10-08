@@ -1,9 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
-
-async function sb() {
-  const { sbFor } = await import("@/lib/db.server");
-  return sbFor();
-}
+import { asc, eq } from "drizzle-orm";
+import { requireRole } from "@/auth/middleware";
+import { FN_ROLES } from "@/auth/roles";
+import { getDb } from "@/server/db/client.server";
+import { northStarConfig } from "@/server/db/schema";
 
 export interface NorthStarConfigRow {
   key: string;
@@ -13,17 +13,21 @@ export interface NorthStarConfigRow {
 }
 
 export const fetchNorthStar = createServerFn({ method: "GET" })
+  .middleware([requireRole(FN_ROLES.dashboard)])
   .inputValidator((d: { program: string }) => d)
   .handler(async ({ data }): Promise<NorthStarConfigRow[]> => {
     try {
-      const client = await sb();
-      const { data: rows, error } = await client
-        .from("north_star_config")
-        .select("key, threshold, enabled, sort")
-        .eq("program", data.program)
-        .order("sort", { ascending: true });
-      if (error) throw new Error(error.message);
-      return (rows ?? []).map((r: Record<string, unknown>) => ({
+      const rows = await getDb()
+        .select({
+          key: northStarConfig.key,
+          threshold: northStarConfig.threshold,
+          enabled: northStarConfig.enabled,
+          sort: northStarConfig.sort,
+        })
+        .from(northStarConfig)
+        .where(eq(northStarConfig.program, data.program))
+        .orderBy(asc(northStarConfig.sort));
+      return rows.map((r) => ({
         key: String(r.key),
         threshold: r.threshold == null ? null : Number(r.threshold),
         enabled: r.enabled !== false,
@@ -35,19 +39,19 @@ export const fetchNorthStar = createServerFn({ method: "GET" })
   });
 
 export const saveNorthStar = createServerFn({ method: "POST" })
+  .middleware([requireRole(FN_ROLES.dashboard)])
   .inputValidator((d: { program: string; key: string; threshold: number | null; enabled?: boolean }) => d)
   .handler(async ({ data }) => {
-    const client = await sb();
-    const { error } = await client.from("north_star_config").upsert(
-      {
-        program: data.program,
-        key: data.key,
-        threshold: data.threshold,
-        enabled: data.enabled ?? true,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "program,key" },
-    );
-    if (error) throw new Error(error.message);
+    const values = {
+      program: data.program,
+      key: data.key,
+      threshold: data.threshold == null ? null : String(data.threshold),
+      enabled: data.enabled ?? true,
+      updatedAt: new Date().toISOString(),
+    };
+    await getDb()
+      .insert(northStarConfig)
+      .values(values)
+      .onConflictDoUpdate({ target: [northStarConfig.program, northStarConfig.key], set: values });
     return { ok: true };
   });
