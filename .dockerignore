@@ -19,6 +19,7 @@ dist
 supabase
 *.md
 sonar-project.properties
+.sonarcloud.properties
 eslint.config.js
 .prettierrc
 .prettierignore

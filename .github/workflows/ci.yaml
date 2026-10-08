@@ -185,7 +185,7 @@ jobs:
             exit 0
           fi
           # Paths that are never image input. Anything else changed => build.
-          not_input='^(campaign-manager/|global-overrides\.yaml$|supabase/|\.lovable/|sonar-project\.properties$|\.github/workflows/(security\.yml|build-images\.yaml)$|.*\.md$)'
+          not_input='^(campaign-manager/|global-overrides\.yaml$|supabase/|\.lovable/|sonar-project\.properties$|\.sonarcloud\.properties$|\.github/workflows/(security\.yml|build-images\.yaml)$|.*\.md$)'
           relevant=$(git diff --name-only "${base}" HEAD | grep -Ev "${not_input}" || true)
           if [ -n "${relevant}" ]; then
             echo "Image inputs changed:"; while IFS= read -r f; do echo "  ${f}"; done <<< "${relevant}"
