@@ -249,7 +249,7 @@ function RequestCard({ req, onChanged }: { req: RequestRow; onChanged: () => voi
       },
     });
     await setStatusFn({
-      data: { id: req.id, status: "approved", reviewer_email: session?.email ?? "", batch_id: id },
+      data: { id: req.id, status: "approved", batch_id: id },
     });
     onChanged();
     refreshUsage();
@@ -337,7 +337,6 @@ function RequestCard({ req, onChanged }: { req: RequestRow; onChanged: () => voi
         data: {
           id: req.id,
           status: "declined",
-          reviewer_email: session?.email ?? "",
           decline_reason: reason,
         },
       });

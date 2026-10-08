@@ -10,12 +10,26 @@ export function hashPassword(plain: string): Promise<string> {
 }
 
 export async function verifyPassword(plain: string, hash: string | null | undefined): Promise<boolean> {
-  if (!hash || !plain) return false;
+  if (!hash) return false;
   try {
     return await bcrypt.compare(plain, hash);
   } catch {
     return false;
   }
+}
+
+// Every refused login runs one full-cost check, so timing does not reveal
+// whether the email exists. checkedHash: the hash already compared, if any.
+const DUMMY_HASH = "$2b$12$ORhtFDsZnF19Jlc1zWmIj.t/EeJ8LL/d9niCuYxUQ2Iuf1h3ldp8W";
+
+export async function equaliseRefusal(plain: string, checkedHash: string | null): Promise<void> {
+  let rounds = 0;
+  try {
+    rounds = checkedHash ? bcrypt.getRounds(checkedHash) : 0;
+  } catch {
+    /* not a bcrypt hash */
+  }
+  if (rounds < COST) await verifyPassword(plain, DUMMY_HASH);
 }
 
 export function passwordProblem(plain: string): string | null {

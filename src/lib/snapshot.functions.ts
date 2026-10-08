@@ -8,6 +8,19 @@ const reports = () => import("@/server/db/reports.server");
 const dashboard = requireRole(FN_ROLES.dashboard);
 const all = (v: string | undefined) => (v && v !== "all" ? v : "all");
 
+async function callStats(program: string): Promise<{ calls: number; lastCallAt: string | null }> {
+  const [{ getDb }, { callRows }, { count, eq, max }] = await Promise.all([
+    import("@/server/db/client.server"),
+    import("@/server/db/schema"),
+    import("drizzle-orm"),
+  ]);
+  const [row] = await getDb()
+    .select({ calls: count(), lastCallAt: max(callRows.syncedAt) })
+    .from(callRows)
+    .where(eq(callRows.program, program));
+  return { calls: row?.calls ?? 0, lastCallAt: row?.lastCallAt ?? null };
+}
+
 export interface SyncResult {
   ok: boolean;
   program: ProgramId;
@@ -289,9 +302,10 @@ export const fetchProgramAggregates = createServerFn({ method: "GET" })
         return emptyPayload(0, null, e instanceof Error ? e.message : String(e));
       }
       const connectionCount = payload.connectionCount ?? 0;
-      const snapshotRowCount = Number(payload.stateRowCount ?? 0);
+      // From the calls themselves; program_sync_state is no longer written.
+      const { calls: snapshotRowCount, lastCallAt } = await callStats(data.program);
       const stateMeta = {
-        last_synced_at: payload.lastSyncedAt ?? null,
+        last_synced_at: lastCallAt,
         status: payload.syncStatus ?? "idle",
       };
       if (!snapshotRowCount) {

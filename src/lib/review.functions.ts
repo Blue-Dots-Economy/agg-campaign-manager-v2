@@ -197,8 +197,6 @@ export const fetchExistingReviews = createServerFn({ method: "GET" })
 export interface ReviewInput {
   job_id?: string | null;
   call_id?: string | null;
-  reviewer_email: string;
-  reviewer_name?: string | null;
   company_name?: string | null;
   campaign_day?: string | null;
   campaign_type?: string | null;
@@ -243,8 +241,15 @@ const FEEDBACK_COLUMNS = [
 export const submitReview = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.campaigns)])
   .inputValidator((data: { review: ReviewInput }) => data)
-  .handler(async ({ data }) => {
-    const review: ReviewInput = { review_type: "transcript", ...data.review, company_name: "" };
+  .handler(async ({ data, context }) => {
+    // The reviewer is the signed-in user, never what the browser sends.
+    const review = {
+      review_type: "transcript",
+      ...data.review,
+      company_name: "",
+      reviewer_email: context.user.email,
+      reviewer_name: context.user.email,
+    };
     // One review per (call_id, reviewer_email); no unique constraint to upsert on.
     const values = fromSqlNames(transcriptReviews, review as unknown as Record<string, unknown>);
     const db = getDb();

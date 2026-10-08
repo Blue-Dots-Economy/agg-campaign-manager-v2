@@ -38,10 +38,6 @@ RUN --mount=type=cache,target=/root/.bun/install/cache \
 
 COPY . .
 
-# VITE_SUPABASE_* are inlined into the client bundle at build time, and come from
-# the tracked .env (see .dockerignore, which deliberately does not exclude it).
-# They are publishable-key values meant to ship to browsers, but the key role is
-# not verified here. Per-environment values would need build args; not added yet.
 ENV NITRO_PRESET=node-server
 RUN bun run build
 
@@ -55,7 +51,7 @@ RUN bun build src/server/db/migrate.ts --target=node --outfile=/app/migrate/migr
 FROM ${RUNTIME_IMAGE} AS runtime
 WORKDIR /app
 
-# Server-side secrets (SUPABASE_SERVICE_ROLE_KEY, PURPLE_SUPABASE_SERVICE_ROLE_KEY, RAYA_API_KEY, ...) are read from
+# Server-side secrets (DATABASE_URL, SESSION_SECRET, CRON_SECRET, RAYA_API_KEY, ...) are read from
 # the environment at RUNTIME and are never baked into the image.
 ENV NODE_ENV=production \
     PORT=3000 \

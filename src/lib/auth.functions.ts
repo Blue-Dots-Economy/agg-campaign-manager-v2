@@ -36,16 +36,20 @@ export const login = createServerFn({ method: "POST" })
     const pw = await import("@/server/auth/password.server");
     const { startSession } = await import("@/server/auth/session.server");
     const now = new Date();
+    const refuse = async (checkedHash: string | null) => {
+      await pw.equaliseRefusal(data.password, checkedHash);
+      return refuseLogin();
+    };
     const [u] = await d.select().from(appUsers).where(eq(appUsers.email, data.email)).limit(1);
 
-    if (!u || !u.active || !u.passwordHash || pw.isLocked(u.lockedUntil, now)) return refuseLogin();
+    if (!u || !u.active || !u.passwordHash || pw.isLocked(u.lockedUntil, now)) return refuse(null);
     if (!(await pw.verifyPassword(data.password, u.passwordHash))) {
       const next = pw.afterFailedLogin(u.failedLoginCount, now);
       await d
         .update(appUsers)
         .set({ failedLoginCount: next.failedLoginCount, lockedUntil: next.lockedUntil?.toISOString() ?? null })
         .where(eq(appUsers.id, u.id));
-      return refuseLogin();
+      return refuse(u.passwordHash);
     }
     await d.update(appUsers).set({ failedLoginCount: 0, lockedUntil: null }).where(eq(appUsers.id, u.id));
     await startSession(u.id);

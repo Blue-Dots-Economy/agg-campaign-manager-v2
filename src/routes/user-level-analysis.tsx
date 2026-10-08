@@ -66,6 +66,8 @@ import {
   type CsvMeta,
 } from "@/lib/upSeekersCsv";
 import { useProgram } from "@/programs/context";
+import { useAuth } from "@/auth/context";
+import { canEditShared } from "@/auth/roles";
 import {
   getProviderParticipants,
   getProviderSummary,
@@ -272,6 +274,8 @@ function MetricTile({
 
 function UserLevelAnalysis() {
   const { config } = useProgram();
+  const { session } = useAuth();
+  const canEdit = canEditShared(session?.role);
   const isProviders = config.id === "providers";
   const entityLabel = isProviders ? "Service Providers" : "Seekers";
 
@@ -415,14 +419,18 @@ function UserLevelAnalysis() {
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Reload current data
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => handleUploadClick()}>
-                <Upload className="h-4 w-4 mr-2" />
-                Upload new CSV…
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => handleReset()}>
-                <RotateCcw className="h-4 w-4 mr-2" />
-                Reset to bundled CSV
-              </DropdownMenuItem>
+              {canEdit && (
+                <>
+                  <DropdownMenuItem onSelect={() => handleUploadClick()}>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Upload new CSV…
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => handleReset()}>
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Reset to bundled CSV
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
           <Button variant="outline" className="gap-2">

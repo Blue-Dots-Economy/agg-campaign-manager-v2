@@ -123,5 +123,6 @@ describe("roles", () => {
     expect(FN_ROLES.requestCampaign.sort()).toEqual(["admin", "coordinator", "jfc"]);
     expect(FN_ROLES.campaigns.sort()).toEqual(["admin", "coordinator", "jfc", "user"]);
     expect(FN_ROLES.dashboard.sort()).toEqual([...ROLES].sort());
+    expect(FN_ROLES.editors.sort()).toEqual(["admin", "jfc"]);
   });
 });

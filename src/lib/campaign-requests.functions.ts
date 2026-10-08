@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { and, desc, eq } from "drizzle-orm";
+import { z } from "zod";
 import { requireRole } from "@/auth/middleware";
 import { FN_ROLES } from "@/auth/roles";
 import { getDb } from "@/server/db/client.server";
@@ -27,14 +28,13 @@ export interface CampaignRequestInput {
   max_retries?: number | null;
   retry_after_hrs?: number | null;
   selected_statuses?: string[] | null;
-  requested_by?: string | null;
   note?: string | null;
 }
 
 export const submitCampaignRequest = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.requestCampaign)])
   .inputValidator((data: { request: CampaignRequestInput }) => data)
-  .handler(async ({ data }): Promise<{ ok: boolean; id: string | null }> => {
+  .handler(async ({ data, context }): Promise<{ ok: boolean; id: string | null }> => {
     const r = data.request;
     if (!r.agent_id) throw new Error("Missing agent.");
     if (!r.contacts?.length) throw new Error("No contacts to request.");
@@ -46,7 +46,7 @@ export const submitCampaignRequest = createServerFn({ method: "POST" })
       source: r.source ?? null, cohort_intent: r.cohort_intent ?? null, cohort_filters: r.cohort_filters ?? null,
       contacts: r.contacts, contact_count: r.contacts.length, schedule: r.schedule ?? null,
       concurrency: r.concurrency ?? null, max_retries: r.max_retries ?? null, retry_after_hrs: r.retry_after_hrs ?? null,
-      selected_statuses: r.selected_statuses ?? null, requested_by: r.requested_by ?? null, status: "pending",
+      selected_statuses: r.selected_statuses ?? null, requested_by: context.user.email, status: "pending",
       note: r.note ?? null,
     };
     const [ins] = await getDb()
@@ -87,12 +87,19 @@ export const updateCampaignRequest = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+const statusInput = z.object({
+  id: z.string().uuid(),
+  status: z.enum(["pending", "approved", "declined"]),
+  batch_id: z.string().max(200).optional(),
+  decline_reason: z.string().max(1000).optional(),
+});
+
 export const setCampaignRequestStatus = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.launch)])
-  .inputValidator((data: { id: string; status: string; reviewer_email?: string; batch_id?: string; decline_reason?: string }) => data)
-  .handler(async ({ data }): Promise<{ ok: boolean }> => {
+  .inputValidator((data: z.input<typeof statusInput>) => statusInput.parse(data))
+  .handler(async ({ data, context }): Promise<{ ok: boolean }> => {
     const patch: Record<string, unknown> = { status: data.status, updated_at: new Date().toISOString() };
-    if (data.reviewer_email) patch["reviewer_email"] = data.reviewer_email;
+    patch["reviewer_email"] = context.user.email;
     if (data.batch_id) patch["batch_id"] = data.batch_id;
     if (data.decline_reason) patch["decline_reason"] = data.decline_reason;
     await getDb().update(campaignRequests).set(fromSqlNames(campaignRequests, patch)).where(eq(campaignRequests.id, data.id));

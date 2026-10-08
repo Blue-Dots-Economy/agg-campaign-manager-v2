@@ -41,6 +41,13 @@ export function canAccess(role: Role | undefined, pathname: string): boolean {
   return allowed.some((r) => (r === "/" ? pathname === "/" : pathname === r || pathname.startsWith(r + "/")));
 }
 
+// May change shared data: the UP seekers CSV and North Star targets.
+export const EDITOR_ROLES: Role[] = ["admin", "jfc"];
+
+export function canEditShared(role: Role | undefined): boolean {
+  return !!role && EDITOR_ROLES.includes(role);
+}
+
 // Roles per server function, from the pages that call it.
 const pagesOf = (...routes: string[]): Role[] =>
   ROLES.filter((role) => routes.some((r) => canAccess(role, r)));
@@ -51,4 +58,5 @@ export const FN_ROLES = {
   requestCampaign: pagesOf("/request-campaign"),
   launch: pagesOf("/launch", "/campaign-requests"),
   admin: pagesOf("/settings"),
+  editors: EDITOR_ROLES,
 } satisfies Record<string, Role[]>;

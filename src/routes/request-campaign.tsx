@@ -136,7 +136,6 @@ function RequestCampaignForm() {
             max_retries: null,
             retry_after_hrs: null,
             selected_statuses: ["Pending"],
-            requested_by: session?.email ?? "",
             note: note.trim() || null,
           },
         },

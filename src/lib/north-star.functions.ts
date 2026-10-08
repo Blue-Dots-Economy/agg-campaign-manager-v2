@@ -39,7 +39,7 @@ export const fetchNorthStar = createServerFn({ method: "GET" })
   });
 
 export const saveNorthStar = createServerFn({ method: "POST" })
-  .middleware([requireRole(FN_ROLES.dashboard)])
+  .middleware([requireRole(FN_ROLES.editors)])
   .inputValidator((d: { program: string; key: string; threshold: number | null; enabled?: boolean }) => d)
   .handler(async ({ data }) => {
     const values = {
