@@ -1,6 +1,6 @@
 // Also verifies existing pgcrypto bcrypt hashes.
 import bcrypt from "bcryptjs";
-import { randomInt } from "node:crypto";
+import { randomBytes, randomInt } from "node:crypto";
 
 export const MIN_PASSWORD_LENGTH = 10;
 const COST = 12;
@@ -20,7 +20,9 @@ export async function verifyPassword(plain: string, hash: string | null | undefi
 
 // Every refused login runs one full-cost check, so timing does not reveal
 // whether the email exists. checkedHash: the hash already compared, if any.
-const DUMMY_HASH = "$2b$12$ORhtFDsZnF19Jlc1zWmIj.t/EeJ8LL/d9niCuYxUQ2Iuf1h3ldp8W";
+// The dummy hash is made at startup from random bytes rather than committed, so
+// there is no hash literal in the source and nothing it could ever match.
+const DUMMY_HASH = bcrypt.hash(randomBytes(32).toString("hex"), COST);
 
 export async function equaliseRefusal(plain: string, checkedHash: string | null): Promise<void> {
   let rounds = 0;
@@ -29,7 +31,7 @@ export async function equaliseRefusal(plain: string, checkedHash: string | null)
   } catch {
     /* not a bcrypt hash */
   }
-  if (rounds < COST) await verifyPassword(plain, DUMMY_HASH);
+  if (rounds < COST) await verifyPassword(plain, await DUMMY_HASH);
 }
 
 export function passwordProblem(plain: string): string | null {

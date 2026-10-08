@@ -12,7 +12,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ScheduleEditor, type ScheduleState } from "@/components/ScheduleEditor";
-import { useAuth } from "@/auth/context";
 import { useConcurrencyUsage, useRefreshConcurrency } from "@/hooks/useConcurrencyUsage";
 import {
   listCampaignRequests,
@@ -173,7 +172,6 @@ function CampaignRequestsPage() {
 }
 
 function RequestCard({ req, onChanged }: { req: RequestRow; onChanged: () => void }) {
-  const { session } = useAuth();
   const [open, setOpen] = useState(false);
   const [schedule, setSchedule] = useState<ScheduleState>(() => toScheduleState(req.schedule));
   const [concurrency, setConcurrency] = useState<number>(req.concurrency ?? 5);
