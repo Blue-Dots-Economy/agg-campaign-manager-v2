@@ -98,14 +98,10 @@ jobs:
       postgres:
         image: postgres:17-alpine
         env:
-          POSTGRES_PASSWORD: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
         ports: ["5432:5432"]
         options: >-
           --health-cmd pg_isready --health-interval 2s --health-timeout 2s --health-retries 15
-    env:
-      MIGRATOR_DATABASE_URL: postgresql://migrator:migrator@localhost:5432/campaign-manager-purpledots
-      CM_APP_DATABASE_URL: postgresql://cm_app:cm_app@localhost:5432/campaign-manager-purpledots
-      PURPLE_LOADER_DATABASE_URL: postgresql://purple_loader:purple_loader@localhost:5432/campaign-manager-purpledots
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -115,19 +111,31 @@ jobs:
         with:
           bun-version: "1.4.2"
 
-      - run: bun install --frozen-lockfile
+      - run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Bootstrap the database and users
-        run: >-
-          psql "postgresql://postgres:postgres@localhost:5432/postgres" -v ON_ERROR_STOP=1
-          -v migrator_password=migrator -v cm_app_password=cm_app
-          -v purple_loader_password=purple_loader -f db/bootstrap.sql
+        run: |
+          set -euo pipefail
+          db=localhost:5432/campaign-manager-purpledots
+          for role in migrator cm_app purple_loader; do
+            pw=$(openssl rand -hex 16)
+            echo "::add-mask::$pw"
+            printf -v "$role" '%s' "$pw"
+          done
+          psql "postgresql://postgres@localhost:5432/postgres" -v ON_ERROR_STOP=1 \
+            -v migrator_password="$migrator" -v cm_app_password="$cm_app" \
+            -v purple_loader_password="$purple_loader" -f db/bootstrap.sql
+          {
+            echo "MIGRATOR_DATABASE_URL=postgresql://migrator:$migrator@$db"
+            echo "CM_APP_DATABASE_URL=postgresql://cm_app:$cm_app@$db"
+            echo "PURPLE_LOADER_DATABASE_URL=postgresql://purple_loader:$purple_loader@$db"
+          } >> "$GITHUB_ENV"
 
       - run: bun run db:migrate
 
       - name: Schema drift
         run: |
-          bun x drizzle-kit generate
+          bun run db:generate
           if [ -n "$(git status --porcelain src/server/db)" ]; then
             git status --porcelain src/server/db
             echo "::error::schema.ts differs from the migrations. Run 'bun run db:generate' and commit the result."
