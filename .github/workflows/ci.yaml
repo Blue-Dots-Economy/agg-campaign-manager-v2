@@ -21,9 +21,7 @@ name: CI
 #                            Skips itself when only non-image files changed
 #                            (Helm chart, docs, Supabase config, other workflows).
 #   * sonar      ADVISORY  - skips until SONAR_TOKEN is set on the repository.
-#
-# There are NO tests in this repo (no test files, no runner, no test script), so
-# there is no test job and Sonar has no coverage to report. Add a runner first.
+#   * migrations BLOCKING  - bootstrap, migrations, schema drift, `bun test tests`.
 #
 # Bun, not npm or pnpm: the lockfile is bun.lock and bunfig.toml carries a 24h
 # supply-chain guard. `--frozen-lockfile` refuses to resolve anything fresh, so CI
@@ -92,6 +90,55 @@ jobs:
       # Lovable's own publishing, so this checks the artefact that actually ships.
       - run: bun run build
 
+  migrations:
+    name: migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 2s --health-timeout 2s --health-retries 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.4.2"
+
+      - run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Bootstrap the database and its login
+        run: |
+          set -euo pipefail
+          pw=$(openssl rand -hex 16)
+          echo "::add-mask::$pw"
+          psql "postgresql://postgres@localhost:5432/postgres" -v ON_ERROR_STOP=1 \
+            -v campaign_manager_password="$pw" -f db/bootstrap.sql
+          url="postgresql://campaign_manager:$pw@localhost:5432/campaign-manager-purpledots"
+          {
+            echo "DATABASE_URL=$url"
+            echo "TEST_DATABASE_URL=$url"
+          } >> "$GITHUB_ENV"
+
+      - run: bun run db:migrate
+
+      - name: Schema drift
+        run: |
+          bun run db:generate
+          if [ -n "$(git status --porcelain src/server/db)" ]; then
+            git status --porcelain src/server/db
+            echo "::error::schema.ts differs from the migrations. Run 'bun run db:generate' and commit the result."
+            exit 1
+          fi
+
+      - run: bun test tests
+
   smoke-image:
     name: smoke-image
     runs-on: ubuntu-latest
@@ -133,7 +180,7 @@ jobs:
             exit 0
           fi
           # Paths that are never image input. Anything else changed => build.
-          not_input='^(campaign-manager/|global-overrides\.yaml$|supabase/|\.lovable/|sonar-project\.properties$|\.github/workflows/(security\.yml|build-images\.yaml)$|.*\.md$)'
+          not_input='^(campaign-manager/|global-overrides\.yaml$|supabase/|\.lovable/|sonar-project\.properties$|\.sonarcloud\.properties$|\.github/workflows/(security\.yml|build-images\.yaml)$|.*\.md$)'
           relevant=$(git diff --name-only "${base}" HEAD | grep -Ev "${not_input}" || true)
           if [ -n "${relevant}" ]; then
             echo "Image inputs changed:"; while IFS= read -r f; do echo "  ${f}"; done <<< "${relevant}"
@@ -209,6 +256,25 @@ jobs:
           done
           echo "container health: ${health}"
           [ "${health}" = "healthy" ] || { echo "::error::the container's HEALTHCHECK reports ${health}, expected healthy"; exit 1; }
+
+      # The deployment runs migrations from this image (`node migrate/migrate.mjs`).
+      # No database here, so check what can fail at build time: the journal is in
+      # the image, and the bundle starts under plain node and refuses to run
+      # without DATABASE_URL. Applying the SQL is covered by the
+      # `migrations` job.
+      - name: Migrator is in the image
+        if: steps.changes.outputs.image == 'true' && env.DOCKERHUB_TOKEN != ''
+        run: |
+          set -euo pipefail
+          docker run --rm agg-campaign-manager-v2:ci node -e "require('fs').statSync('migrate/migrations/meta/_journal.json')" \
+            || { echo "::error::migrate/migrations/meta/_journal.json is missing from the image"; exit 1; }
+          set +e
+          out=$(docker run --rm agg-campaign-manager-v2:ci node migrate/migrate.mjs 2>&1)
+          code=$?
+          set -e
+          echo "${out}"
+          [ "${code}" != "0" ] && echo "${out}" | grep -q "DATABASE_URL is not set" \
+            || { echo "::error::node migrate/migrate.mjs did not start as expected"; exit 1; }
 
       - name: Explain the skip
         if: steps.changes.outputs.image == 'true' && env.DOCKERHUB_TOKEN == ''

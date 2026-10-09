@@ -350,7 +350,6 @@ function LaunchWizard() {
             max_retries: maxRetries,
             retry_after_hrs: retryAfterHrs,
             selected_statuses: selectedStatuses,
-            requested_by: session?.email ?? "",
           },
         },
       });

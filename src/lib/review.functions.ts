@@ -1,4 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
+import { and, asc, desc, eq, isNull, or } from "drizzle-orm";
+import { requireRole } from "@/auth/middleware";
+import { FN_ROLES } from "@/auth/roles";
+import { getDb } from "@/server/db/client.server";
+import { fromSqlNames } from "@/server/db/columns";
+import { callRows, sheetConnections, transcriptReviews } from "@/server/db/schema";
 import {
   getCallDetail,
   readStagingCallIds,
@@ -10,11 +16,6 @@ import {
 
 export type ReviewDataset = "seekers" | "providers";
 
-async function sb() {
-  const { sbFor } = await import("@/lib/db.server");
-  return sbFor();
-}
-
 function normKey(h: string): string {
   return String(h ?? "").trim().toLowerCase().replace(/[\s\-]+/g, "_");
 }
@@ -23,14 +24,10 @@ async function resolveSheet(
   dataset: ReviewDataset,
   channel?: string,
 ): Promise<{ sheet_id: string; tab_name: string | null }> {
-  const client = await sb();
-  const { data, error } = await client
-    .from("sheet_connections")
-    .select("sheet_id, tab_name, channel")
-    .eq("program", dataset)
-    .eq("enabled", true);
-  if (error) throw new Error(`sheet_connections lookup failed: ${error.message}`);
-  const rows = (data ?? []) as Array<{ sheet_id: string; tab_name: string | null; channel: string | null }>;
+  const rows = await getDb()
+    .select({ sheet_id: sheetConnections.sheetId, tab_name: sheetConnections.tabName, channel: sheetConnections.channel })
+    .from(sheetConnections)
+    .where(and(eq(sheetConnections.program, dataset), eq(sheetConnections.enabled, true)));
   if (rows.length === 0) throw new Error(`No enabled sheet connection for dataset '${dataset}'`);
   const want = channel ?? "outbound";
   const pick =
@@ -41,25 +38,30 @@ async function resolveSheet(
 }
 
 export const fetchReviewCalls = createServerFn({ method: "GET" })
+  .middleware([requireRole(FN_ROLES.dashboard)])
   .inputValidator((data: { dataset: ReviewDataset }) => data)
   .handler(async ({ data }): Promise<Array<Record<string, string>>> => {
-    const client = await sb();
-    const cols = "call_id, campaign_day, campaign_date, campaign_type, language, city_campaign, call_outcome, call_duration_seconds, intent_score, drop_reason, job_status, phone, channel, data";
-    const rows: Record<string, unknown>[] = [];
-    let _from = 0;
-    while (true) {
-      const { data: batch, error } = await client
-        .from("call_rows")
-        .select(cols)
-        .eq("program", data.dataset)
-        .order("call_id", { ascending: true })
-        .range(_from, _from + 999);
-      if (error) throw new Error(error.message);
-      const b = (batch ?? []) as Record<string, unknown>[];
-      rows.push(...b);
-      if (b.length === 0 || rows.length >= 100000) break;
-      _from += b.length;
-    }
+    const rows: Record<string, unknown>[] = await getDb()
+      .select({
+        call_id: callRows.callId,
+        campaign_day: callRows.campaignDay,
+        campaign_date: callRows.campaignDate,
+        campaign_type: callRows.campaignType,
+        language: callRows.language,
+        city_campaign: callRows.cityCampaign,
+        call_outcome: callRows.callOutcome,
+        call_duration_seconds: callRows.callDurationSeconds,
+        intent_score: callRows.intentScore,
+        drop_reason: callRows.dropReason,
+        job_status: callRows.jobStatus,
+        phone: callRows.phone,
+        channel: callRows.channel,
+        data: callRows.data,
+      })
+      .from(callRows)
+      .where(eq(callRows.program, data.dataset))
+      .orderBy(asc(callRows.callId))
+      .limit(100000);
     return rows.map((r: Record<string, unknown>) => {
       const d = (r.data ?? {}) as Record<string, unknown>;
       const raw = (d.raw ?? {}) as Record<string, unknown>;
@@ -92,16 +94,15 @@ export const fetchReviewCalls = createServerFn({ method: "GET" })
   });
 
 export const fetchCallDetail = createServerFn({ method: "GET" })
+  .middleware([requireRole(FN_ROLES.campaigns)])
   .inputValidator((data: { dataset: ReviewDataset; callId: string }) => data)
   .handler(async ({ data }) => {
-    const client = await sb();
-    const { data: row } = await client
-      .from("call_rows")
-      .select("channel")
-      .eq("program", data.dataset)
-      .eq("call_id", data.callId)
-      .maybeSingle();
-    const channel = (row?.channel as string | undefined) ?? "outbound";
+    const [row] = await getDb()
+      .select({ channel: callRows.channel })
+      .from(callRows)
+      .where(and(eq(callRows.program, data.dataset), eq(callRows.callId, data.callId)))
+      .limit(1);
+    const channel = row?.channel ?? "outbound";
     const { sheet_id, tab_name } = await resolveSheet(data.dataset, channel);
     const detail = await getCallDetail(sheet_id, tab_name ?? undefined, data.callId);
     return (
@@ -109,42 +110,32 @@ export const fetchCallDetail = createServerFn({ method: "GET" })
     );
   });
 
-export const fetchReviewMap = createServerFn({ method: "GET" }).handler(async () => {
-  const client = await sb();
-  const { data, error } = await client
-    .from("transcript_reviews")
-    .select("call_id, job_id, reviewer_email");
-  if (error) throw new Error(error.message);
-  return (data ?? []) as Array<{
-    call_id: string | null;
-    job_id: string | null;
-    reviewer_email: string | null;
-  }>;
-});
+export const fetchReviewMap = createServerFn({ method: "GET" })
+  .middleware([requireRole(FN_ROLES.dashboard)])
+  .handler(async () => {
+    return getDb()
+      .select({
+        call_id: transcriptReviews.callId,
+        job_id: transcriptReviews.jobId,
+        reviewer_email: transcriptReviews.reviewerEmail,
+      })
+      .from(transcriptReviews);
+  });
 
 export const fetchReviewedCallIds = createServerFn({ method: "GET" })
+  .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator((data: { email: string; program?: ReviewDataset }) => data)
   .handler(async ({ data }): Promise<string[]> => {
     const email = (data.email || "").trim().toLowerCase();
     if (!email) return [];
-    const client = await sb();
     const ids = new Set<string>();
-    // 1) Supabase transcript_reviews (paginated past the ~1000-row cap)
-    let from = 0;
-    while (true) {
-      const { data: batch, error } = await client
-        .from("transcript_reviews")
-        .select("call_id, job_id")
-        .eq("reviewer_email", email)
-        .range(from, from + 999);
-      if (error) throw new Error(error.message);
-      const rows = batch ?? [];
-      for (const r of rows as Array<{ call_id: string | null; job_id: string | null }>) {
-        if (r.call_id) ids.add(String(r.call_id));
-        if (r.job_id) ids.add(String(r.job_id));
-      }
-      if (rows.length === 0) break;
-      from += rows.length;
+    const rows = await getDb()
+      .select({ call_id: transcriptReviews.callId, job_id: transcriptReviews.jobId })
+      .from(transcriptReviews)
+      .where(eq(transcriptReviews.reviewerEmail, email));
+    for (const r of rows) {
+      if (r.call_id) ids.add(String(r.call_id));
+      if (r.job_id) ids.add(String(r.job_id));
     }
     // 2) Master sheet "Feedback Responses" tab (durable append-only log). Never throws.
     if (data.program) {
@@ -159,26 +150,18 @@ export const fetchReviewedCallIds = createServerFn({ method: "GET" })
 
 /** Every call_id/job_id reviewed by ANY reviewer for a program (DB ∪ sheet). */
 export const fetchAllReviewedCallIds = createServerFn({ method: "GET" })
+  .middleware([requireRole(FN_ROLES.dashboard)])
   .inputValidator((data: { program: ReviewDataset }) => data)
   .handler(async ({ data }): Promise<string[]> => {
-    const client = await sb();
     const ids = new Set<string>();
-    // 1) Supabase transcript_reviews for this program (+ legacy null-dataset rows), paginated.
-    let from = 0;
-    while (true) {
-      const { data: batch, error } = await client
-        .from("transcript_reviews")
-        .select("call_id, job_id")
-        .or(`dataset.eq.${data.program},dataset.is.null`)
-        .range(from, from + 999);
-      if (error) throw new Error(error.message);
-      const rows = batch ?? [];
-      for (const r of rows as Array<{ call_id: string | null; job_id: string | null }>) {
-        if (r.call_id) ids.add(String(r.call_id));
-        if (r.job_id) ids.add(String(r.job_id));
-      }
-      if (rows.length === 0) break;
-      from += rows.length;
+    // 1) transcript_reviews for this program (+ legacy null-dataset rows)
+    const rows = await getDb()
+      .select({ call_id: transcriptReviews.callId, job_id: transcriptReviews.jobId })
+      .from(transcriptReviews)
+      .where(or(eq(transcriptReviews.dataset, data.program), isNull(transcriptReviews.dataset)));
+    for (const r of rows) {
+      if (r.call_id) ids.add(String(r.call_id));
+      if (r.job_id) ids.add(String(r.job_id));
     }
     // 2) Master sheet "Feedback Responses" tab (all reviewers). Never throws.
     try {
@@ -190,34 +173,30 @@ export const fetchAllReviewedCallIds = createServerFn({ method: "GET" })
   });
 
 export const fetchExistingReviews = createServerFn({ method: "GET" })
+  .middleware([requireRole(FN_ROLES.dashboard)])
   .inputValidator((data: { callId?: string | null; jobId?: string | null }) => data)
   .handler(async ({ data }) => {
-    const client = await sb();
     const callId = (data.callId ?? "").trim();
     const jobId = (data.jobId ?? "").trim();
-    let query = client
-      .from("transcript_reviews")
-      .select(
-        "reviewer_email, reviewer_name, overall_rating, quantitative_issues, reviewer_notes, turn_flags, created_at",
-      )
-      .order("created_at", { ascending: false });
-    if (callId) {
-      query = query.eq("call_id", callId);
-    } else if (jobId) {
-      query = query.eq("job_id", jobId);
-    } else {
-      return [];
-    }
-    const { data: rows, error } = await query;
-    if (error) throw new Error(error.message);
-    return rows ?? [];
+    if (!callId && !jobId) return [];
+    return getDb()
+      .select({
+        reviewer_email: transcriptReviews.reviewerEmail,
+        reviewer_name: transcriptReviews.reviewerName,
+        overall_rating: transcriptReviews.overallRating,
+        quantitative_issues: transcriptReviews.quantitativeIssues,
+        reviewer_notes: transcriptReviews.reviewerNotes,
+        turn_flags: transcriptReviews.turnFlags,
+        created_at: transcriptReviews.createdAt,
+      })
+      .from(transcriptReviews)
+      .where(callId ? eq(transcriptReviews.callId, callId) : eq(transcriptReviews.jobId, jobId))
+      .orderBy(desc(transcriptReviews.createdAt));
   });
 
 export interface ReviewInput {
   job_id?: string | null;
   call_id?: string | null;
-  reviewer_email: string;
-  reviewer_name?: string | null;
   company_name?: string | null;
   campaign_day?: string | null;
   campaign_type?: string | null;
@@ -260,16 +239,28 @@ const FEEDBACK_COLUMNS = [
 ];
 
 export const submitReview = createServerFn({ method: "POST" })
+  .middleware([requireRole(FN_ROLES.campaigns)])
   .inputValidator((data: { review: ReviewInput }) => data)
-  .handler(async ({ data }) => {
-    const review: ReviewInput = { review_type: "transcript", ...data.review, company_name: "" };
-    const client = await sb();
-    const { error } = await client
-      .from("transcript_reviews")
-      .upsert(review as unknown as Record<string, unknown>, {
-        onConflict: "call_id,reviewer_email",
-      });
-    if (error) throw new Error(error.message);
+  .handler(async ({ data, context }) => {
+    // The reviewer is the signed-in user, never what the browser sends.
+    const review = {
+      review_type: "transcript",
+      ...data.review,
+      company_name: "",
+      reviewer_email: context.user.email,
+      reviewer_name: context.user.email,
+    };
+    // One review per (call_id, reviewer_email); no unique constraint to upsert on.
+    const values = fromSqlNames(transcriptReviews, review as unknown as Record<string, unknown>);
+    const db = getDb();
+    await db.transaction(async (tx) => {
+      if (review.call_id) {
+        await tx
+          .delete(transcriptReviews)
+          .where(and(eq(transcriptReviews.callId, review.call_id), eq(transcriptReviews.reviewerEmail, review.reviewer_email)));
+      }
+      await tx.insert(transcriptReviews).values(values);
+    });
 
     // Append to master sheet's "Feedback Responses" tab. Never fail the DB write on a sheet hiccup.
     try {
