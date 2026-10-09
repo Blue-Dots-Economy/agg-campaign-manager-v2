@@ -62,7 +62,7 @@ ENV NODE_ENV=production \
 COPY --from=build --chown=node:node /app/.output ./.output
 
 # Migrations (SQL + meta/_journal.json) and the bundled migrator, for the
-# deployment's migrate Job: `node migrate/migrate.mjs` with MIGRATOR_DATABASE_URL.
+# deployment's migrate Job: `node migrate/migrate.mjs` with DATABASE_URL.
 COPY --from=build --chown=node:node /app/migrate ./migrate
 
 # The Node images ship a non-root `node` user (uid 1000).

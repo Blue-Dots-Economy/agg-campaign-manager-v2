@@ -113,22 +113,17 @@ jobs:
 
       - run: bun install --frozen-lockfile --ignore-scripts
 
-      - name: Bootstrap the database and users
+      - name: Bootstrap the database and its login
         run: |
           set -euo pipefail
-          db=localhost:5432/campaign-manager-purpledots
-          for role in migrator cm_app purple_loader; do
-            pw=$(openssl rand -hex 16)
-            echo "::add-mask::$pw"
-            printf -v "$role" '%s' "$pw"
-          done
+          pw=$(openssl rand -hex 16)
+          echo "::add-mask::$pw"
           psql "postgresql://postgres@localhost:5432/postgres" -v ON_ERROR_STOP=1 \
-            -v migrator_password="$migrator" -v cm_app_password="$cm_app" \
-            -v purple_loader_password="$purple_loader" -f db/bootstrap.sql
+            -v campaign_manager_password="$pw" -f db/bootstrap.sql
+          url="postgresql://campaign_manager:$pw@localhost:5432/campaign-manager-purpledots"
           {
-            echo "MIGRATOR_DATABASE_URL=postgresql://migrator:$migrator@$db"
-            echo "CM_APP_DATABASE_URL=postgresql://cm_app:$cm_app@$db"
-            echo "PURPLE_LOADER_DATABASE_URL=postgresql://purple_loader:$purple_loader@$db"
+            echo "DATABASE_URL=$url"
+            echo "TEST_DATABASE_URL=$url"
           } >> "$GITHUB_ENV"
 
       - run: bun run db:migrate
@@ -265,7 +260,7 @@ jobs:
       # The deployment runs migrations from this image (`node migrate/migrate.mjs`).
       # No database here, so check what can fail at build time: the journal is in
       # the image, and the bundle starts under plain node and refuses to run
-      # without MIGRATOR_DATABASE_URL. Applying the SQL is covered by the
+      # without DATABASE_URL. Applying the SQL is covered by the
       # `migrations` job.
       - name: Migrator is in the image
         if: steps.changes.outputs.image == 'true' && env.DOCKERHUB_TOKEN != ''
@@ -278,7 +273,7 @@ jobs:
           code=$?
           set -e
           echo "${out}"
-          [ "${code}" != "0" ] && echo "${out}" | grep -q "MIGRATOR_DATABASE_URL is not set" \
+          [ "${code}" != "0" ] && echo "${out}" | grep -q "DATABASE_URL is not set" \
             || { echo "::error::node migrate/migrate.mjs did not start as expected"; exit 1; }
 
       - name: Explain the skip

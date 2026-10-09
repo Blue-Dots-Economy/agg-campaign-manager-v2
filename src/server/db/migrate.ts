@@ -1,4 +1,4 @@
-// MIGRATOR_DATABASE_URL=... bun run db:migrate
+// Reads DATABASE_URL (or the old name, MIGRATOR_DATABASE_URL).
 import { fileURLToPath } from "node:url";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
@@ -16,9 +16,9 @@ export async function runMigrations(url: string): Promise<void> {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const url = process.env.MIGRATOR_DATABASE_URL;
+  const url = process.env.MIGRATOR_DATABASE_URL || process.env.DATABASE_URL;
   if (!url) {
-    console.error("MIGRATOR_DATABASE_URL is not set");
+    console.error("DATABASE_URL is not set");
     process.exit(1);
   }
   await runMigrations(url);

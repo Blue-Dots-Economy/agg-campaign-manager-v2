@@ -2000,13 +2000,3 @@ SELECT jsonb_build_object(
   'metrics', (SELECT metrics_raw FROM metrics)
 );
 $$;
-
--- grants (3.3)
-
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.app_users, public.campaign_requests, public.launched_batch_inputs, public.launched_batches, public.north_star_config, public.program_agents, public.program_export_targets, public.program_sync_state, public.reviewers, public.sheet_connections, public.transcript_reviews TO cm_app;
-GRANT SELECT ON public.purple_dots_calls, public.purple_dots_connections, public.call_rows TO cm_app;
-GRANT EXECUTE ON FUNCTION public.get_campaign_drop_causes(_campaign text, _state text, _date_from date, _date_to date, _channel text), public.get_campaign_list(_program text, _state text, _date_from date, _date_to date, _channel text), public.get_dkb_campaign_causes(_campaign text, _state text, _date_from date, _date_to date, _channel text), public.get_dkb_drop_analysis(_state text, _date_from date, _date_to date, _campaign_type text, _campaign text, _channel text), public.get_funnel_call_ids(_program text, _state text, _date_from date, _date_to date, _campaign_type text, _campaign text, _stage text, _channel text), public.get_funnel_durations(_program text, _state text, _date_from date, _date_to date, _campaign_type text, _campaign text, _channel text), public.get_kkb_call_outcomes(_state text, _date_from date, _date_to date, _campaign_type text, _campaign text, _channel text), public.get_kkb_drop_analysis(_state text, _date_from date, _date_to date, _campaign_type text, _campaign text, _channel text), public.get_program_aggregates(_program text, _state text, _date_from date, _date_to date, _campaign_type text, _campaign text, _channel text), public.get_program_filter_options(_program text), public.get_program_metric_groups(_program text, _state text, _date_from date, _date_to date, _campaign_type text, _campaign text, _channel text), public.get_program_metrics_raw(_program text, _state text, _date_from date, _date_to date, _campaign_type text, _campaign text, _channel text), public.get_program_aggregate_payload(_program text, _state text, _date_from date, _date_to date, _campaign_type text, _campaign text, _channel text), public.pd_norm_stage(text) TO cm_app;
-
-GRANT SELECT, INSERT, UPDATE ON public.purple_dots_calls, public.purple_dots_connections TO purple_loader;
--- connections.id is a sequence; without this, inserts fail
-GRANT USAGE, SELECT ON SEQUENCE public.purple_dots_connections_id_seq TO purple_loader;

@@ -1,11 +1,9 @@
-// Needs db/bootstrap.sql applied and the three *_DATABASE_URL vars; skipped otherwise.
+// Needs db/bootstrap.sql applied and TEST_DATABASE_URL (the campaign_manager login); skipped otherwise.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import pg from "pg";
 import { runMigrations } from "../../src/server/db/migrate";
 
-const MIGRATOR = process.env.MIGRATOR_DATABASE_URL;
-const CM_APP = process.env.CM_APP_DATABASE_URL;
-const LOADER = process.env.PURPLE_LOADER_DATABASE_URL;
+const URL = process.env.TEST_DATABASE_URL;
 
 const PREFIX = "reports-test-";
 // 3 seekers calls (2 outbound, 1 inbound), 1 provider, 1 test call.
@@ -17,33 +15,30 @@ const CALLS = [
   { id: "e", persona: "seeker", channel: "Outbound", answered: true, test: true },
 ];
 
-describe.skipIf(!MIGRATOR || !CM_APP || !LOADER)("reports", () => {
+describe.skipIf(!URL)("reports", () => {
   let reports: typeof import("../../src/server/db/reports.server");
   let owner: pg.Client;
 
   beforeAll(async () => {
-    await runMigrations(MIGRATOR!);
-    owner = new pg.Client({ connectionString: MIGRATOR });
+    await runMigrations(URL!);
+    owner = new pg.Client({ connectionString: URL });
     await owner.connect();
     await cleanup();
 
-    const loader = new pg.Client({ connectionString: LOADER });
-    await loader.connect();
     for (const c of CALLS) {
-      await loader.query(
+      await owner.query(
         `insert into purple_dots_calls
            (call_id, call_uuid, persona, channel, call_answered, test_flag, campaign_name, call_date_ist, call_datetime_ist)
          values ($1, $1, $2, $3, $4, $5, 'Reports Test', '2026-09-01', '2026-09-01T10:00:00+05:30')`,
         [PREFIX + c.id, c.persona, c.channel, c.answered, c.test],
       );
     }
-    await loader.end();
     await owner.query(
       `insert into program_sync_state (program, row_count, status) values ('seekers', 3, 'ok')
        on conflict (program) do update set row_count = 3, status = 'ok'`,
     );
 
-    process.env.DATABASE_URL = CM_APP;
+    process.env.DATABASE_URL = URL;
     reports = await import("../../src/server/db/reports.server");
   });
 

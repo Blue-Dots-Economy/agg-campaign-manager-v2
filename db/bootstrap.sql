@@ -1,29 +1,24 @@
 -- Run once per environment, as superuser:
---   psql "$ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 -v migrator_password=... \
---     -v cm_app_password=... -v purple_loader_password=... -f db/bootstrap.sql
+--   psql "$ADMIN_DATABASE_URL" -v ON_ERROR_STOP=1 -v campaign_manager_password=... -f db/bootstrap.sql
+-- One login, campaign_manager, for the app, migrations and pipeline.
 
-SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', r, p)
-FROM (VALUES ('migrator',      :'migrator_password'),
-             ('cm_app',        :'cm_app_password'),
-             ('purple_loader', :'purple_loader_password')) AS v (r, p)
-WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r)
+SELECT format('CREATE ROLE campaign_manager LOGIN PASSWORD %L', :'campaign_manager_password')
+WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'campaign_manager')
 \gexec
 
-SELECT 'CREATE DATABASE "campaign-manager-purpledots" OWNER migrator'
+SELECT 'CREATE DATABASE "campaign-manager-purpledots" OWNER campaign_manager'
 WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'campaign-manager-purpledots')
 \gexec
 
 REVOKE ALL ON DATABASE "campaign-manager-purpledots" FROM PUBLIC;
-GRANT CONNECT ON DATABASE "campaign-manager-purpledots" TO migrator, cm_app, purple_loader;
 
 \connect "campaign-manager-purpledots"
 
-ALTER SCHEMA public OWNER TO migrator;
+ALTER SCHEMA public OWNER TO campaign_manager;
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
-GRANT USAGE ON SCHEMA public TO cm_app, purple_loader;
 
--- Owned by the pipeline repo.
-CREATE SCHEMA IF NOT EXISTS platform AUTHORIZATION purple_loader;
+-- Written by the pipeline repo.
+CREATE SCHEMA IF NOT EXISTS platform AUTHORIZATION campaign_manager;
 
 -- Needs superuser; kept out of public.
 CREATE SCHEMA IF NOT EXISTS extensions;

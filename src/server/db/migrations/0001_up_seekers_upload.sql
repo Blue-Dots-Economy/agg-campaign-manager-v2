@@ -6,5 +6,3 @@ CREATE TABLE "up_seekers_upload" (
 	"uploaded_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "up_seekers_upload_single_row" CHECK (id = 1)
 );
---> statement-breakpoint
-GRANT SELECT, INSERT, UPDATE, DELETE ON "up_seekers_upload" TO cm_app;
