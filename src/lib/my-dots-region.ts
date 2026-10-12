@@ -30,6 +30,10 @@ export interface CoordinatorRow {
   newInPeriod: number;
   avgCompletion: number;
   belowThreshold: number;
+  activePct: number;
+  inactivePct: number;
+  /** round(0.5 * (100 - inactivePct) + 0.5 * avgCompletion) */
+  activityScore: number;
   participants: ScopedParticipantRow[];
 }
 
@@ -42,6 +46,10 @@ export interface OrgRow {
   newInPeriod: number;
   avgCompletion: number;
   belowThreshold: number;
+  activePct: number;
+  inactivePct: number;
+  /** round(0.5 * (100 - inactivePct) + 0.5 * avgCompletion) */
+  activityScore: number;
   coordinators: CoordinatorRow[];
 }
 
@@ -203,12 +211,20 @@ function summarise(rows: ScopedParticipantRow[], period: Period) {
     sum += r.profileCompletion;
     if (r.profileCompletion < PROFILE_COMPLETION_THRESHOLD) below++;
   }
+  const n = rows.length;
+  const avgCompletion = n ? Math.round(sum / n) : 0;
+  const inactivePct = n ? Math.round((status.inactive / n) * 100) : 0;
+  const activePct = n ? Math.round((status.active / n) * 100) : 0;
   return {
-    total: rows.length,
+    total: n,
     status,
     newInPeriod,
-    avgCompletion: rows.length ? Math.round(sum / rows.length) : 0,
+    avgCompletion,
     belowThreshold: below,
+    activePct,
+    inactivePct,
+    // Activity score: deterministic composite, same formula for orgs and coordinators.
+    activityScore: n ? Math.round(0.5 * (100 - inactivePct) + 0.5 * avgCompletion) : 0,
   };
 }
 
