@@ -151,15 +151,14 @@ function buildSample(): ScopedParticipant[] {
         const type: ParticipantType = rand() < 0.82 ? "seeker" : "provider";
         // Coordinators without recent onboards never have anyone joined in the last 90 days.
         const minJoin = c.recentOnboards ? 1 : 95;
-        const joinedDaysAgo = Math.floor(minJoin + rand() * (360 - minJoin));
-        const neverRoll = rand();
+        const joinedDaysAgo = Math.floor(minJoin + Math.pow(rand(), 1.6) * (360 - minJoin));
         let lastEngagedDaysAgo: number | null;
-        if (neverRoll > 0.55 + org.health * 0.4) {
+        if (rand() < (1 - org.health) * 0.35) {
           lastEngagedDaysAgo = null;
         } else {
-          // healthy orgs skew to recent engagement
-          const skew = Math.pow(rand(), 0.5 + org.health * 2.5);
-          lastEngagedDaysAgo = Math.min(joinedDaysAgo, Math.floor(1 + (1 - skew) * 180));
+          // healthy orgs skew strongly to recent engagement
+          const d = Math.floor(1 + Math.pow(rand(), 1 + org.health * 4) * 150);
+          lastEngagedDaysAgo = Math.min(joinedDaysAgo, d);
         }
         const base = 25 + org.health * 55;
         const profileCompletion = Math.max(
