@@ -40,7 +40,8 @@ import { registry } from "@/programs/registry";
 
 const ROLE_OPTIONS = [
   { value: "admin", label: "Admin" },
-  { value: "jfc", label: "JFC" },
+  { value: "wc", label: "WC (Working Committee)" },
+  { value: "jfc", label: "JFC (deprecated)" },
   { value: "owner", label: "Owner" },
   { value: "coordinator", label: "Coordinator" },
   { value: "ecosystem", label: "Ecosystem" },
