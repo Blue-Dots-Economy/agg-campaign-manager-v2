@@ -135,6 +135,7 @@ const ORGS: OrgSpec[] = [
     coordinators: [
       { code: "BST-C09", size: 22, recentOnboards: true },
       { code: "BST-C10", size: 20, recentOnboards: true },
+      { code: "BST-C11", size: 20, recentOnboards: true },
     ],
   },
 ];
