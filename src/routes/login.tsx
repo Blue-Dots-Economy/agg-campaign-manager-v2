@@ -60,7 +60,7 @@ function LoginPage() {
               value={email}
               onChange={(e) => { setEmail(e.target.value); setError(false); }}
               required
-              aria-invalid={error || undefined}
+              aria-invalid={!!error || undefined}
               aria-describedby={error ? "login-error" : undefined}
             />
           </div>
@@ -72,7 +72,7 @@ function LoginPage() {
               autoComplete="current-password"
               value={password}
               onChange={(e) => { setPassword(e.target.value); setError(false); }}
-              aria-invalid={error || undefined}
+              aria-invalid={!!error || undefined}
               aria-describedby={error ? "login-error" : undefined}
             />
           </div>
