@@ -10,16 +10,23 @@ async function sb() {
 
 export const resolveLogin = createServerFn({ method: "POST" })
   .inputValidator((d: { email: string; password?: string }) => d)
-  .handler(async ({ data }): Promise<{ role: "admin" | "user" | "ecosystem" | "jfc" | "owner" | "coordinator" | null; name?: string | null; district?: string | null; program?: string | null; node_type?: string | null; node_name?: string | null }> => {
+  .handler(async ({ data }): Promise<{ role: "admin" | "user" | "ecosystem" | "jfc" | "wc" | "owner" | "coordinator" | null; name?: string | null; district?: string | null; program?: string | null; node_type?: string | null; node_name?: string | null; fault?: boolean }> => {
     const email = (data.email || "").trim().toLowerCase();
     const password = data.password || "";
     const client = await sb();
     try {
-      const { data: rows } = await client.rpc("app_user_login", { _email: email, _password: password || null });
+      // The Supabase client returns errors instead of throwing, so `error` must be
+      // checked explicitly: a database fault (missing function, signature mismatch,
+      // crypt() failure) must not be mistaken for a wrong password.
+      const { data: rows, error } = await client.rpc("app_user_login", { _email: email, _password: password || null });
+      if (error) {
+        console.error("[auth] app_user_login RPC failed:", { message: error.message, code: error.code, details: error.details, hint: error.hint });
+        return { role: null, fault: true };
+      }
       const row = (Array.isArray(rows) ? rows[0] : rows) as Record<string, string> | undefined;
       if (row?.role) {
         return {
-          role: row.role as "admin" | "user" | "ecosystem" | "jfc" | "owner" | "coordinator",
+          role: row.role as "admin" | "user" | "ecosystem" | "jfc" | "wc" | "owner" | "coordinator",
           name: row.name ?? null,
           district: row.district ?? null,
           program: row.program ?? null,
@@ -27,11 +34,22 @@ export const resolveLogin = createServerFn({ method: "POST" })
           node_name: row.node_name ?? null,
         };
       }
-    } catch { /* fall through to legacy checks */ }
+    } catch (e) {
+      // A thrown error here is a fault (network, client setup), not a missing account.
+      console.error("[auth] app_user_login threw:", e instanceof Error ? e.message : String(e));
+      return { role: null, fault: true };
+    }
     try {
-      const { data: r } = await client.from("reviewers").select("email").eq("email", email).maybeSingle();
+      const { data: r, error } = await client.from("reviewers").select("email").eq("email", email).maybeSingle();
+      if (error) {
+        console.error("[auth] reviewers fallback query failed:", { message: error.message, code: error.code, details: error.details, hint: error.hint });
+        return { role: null, fault: true };
+      }
       if (r) return { role: "user" };
-    } catch { /* ignore */ }
+    } catch (e) {
+      console.error("[auth] reviewers fallback query threw:", e instanceof Error ? e.message : String(e));
+      return { role: null, fault: true };
+    }
     return { role: null };
   });
 
