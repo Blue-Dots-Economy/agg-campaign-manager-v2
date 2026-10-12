@@ -53,8 +53,14 @@ export interface OrgRow {
   coordinators: CoordinatorRow[];
 }
 
+export type RollupScope =
+  | { kind: "region" }
+  | { kind: "org"; orgId: string }
+  | { kind: "coordinator"; code: string };
+
 export interface RegionRollup {
   region: string;
+  scope: RollupScope;
   period: Period;
   type: "all" | ParticipantType;
   isSample: true;
@@ -237,12 +243,33 @@ export function getRegionRollup(opts: {
   region: string;
   period: Period;
   type: "all" | ParticipantType;
+  /** Defaults to the whole region. Scope is enforced here, before summarising:
+   *  rows, organisations and coordinators outside it never enter the result. */
+  scope?: RollupScope;
 }): RegionRollup {
+  const scope: RollupScope = opts.scope ?? { kind: "region" };
+  const inScope = (p: ScopedParticipant) =>
+    scope.kind === "region" ||
+    (scope.kind === "org" && p.orgId === scope.orgId) ||
+    (scope.kind === "coordinator" && p.coordinatorCode === scope.code);
+
   const rows: ScopedParticipantRow[] = SAMPLE.filter(
-    (p) => opts.type === "all" || p.type === opts.type,
+    (p) => inScope(p) && (opts.type === "all" || p.type === opts.type),
   ).map((p) => ({ ...p, lifecycle: deriveLifecycle(p) }));
 
-  const orgs: OrgRow[] = ORGS.map((o) => {
+  const scopedOrgs = ORGS.filter((o) =>
+    scope.kind === "region"
+      ? true
+      : scope.kind === "org"
+        ? o.id === scope.orgId
+        : o.coordinators.some((c) => c.code === scope.code),
+  ).map((o) => ({
+    ...o,
+    coordinators:
+      scope.kind === "coordinator" ? o.coordinators.filter((c) => c.code === scope.code) : o.coordinators,
+  }));
+
+  const orgs: OrgRow[] = scopedOrgs.map((o) => {
     const coordinators: CoordinatorRow[] = o.coordinators.map((c) => {
       const cr = rows.filter((r) => r.coordinatorCode === c.code);
       return { code: c.code, orgId: o.id, ...summarise(cr, opts.period), participants: cr };
@@ -256,6 +283,7 @@ export function getRegionRollup(opts: {
 
   return {
     region: opts.region,
+    scope,
     period: opts.period,
     type: opts.type,
     isSample: true,
@@ -270,4 +298,15 @@ export function getRegionRollup(opts: {
     coordinatorCount: coords.length,
     orgs,
   };
+}
+
+/**
+ * SWAP SEAM #2 — who is this actor scoped to? There is no user→organisation or
+ * user→coordinator mapping in the database yet, so this returns fixed sample
+ * scopes. Replace this one function body when that mapping exists.
+ */
+export function getScopeForActor(role: string | undefined, _email: string | undefined): RollupScope {
+  if (role === "owner") return { kind: "org", orgId: "ORG-GPB" };
+  if (role === "coordinator") return { kind: "coordinator", code: "BST-C07" };
+  return { kind: "region" };
 }
