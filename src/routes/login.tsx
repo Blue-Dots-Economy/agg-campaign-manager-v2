@@ -21,13 +21,17 @@ function LoginPage() {
   const isDark = resolveDark(theme);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<"credentials" | "fault" | false>(false);
 
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const role = await login(email, password);
-    if (role) navigate({ to: landingFor(role) });
-    else setError(true);
+    try {
+      const role = await login(email, password);
+      if (role) navigate({ to: landingFor(role) });
+      else setError("credentials");
+    } catch {
+      setError("fault");
+    }
   };
 
   return (
@@ -73,7 +77,7 @@ function LoginPage() {
             />
           </div>
           {error && (
-            <p id="login-error" role="alert" className="text-xs text-rose-600">Not an authorised email, or wrong admin password.</p>
+            <p id="login-error" role="alert" className="text-xs text-rose-600">{error === "fault" ? "Something went wrong signing in. Please try again or contact support." : "Incorrect email or password."}</p>
           )}
           <Button type="submit" className="w-full">Sign in</Button>
         </form>

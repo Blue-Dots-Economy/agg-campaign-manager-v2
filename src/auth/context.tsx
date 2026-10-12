@@ -75,6 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     const res = await resolve({ data: { email, password } });
+    if (res?.fault) throw new Error("auth-fault");
     if (res?.role) {
       const s: Session = { email: email.trim().toLowerCase(), role: res.role, name: res.name ?? null, district: res.district ?? null, program: res.program ?? null, nodeType: res.node_type ?? null, nodeName: res.node_name ?? null };
       const raw = JSON.stringify(s);
