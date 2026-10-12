@@ -66,6 +66,8 @@ import {
   type CsvMeta,
 } from "@/lib/upSeekersCsv";
 import { useProgram } from "@/programs/context";
+import { useAuth } from "@/auth/context";
+import { RegionRollupView } from "@/components/my-dots/RegionRollupView";
 import {
   getProviderParticipants,
   getProviderSummary,
@@ -79,7 +81,7 @@ import {
 } from "@/lib/purple-dots-participants";
 
 export const Route = createFileRoute("/user-level-analysis")({
-  component: UserLevelAnalysis,
+  component: MyPurpleDotsRoute,
   head: () => ({
     meta: [
       { title: "My Purple Dots · Participant network" },
@@ -268,6 +270,14 @@ function MetricTile({
       </div>
     </div>
   );
+}
+
+// Region rollup for Working Committee / admin / ecosystem; every other role keeps the roster below.
+function MyPurpleDotsRoute() {
+  const { session } = useAuth();
+  const role = session?.role;
+  if (role === "wc" || role === "admin" || role === "ecosystem") return <RegionRollupView />;
+  return <UserLevelAnalysis />;
 }
 
 function UserLevelAnalysis() {
