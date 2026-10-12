@@ -68,6 +68,10 @@ import {
 import { useProgram } from "@/programs/context";
 import { useAuth } from "@/auth/context";
 import { RegionRollupView } from "@/components/my-dots/RegionRollupView";
+import { OwnerRollupView } from "@/components/my-dots/OwnerRollupView";
+import { CoordinatorRollupView } from "@/components/my-dots/CoordinatorRollupView";
+import { getScopeForActor } from "@/lib/my-dots-region";
+import { useRouterState } from "@tanstack/react-router";
 import {
   getProviderParticipants,
   getProviderSummary,
@@ -272,10 +276,22 @@ function MetricTile({
   );
 }
 
-// Region rollup for Working Committee / admin / ecosystem; every other role keeps the roster below.
+// Persona views: owner → own organisation, coordinator → own caseload,
+// wc/admin/ecosystem → region. Admin may preview the others with ?persona=owner|coordinator.
+// Every other role keeps the roster below.
 function MyPurpleDotsRoute() {
   const { session } = useAuth();
   const role = session?.role;
+  const search = useRouterState({ select: (s) => s.location.search }) as Record<string, unknown>;
+  const persona =
+    role === "admin" && (search?.persona === "owner" || search?.persona === "coordinator")
+      ? search.persona
+      : role;
+  if (persona === "owner" || persona === "coordinator") {
+    const scope = getScopeForActor(persona, session?.email);
+    if (scope.kind === "org") return <OwnerRollupView scope={scope} />;
+    if (scope.kind === "coordinator") return <CoordinatorRollupView scope={scope} />;
+  }
   if (role === "wc" || role === "admin" || role === "ecosystem") return <RegionRollupView />;
   return <UserLevelAnalysis />;
 }
