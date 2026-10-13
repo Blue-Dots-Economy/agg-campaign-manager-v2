@@ -21,23 +21,21 @@ import type { CoordinatorRow, OrgRow } from "@/lib/my-dots-region";
 import {
   ACTIVITY_FORMULA,
   ActivityCell,
-  ControlsAndHeader,
+  HeaderBand,
   InfoCard,
   NeedsAttention,
   ParticipantTable,
   SAMPLE_NOTE,
-  SampleBanner,
   SectionLabel,
   SortBtn,
   StatusCards,
-  TitleRow,
   sortRows,
   useRollup,
   useSort,
 } from "./shared";
 
 export function RegionRollupView() {
-  const { rollup, type, setType, period, setPeriod, refreshing, refresh } = useRollup({ kind: "region" });
+  const { rollup, type, period, setPeriod, refreshing, refresh } = useRollup({ kind: "region" });
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const { sortKey, sortDir, toggleSort } = useSort();
   const [drill, setDrill] = useState<{ org: OrgRow; coord: CoordinatorRow } | null>(null);
@@ -48,11 +46,9 @@ export function RegionRollupView() {
   return (
     <TooltipProvider>
       <div className="space-y-6">
-        <TitleRow badge={rollup.region} />
-        <SampleBanner />
-        <ControlsAndHeader
+        <HeaderBand
+          badge={rollup.region}
           type={type}
-          setType={setType}
           period={period}
           setPeriod={setPeriod}
           total={rollup.total}

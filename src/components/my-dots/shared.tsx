@@ -1,8 +1,8 @@
 // Shared building blocks for the My Purple Dots persona views (region, owner, coordinator).
 // Privacy: participants by ID only, coordinators by code only, organisations by institution name.
 import { useMemo, useState } from "react";
+import { useProgram } from "@/programs/context";
 import {
-  UserPlus,
   Users,
   AlertTriangle,
   PauseCircle,
@@ -11,13 +11,12 @@ import {
   FlaskConical,
   Sparkles,
   UserX,
-  FileWarning,
+  TrendingDown,
   UserCog,
   ArrowUpDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -56,13 +55,13 @@ export const STATUS: {
   tile: string;
 }[] = [
   { key: "new", label: "New", desc: "Joined within the last 7 days", Icon: Sparkles,
-    num: "text-emerald-600 dark:text-emerald-400", card: "bg-emerald-500/5 border-emerald-500/20", tile: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" },
+    num: "text-emerald-600 dark:text-emerald-400", card: "bg-emerald-500/[0.01] border-border", tile: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" },
   { key: "active", label: "Active", desc: "Engaged in the last 30 days", Icon: Users,
-    num: "text-blue-600 dark:text-blue-400", card: "bg-blue-500/5 border-blue-500/20", tile: "bg-blue-500/15 text-blue-600 dark:text-blue-400" },
+    num: "text-blue-600 dark:text-blue-400", card: "bg-blue-500/[0.01] border-border", tile: "bg-blue-500/15 text-blue-600 dark:text-blue-400" },
   { key: "at-risk", label: "At Risk", desc: "No engagement for 31–90 days", Icon: AlertTriangle,
-    num: "text-amber-600 dark:text-amber-400", card: "bg-amber-500/5 border-amber-500/20", tile: "bg-amber-500/15 text-amber-600 dark:text-amber-400" },
+    num: "text-amber-600 dark:text-amber-400", card: "bg-amber-500/[0.01] border-border", tile: "bg-amber-500/15 text-amber-600 dark:text-amber-400" },
   { key: "inactive", label: "Inactive", desc: "No activity for over 90 days, or never", Icon: PauseCircle,
-    num: "text-rose-600 dark:text-rose-400", card: "bg-rose-500/5 border-rose-500/20", tile: "bg-rose-500/15 text-rose-600 dark:text-rose-400" },
+    num: "text-rose-600 dark:text-rose-400", card: "bg-rose-500/[0.01] border-border", tile: "bg-rose-500/15 text-rose-600 dark:text-rose-400" },
 ];
 
 export const LIFECYCLE_LABEL: Record<Lifecycle, string> = {
@@ -121,7 +120,9 @@ export function SortBtn({
 
 /** Type/period/refresh state + the single rollup call, shared by every persona view. */
 export function useRollup(scope: RollupScope) {
-  const [type, setType] = useState<"all" | ParticipantType>("all");
+  // Type follows the sidebar's global Seekers | Providers switch (read-only here).
+  const { programId } = useProgram();
+  const type: ParticipantType = programId === "providers" ? "provider" : "seeker";
   const [period, setPeriod] = useState<Period>(30);
   const [nonce, setNonce] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
@@ -136,11 +137,11 @@ export function useRollup(scope: RollupScope) {
     setNonce((n) => n + 1);
     setTimeout(() => setRefreshing(false), 300);
   };
-  return { rollup, type, setType, period, setPeriod, refreshing, refresh };
+  return { rollup, type, period, setPeriod, refreshing, refresh };
 }
 
-export function eyebrowFor(type: "all" | ParticipantType) {
-  return type === "provider" ? "PROVIDERS" : type === "seeker" ? "SEEKERS" : "SEEKERS & PROVIDERS";
+export function eyebrowFor(type: ParticipantType) {
+  return type === "provider" ? "PROVIDERS" : "SEEKERS";
 }
 
 export function activityBarClass(score: number) {
@@ -183,46 +184,35 @@ export function InfoCard({ Icon, tile, headline, sub }: { Icon: typeof Users; ti
   );
 }
 
-export function SampleBanner() {
+/** Small, de-emphasised sample-data marker that lives inside the header band. */
+export function SampleChip() {
   return (
-    <div
-      className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium text-foreground"
-      style={{
-        borderColor: "color-mix(in oklab, var(--brand) 40%, transparent)",
-        background: "color-mix(in oklab, var(--brand) 10%, transparent)",
-      }}
-    >
-      <FlaskConical className="h-4 w-4 text-brand" />
-      {SAMPLE_NOTE}
-    </div>
+    <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[11px] text-muted-foreground" title={SAMPLE_NOTE}>
+      <FlaskConical className="h-3 w-3" />
+      Sample data
+    </span>
   );
 }
 
-export function TitleRow({ badge }: { badge: string }) {
+/** Network-style stat: icon + title row, large number alone, small sub-label. */
+export function StatCard({ Icon, title, value, sub }: { Icon: typeof Users; title: string; value: string | number; sub: string }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-4">
-      <div className="flex items-center gap-2">
-        <h1 className="text-3xl font-bold tracking-tight">My Purple Dots</h1>
-        <Badge variant="secondary">{badge}</Badge>
+    <div className="rounded-xl border border-border bg-card p-5">
+      <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+        <Icon className="h-4 w-4 text-brand" />
+        {title}
       </div>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span>
-            <Button className="gap-2" disabled>
-              <UserPlus className="h-4 w-4" />
-              Add Participants
-            </Button>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>Available once the database is connected</TooltipContent>
-      </Tooltip>
+      <div className={`mt-3 font-bold tracking-tight tabular-nums text-foreground ${typeof value === "number" ? "text-4xl" : "text-xl"}`}>
+        {typeof value === "number" ? value.toLocaleString() : value}
+      </div>
+      <div className="mt-1 text-sm text-muted-foreground">{sub}</div>
     </div>
   );
 }
 
-export function ControlsAndHeader({
+export function HeaderBand({
+  badge,
   type,
-  setType,
   period,
   setPeriod,
   total,
@@ -230,8 +220,8 @@ export function ControlsAndHeader({
   refreshing,
   onRefresh,
 }: {
-  type: "all" | ParticipantType;
-  setType: (t: "all" | ParticipantType) => void;
+  badge: string;
+  type: ParticipantType;
   period: Period;
   setPeriod: (p: Period) => void;
   total: number;
@@ -240,38 +230,29 @@ export function ControlsAndHeader({
   onRefresh: () => void;
 }) {
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          size="sm"
-          value={type}
-          onValueChange={(v) => v && setType(v as typeof type)}
-        >
-          <ToggleGroupItem value="all">All</ToggleGroupItem>
-          <ToggleGroupItem value="seeker">Seeker</ToggleGroupItem>
-          <ToggleGroupItem value="provider">Provider</ToggleGroupItem>
-        </ToggleGroup>
+    <div className="rounded-xl border border-border bg-card p-5 flex flex-wrap items-center gap-4">
+      <div className="h-12 w-12 rounded-xl bg-brand-soft flex items-center justify-center text-brand">
+        <Users className="h-6 w-6" />
+      </div>
+      <div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">{eyebrowFor(type)}</span>
+          <Badge variant="secondary">{badge}</Badge>
+          <SampleChip />
+        </div>
+        <div className="text-2xl font-bold tabular-nums">{total.toLocaleString()}</div>
+      </div>
+      <div className="hidden sm:block h-10 w-px bg-border" />
+      <p className="text-sm text-muted-foreground flex-1 min-w-[200px]">{sentence}</p>
+      <div className="flex items-center gap-2 ml-auto">
         <Select value={String(period)} onValueChange={(v) => setPeriod(Number(v) as Period)}>
-          <SelectTrigger className="h-8 w-[120px]"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="h-9 w-[120px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="7">This week</SelectItem>
             <SelectItem value="30">30 days</SelectItem>
             <SelectItem value="90">90 days</SelectItem>
           </SelectContent>
         </Select>
-      </div>
-      <div className="rounded-xl border border-border bg-card p-5 flex flex-wrap items-center gap-4">
-        <div className="h-12 w-12 rounded-xl bg-brand-soft flex items-center justify-center text-brand">
-          <Users className="h-6 w-6" />
-        </div>
-        <div>
-          <div className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">{eyebrowFor(type)}</div>
-          <div className="text-2xl font-bold tabular-nums">{total.toLocaleString()}</div>
-        </div>
-        <div className="hidden sm:block h-10 w-px bg-border" />
-        <p className="text-sm text-muted-foreground flex-1 min-w-[200px]">{sentence}</p>
         <Button variant="outline" className="gap-2" onClick={onRefresh} disabled={refreshing}>
           <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
           Refresh
@@ -315,15 +296,23 @@ export function NeedsAttention({
   const zeroCodes = coords.filter((c) => c.newInPeriod === 0).map((c) => c.code);
   const selfNew = coords.reduce((a, c) => a + c.newInPeriod, 0);
   const periodText = PERIOD_LABEL[period].toLowerCase();
+  // Card 1: weakest unit. Several orgs → lowest org; one org → lowest coordinator; self → own score.
+  const multiOrg = rollup.orgs.length > 1;
+  const units = multiOrg
+    ? rollup.orgs.map((o) => ({ name: o.name, score: o.activityScore, inactive: o.inactivePct, n: o.total }))
+    : coords.map((c) => ({ name: c.code, score: c.activityScore, inactive: c.inactivePct, n: c.total }));
+  const weakest = units.filter((u) => u.n > 0).sort((a, b) => a.score - b.score)[0];
+  const lowestIn = multiOrg ? "lowest in district" : mode === "self" ? "your caseload" : "lowest in organisation";
+  const belowPct = rollup.total ? Math.round((na.profilesBelowThreshold / rollup.total) * 100) : 0;
   return (
     <div>
       <SectionLabel>Needs attention</SectionLabel>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <InfoCard
-          Icon={UserX}
+          Icon={TrendingDown}
           tile="bg-rose-500/15 text-rose-600 dark:text-rose-400"
-          headline={`${na.inactiveSharePct}% inactive`}
-          sub={`${rollup.status.inactive} of ${rollup.total} with no activity for over 90 days`}
+          headline={weakest ? `${weakest.name} — activity ${weakest.score}` : "No participants yet"}
+          sub={weakest ? `${lowestIn} · ${weakest.inactive}% inactive` : periodText}
         />
         {mode === "group" ? (
           <InfoCard
@@ -341,10 +330,10 @@ export function NeedsAttention({
           />
         )}
         <InfoCard
-          Icon={FileWarning}
-          tile="bg-amber-500/15 text-amber-600 dark:text-amber-400"
-          headline={`${na.profilesBelowThreshold} profiles below ${PROFILE_COMPLETION_THRESHOLD}%`}
-          sub={`${rollup.total ? Math.round((na.profilesBelowThreshold / rollup.total) * 100) : 0}% of participants need profile completion`}
+          Icon={UserX}
+          tile="bg-rose-500/15 text-rose-600 dark:text-rose-400"
+          headline={`${na.inactiveSharePct}% inactive`}
+          sub={`${rollup.status.inactive} of ${rollup.total} inactive · ${na.profilesBelowThreshold} profiles below ${PROFILE_COMPLETION_THRESHOLD}% (${belowPct}%)`}
         />
       </div>
     </div>

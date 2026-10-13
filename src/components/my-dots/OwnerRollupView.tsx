@@ -14,15 +14,13 @@ import type { RollupScope } from "@/lib/my-dots-region";
 import {
   ACTIVITY_FORMULA,
   ActivityCell,
-  ControlsAndHeader,
+  HeaderBand,
   InfoCard,
   NeedsAttention,
   ParticipantRow,
-  SampleBanner,
   SectionLabel,
   SortBtn,
   StatusCards,
-  TitleRow,
   sortRows,
   useRollup,
   useSort,
@@ -30,7 +28,7 @@ import {
 
 /** Organisation owner: one organisation, its coordinators, and their participants. */
 export function OwnerRollupView({ scope }: { scope: Extract<RollupScope, { kind: "org" }> }) {
-  const { rollup, type, setType, period, setPeriod, refreshing, refresh } = useRollup(scope);
+  const { rollup, type, period, setPeriod, refreshing, refresh } = useRollup(scope);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const { sortKey, sortDir, toggleSort } = useSort();
 
@@ -42,11 +40,9 @@ export function OwnerRollupView({ scope }: { scope: Extract<RollupScope, { kind:
   return (
     <TooltipProvider>
       <div className="space-y-6">
-        <TitleRow badge={orgName} />
-        <SampleBanner />
-        <ControlsAndHeader
+        <HeaderBand
+          badge={orgName}
           type={type}
-          setType={setType}
           period={period}
           setPeriod={setPeriod}
           total={rollup.total}
