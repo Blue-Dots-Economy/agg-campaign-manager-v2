@@ -1,57 +1,34 @@
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { REGION_TREE } from "@/lib/ecosystem-config";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ALL_DISTRICTS, DISTRICT_LIST } from "@/lib/ecosystem-data";
 
+/** district === ALL_DISTRICTS (state "") is the national roll-up. */
 export interface RegionValue {
   state: string;
   district: string;
 }
 
-export function RegionSelector({
-  value,
-  onChange,
-}: {
-  value: RegionValue;
-  onChange: (v: RegionValue) => void;
-}) {
-  const stateEntry = REGION_TREE.find((s) => s.state === value.state) ?? REGION_TREE[0];
+export const NATIONAL_REGION: RegionValue = { state: "", district: ALL_DISTRICTS };
+
+export function RegionSelector({ value, onChange }: { value: RegionValue; onChange: (v: RegionValue) => void }) {
   return (
-    <div className="flex items-center gap-2">
-      <Select
-        value={value.state}
-        onValueChange={(s) => {
-          const entry = REGION_TREE.find((r) => r.state === s);
-          onChange({ state: s, district: entry?.districts[0] ?? "" });
-        }}
-      >
-        <SelectTrigger className="h-8 w-[120px] text-xs">
-          <SelectValue placeholder="State" />
-        </SelectTrigger>
-        <SelectContent>
-          {REGION_TREE.map((s) => (
-            <SelectItem key={s.state} value={s.state}>
-              {s.state}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Select value={value.district} onValueChange={(d) => onChange({ ...value, district: d })}>
-        <SelectTrigger className="h-8 w-[180px] text-xs">
-          <SelectValue placeholder="District" />
-        </SelectTrigger>
-        <SelectContent>
-          {stateEntry.districts.map((d) => (
-            <SelectItem key={d} value={d}>
-              {d}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
+    <Select
+      value={value.district}
+      onValueChange={(d) => {
+        const entry = DISTRICT_LIST.find((x) => x.name === d);
+        onChange(entry ? { state: entry.state, district: entry.name } : NATIONAL_REGION);
+      }}
+    >
+      <SelectTrigger className="h-8 w-[220px] text-xs">
+        <SelectValue placeholder="District" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={ALL_DISTRICTS}>All districts</SelectItem>
+        {DISTRICT_LIST.map((d) => (
+          <SelectItem key={d.name} value={d.name}>
+            {d.name} <span className="text-muted-foreground">· {d.state}</span>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }

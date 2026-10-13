@@ -11,8 +11,8 @@ export const ROLE_ROUTES: Record<Role, string[]> = {
   coordinator: ["/user-level-analysis", "/", "/campaigns", "/review", "/request-campaign"],
   owner: ["/user-level-analysis", "/"],
   ecosystem: ["/ecosystem-view", "/user-level-analysis", "/"],
-  // Network Administrator: same pages as ecosystem; lands on the national My Purple Dots view.
-  network_admin: ["/ecosystem-view", "/user-level-analysis", "/"],
+  // Network Administrator: national oversight — campaigns + call review (read), no launch/request/settings.
+  network_admin: ["/ecosystem-view", "/user-level-analysis", "/", "/campaigns", "/review"],
   user: ["/user-level-analysis", "/", "/campaigns", "/review"],
 };
 

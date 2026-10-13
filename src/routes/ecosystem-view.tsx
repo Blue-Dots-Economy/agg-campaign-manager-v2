@@ -28,9 +28,9 @@ import {
 } from "@/components/ui/table";
 import { Panel } from "@/components/Panel";
 import { MetricCard } from "@/components/metrics/MetricCard";
-import { RegionSelector, type RegionValue } from "@/components/ecosystem/RegionSelector";
+import { NATIONAL_REGION, RegionSelector, type RegionValue } from "@/components/ecosystem/RegionSelector";
+import { SampleChip } from "@/components/my-dots/shared";
 import { OnboardingTab } from "@/components/ecosystem/OnboardingTab";
-import { REGION_TREE } from "@/lib/ecosystem-config";
 import {
   actionGap,
   demandSupplyGap,
@@ -104,10 +104,7 @@ function relativeAge(iso: string): string {
 }
 
 function EcosystemView() {
-  const [region, setRegion] = useState<RegionValue>({
-    state: REGION_TREE[0].state,
-    district: REGION_TREE[0].districts[0],
-  });
+  const [region, setRegion] = useState<RegionValue>(NATIONAL_REGION);
   const [syncedAt, setSyncedAt] = useState(() => new Date().toISOString());
 
   const totals = useMemo(() => getEcosystemTotals(region), [region, syncedAt]);
@@ -117,6 +114,7 @@ function EcosystemView() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex flex-wrap items-center gap-2">
           <RegionSelector value={region} onChange={setRegion} />
+          <SampleChip />
           <TabsList>
             <TabsTrigger
               value="providers"
@@ -167,7 +165,7 @@ function EcosystemView() {
       </TabsContent>
 
       <TabsContent value="onboarding" className="space-y-6 mt-0">
-        <OnboardingTab region={region} />
+        <OnboardingTab key={region.district} region={region} />
       </TabsContent>
     </Tabs>
   );
