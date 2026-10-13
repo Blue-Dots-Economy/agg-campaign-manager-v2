@@ -150,7 +150,8 @@ export function MobileNav() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
   const { logout, session } = useAuth();
-  const isEcosystem = session?.role === "ecosystem";
+  // network_admin shares ecosystem's page list, so it gets the same trimmed menu.
+  const isEcosystem = session?.role === "ecosystem" || session?.role === "network_admin";
   const groups = isEcosystem
     ? [{
         title: "",

@@ -461,7 +461,7 @@ export function getScopeForActor(role: string | undefined, _email: string | unde
   if (role === "owner") return { kind: "org", orgId: "ORG-GPB" };
   if (role === "coordinator") return { kind: "coordinator", code: "BST-C07" };
   // Programme-wide roles see every district.
-  if (role === "admin" || role === "ecosystem") return { kind: "national" };
+  if (role === "admin" || role === "ecosystem" || role === "network_admin") return { kind: "national" };
   // Working Committee (and deprecated JFC) are district-level; sample maps them to Basti.
   return { kind: "region" };
 }

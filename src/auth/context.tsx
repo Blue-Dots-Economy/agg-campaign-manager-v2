@@ -6,7 +6,7 @@ import { resolveLogin } from "@/lib/reviewers.functions";
 const STORAGE_KEY = "rozgar-auth";
 const COOKIE_KEY = "rozgar_auth";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
-export type Role = "admin" | "user" | "ecosystem" | "jfc" | "wc" | "owner" | "coordinator";
+export type Role = "admin" | "user" | "ecosystem" | "jfc" | "wc" | "owner" | "coordinator" | "network_admin";
 export type Session = { email: string; role: Role; name?: string | null; district?: string | null; program?: string | null; nodeType?: string | null; nodeName?: string | null };
 
 function readCookie(name: string): string | null {

@@ -45,6 +45,7 @@ const ROLE_OPTIONS = [
   { value: "owner", label: "Owner" },
   { value: "coordinator", label: "Coordinator" },
   { value: "ecosystem", label: "Ecosystem" },
+  { value: "network_admin", label: "Network Administrator" },
   { value: "user", label: "Reviewer" },
 ];
 

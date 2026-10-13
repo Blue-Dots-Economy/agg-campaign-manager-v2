@@ -11,6 +11,8 @@ export const ROLE_ROUTES: Record<Role, string[]> = {
   coordinator: ["/user-level-analysis", "/", "/campaigns", "/review", "/request-campaign"],
   owner: ["/user-level-analysis", "/"],
   ecosystem: ["/ecosystem-view", "/user-level-analysis", "/"],
+  // Network Administrator: same pages as ecosystem; lands on the national My Purple Dots view.
+  network_admin: ["/ecosystem-view", "/user-level-analysis", "/"],
   user: ["/user-level-analysis", "/", "/campaigns", "/review"],
 };
 
@@ -21,6 +23,7 @@ export const DEFAULT_LANDING: Record<Role, string> = {
   wc: "/",
   owner: "/user-level-analysis",
   ecosystem: "/ecosystem-view",
+  network_admin: "/user-level-analysis",
   user: "/",
 };
 

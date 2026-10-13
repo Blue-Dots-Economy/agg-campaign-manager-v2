@@ -278,7 +278,7 @@ function MetricTile({
 }
 
 // Persona views: owner → own organisation, coordinator → own caseload,
-// admin/ecosystem → national, wc → district. Admin may preview with ?persona=owner|coordinator|national|wc.
+// admin/ecosystem/network_admin → national, wc → district. Admin may preview with ?persona=owner|coordinator|national|wc.
 // Every other role keeps the roster below.
 function MyPurpleDotsRoute() {
   const { session } = useAuth();
@@ -294,7 +294,7 @@ function MyPurpleDotsRoute() {
     if (scope.kind === "org") return <OwnerRollupView scope={scope} />;
     if (scope.kind === "coordinator") return <CoordinatorRollupView scope={scope} />;
   }
-  if (persona === "national") return <NationalRollupView />;
+  if (persona === "national" || persona === "network_admin") return <NationalRollupView />;
   if (persona === "admin" || persona === "ecosystem") {
     if (getScopeForActor(persona, session?.email).kind === "national") return <NationalRollupView />;
     return <RegionRollupView />;
