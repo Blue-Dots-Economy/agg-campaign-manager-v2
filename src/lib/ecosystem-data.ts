@@ -156,14 +156,14 @@ function inScope(region: EcosystemRegion): DistrictEco[] {
   return DISTRICT_ECO.filter((d) => d.name === region.district);
 }
 
-function sumBy<T extends Record<string, unknown>>(rows: T[][], key: keyof T & string, numKeys: (keyof T & string)[]): T[] {
+function sumBy<T extends object>(rows: T[][], key: keyof T & string, numKeys: (keyof T & string)[]): T[] {
   const out = new Map<string, T>();
   for (const list of rows)
     for (const r of list) {
       const k = String(r[key]);
       const cur = out.get(k);
       if (!cur) out.set(k, { ...r });
-      else for (const n of numKeys) (cur as Record<string, unknown>)[n] = (cur[n] as number) + (r[n] as number);
+      else for (const n of numKeys) (cur as Record<string, number>)[n] = (cur[n] as number) + (r[n] as number);
     }
   return [...out.values()];
 }
