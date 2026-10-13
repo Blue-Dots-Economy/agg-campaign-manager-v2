@@ -14,15 +14,13 @@ import type { RollupScope } from "@/lib/my-dots-region";
 import {
   ACTIVITY_FORMULA,
   ActivityCell,
-  ControlsAndHeader,
-  InfoCard,
+  HeaderBand,
+  StatCard,
   NeedsAttention,
   ParticipantRow,
-  SampleBanner,
   SectionLabel,
   SortBtn,
   StatusCards,
-  TitleRow,
   sortRows,
   useRollup,
   useSort,
@@ -30,7 +28,7 @@ import {
 
 /** Organisation owner: one organisation, its coordinators, and their participants. */
 export function OwnerRollupView({ scope }: { scope: Extract<RollupScope, { kind: "org" }> }) {
-  const { rollup, type, setType, period, setPeriod, refreshing, refresh } = useRollup(scope);
+  const { rollup, type, period, setPeriod, refreshing, refresh } = useRollup(scope);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const { sortKey, sortDir, toggleSort } = useSort();
 
@@ -42,11 +40,9 @@ export function OwnerRollupView({ scope }: { scope: Extract<RollupScope, { kind:
   return (
     <TooltipProvider>
       <div className="space-y-6">
-        <TitleRow badge={orgName} />
-        <SampleBanner />
-        <ControlsAndHeader
+        <HeaderBand
+          badge={orgName}
           type={type}
-          setType={setType}
           period={period}
           setPeriod={setPeriod}
           total={rollup.total}
@@ -60,9 +56,9 @@ export function OwnerRollupView({ scope }: { scope: Extract<RollupScope, { kind:
         <div>
           <SectionLabel>Network</SectionLabel>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <InfoCard Icon={Building2} tile="bg-brand-soft text-brand" headline={orgName} sub={`${org?.kind ?? ""} · ${rollup.region}`} />
-            <InfoCard Icon={Network} tile="bg-brand-soft text-brand" headline={`${rollup.coordinatorCount} Coordinators`} sub="In this organisation" />
-            <InfoCard Icon={Users} tile="bg-brand-soft text-brand" headline={`${avgPerCoord} Avg Purple Dots / Coordinator`} sub="Managed each" />
+            <StatCard Icon={Building2} title="Organisation" value={orgName} sub={`${org?.kind ?? ""} · ${rollup.region}`} />
+            <StatCard Icon={Network} title="Coordinators" value={rollup.coordinatorCount} sub="In this organisation" />
+            <StatCard Icon={Users} title="Avg Purple Dots / Coordinator" value={avgPerCoord} sub="Managed each" />
           </div>
         </div>
 

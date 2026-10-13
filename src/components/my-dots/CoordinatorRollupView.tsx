@@ -1,29 +1,25 @@
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { RollupScope } from "@/lib/my-dots-region";
 import {
-  ControlsAndHeader,
+  HeaderBand,
   NeedsAttention,
   ParticipantTable,
-  SampleBanner,
   SectionLabel,
   StatusCards,
-  TitleRow,
   useRollup,
 } from "./shared";
 
 /** Coordinator: own caseload only. The rollup is scoped in the data layer, so no sibling data is present. */
 export function CoordinatorRollupView({ scope }: { scope: Extract<RollupScope, { kind: "coordinator" }> }) {
-  const { rollup, type, setType, period, setPeriod, refreshing, refresh } = useRollup(scope);
+  const { rollup, type, period, setPeriod, refreshing, refresh } = useRollup(scope);
   const participants = rollup.orgs.flatMap((o) => o.coordinators.flatMap((c) => c.participants));
 
   return (
     <TooltipProvider>
       <div className="space-y-6">
-        <TitleRow badge={scope.code} />
-        <SampleBanner />
-        <ControlsAndHeader
+        <HeaderBand
+          badge={scope.code}
           type={type}
-          setType={setType}
           period={period}
           setPeriod={setPeriod}
           total={rollup.total}
