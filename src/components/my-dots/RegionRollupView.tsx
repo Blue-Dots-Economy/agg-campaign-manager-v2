@@ -22,7 +22,7 @@ import {
   ACTIVITY_FORMULA,
   ActivityCell,
   HeaderBand,
-  InfoCard,
+  StatCard,
   NeedsAttention,
   ParticipantTable,
   SAMPLE_NOTE,
@@ -62,9 +62,9 @@ export function RegionRollupView() {
         <div>
           <SectionLabel>Network</SectionLabel>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <InfoCard Icon={Building2} tile="bg-brand-soft text-brand" headline={`${rollup.organisationCount} Partner organisations`} sub="Colleges and associations" />
-            <InfoCard Icon={Network} tile="bg-brand-soft text-brand" headline={`${rollup.coordinatorCount} Coordinators`} sub="Across all organisations" />
-            <InfoCard Icon={Users} tile="bg-brand-soft text-brand" headline={`${avgPerCoord} Avg Purple Dots / Coordinator`} sub="Managed each" />
+            <StatCard Icon={Building2} title="Partner organisations" value={rollup.organisationCount} sub="Colleges and associations" />
+            <StatCard Icon={Network} title="Coordinators" value={rollup.coordinatorCount} sub="Across all organisations" />
+            <StatCard Icon={Users} title="Avg Purple Dots / Coordinator" value={avgPerCoord} sub="Managed each" />
           </div>
         </div>
 

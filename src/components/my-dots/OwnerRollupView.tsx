@@ -15,7 +15,7 @@ import {
   ACTIVITY_FORMULA,
   ActivityCell,
   HeaderBand,
-  InfoCard,
+  StatCard,
   NeedsAttention,
   ParticipantRow,
   SectionLabel,
@@ -56,9 +56,9 @@ export function OwnerRollupView({ scope }: { scope: Extract<RollupScope, { kind:
         <div>
           <SectionLabel>Network</SectionLabel>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <InfoCard Icon={Building2} tile="bg-brand-soft text-brand" headline={orgName} sub={`${org?.kind ?? ""} · ${rollup.region}`} />
-            <InfoCard Icon={Network} tile="bg-brand-soft text-brand" headline={`${rollup.coordinatorCount} Coordinators`} sub="In this organisation" />
-            <InfoCard Icon={Users} tile="bg-brand-soft text-brand" headline={`${avgPerCoord} Avg Purple Dots / Coordinator`} sub="Managed each" />
+            <StatCard Icon={Building2} title="Organisation" value={orgName} sub={`${org?.kind ?? ""} · ${rollup.region}`} />
+            <StatCard Icon={Network} title="Coordinators" value={rollup.coordinatorCount} sub="In this organisation" />
+            <StatCard Icon={Users} title="Avg Purple Dots / Coordinator" value={avgPerCoord} sub="Managed each" />
           </div>
         </div>
 
