@@ -1,38 +1,7 @@
-import { Fragment, useState } from "react";
-import { ChevronDown, ChevronRight, Info, Building2, Network, Users } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import type { CoordinatorRow, OrgRow } from "@/lib/my-dots-region";
-import {
-  ACTIVITY_FORMULA,
-  ActivityCell,
-  HeaderBand,
-  StatCard,
-  NeedsAttention,
-  ParticipantTable,
-  SAMPLE_NOTE,
-  SectionLabel,
-  SortBtn,
-  StatusCards,
-  sortRows,
-  useRollup,
-  useSort,
-} from "./shared";
+import { Building2, Network, Users } from "lucide-react";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { HeaderBand, StatCard, NeedsAttention, SectionLabel, StatusCards, useRollup } from "./shared";
+import { OrgTable } from "./OrgTable";
 
 export function RegionRollupView() {
   const { rollup, type, period, setPeriod, refreshing, refresh } = useRollup({ kind: "region" });

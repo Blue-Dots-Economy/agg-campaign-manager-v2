@@ -144,6 +144,19 @@ export function eyebrowFor(type: ParticipantType) {
   return type === "provider" ? "PROVIDERS" : "SEEKERS";
 }
 
+/** Subtle tile tint on the same thresholds as the activity bar. */
+export function activityTintClass(score: number) {
+  if (score >= 60) return "bg-emerald-500/[0.04]";
+  if (score >= 40) return "bg-amber-500/[0.04]";
+  return "bg-rose-500/[0.04]";
+}
+
+export function activityTextClass(score: number) {
+  if (score >= 60) return "text-emerald-600 dark:text-emerald-400";
+  if (score >= 40) return "text-amber-600 dark:text-amber-400";
+  return "text-rose-600 dark:text-rose-400";
+}
+
 export function activityBarClass(score: number) {
   if (score >= 60) return "bg-emerald-500";
   if (score >= 40) return "bg-amber-500";
@@ -296,13 +309,17 @@ export function NeedsAttention({
   const zeroCodes = coords.filter((c) => c.newInPeriod === 0).map((c) => c.code);
   const selfNew = coords.reduce((a, c) => a + c.newInPeriod, 0);
   const periodText = PERIOD_LABEL[period].toLowerCase();
-  // Card 1: weakest unit. Several orgs → lowest org; one org → lowest coordinator; self → own score.
+  // Card 1: weakest unit, one level below the current scope.
+  // Several districts → lowest district; several orgs → lowest org; one org → lowest coordinator.
+  const multiDistrict = rollup.districts.length > 1;
   const multiOrg = rollup.orgs.length > 1;
-  const units = multiOrg
-    ? rollup.orgs.map((o) => ({ name: o.name, score: o.activityScore, inactive: o.inactivePct, n: o.total }))
-    : coords.map((c) => ({ name: c.code, score: c.activityScore, inactive: c.inactivePct, n: c.total }));
+  const units = multiDistrict
+    ? rollup.districts.map((d) => ({ name: d.name, score: d.activityScore, inactive: d.inactivePct, n: d.total }))
+    : multiOrg
+      ? rollup.orgs.map((o) => ({ name: o.name, score: o.activityScore, inactive: o.inactivePct, n: o.total }))
+      : coords.map((c) => ({ name: c.code, score: c.activityScore, inactive: c.inactivePct, n: c.total }));
   const weakest = units.filter((u) => u.n > 0).sort((a, b) => a.score - b.score)[0];
-  const lowestIn = multiOrg ? "lowest in district" : mode === "self" ? "your caseload" : "lowest in organisation";
+  const lowestIn = multiDistrict ? "lowest nationally" : multiOrg ? "lowest in district" : mode === "self" ? "your caseload" : "lowest in organisation";
   const belowPct = rollup.total ? Math.round((na.profilesBelowThreshold / rollup.total) * 100) : 0;
   return (
     <div>
