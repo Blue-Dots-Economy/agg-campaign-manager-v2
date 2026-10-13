@@ -10,7 +10,7 @@ async function sb() {
 
 export const resolveLogin = createServerFn({ method: "POST" })
   .inputValidator((d: { email: string; password?: string }) => d)
-  .handler(async ({ data }): Promise<{ role: "admin" | "user" | "ecosystem" | "jfc" | "wc" | "owner" | "coordinator" | null; name?: string | null; district?: string | null; program?: string | null; node_type?: string | null; node_name?: string | null; fault?: boolean }> => {
+  .handler(async ({ data }): Promise<{ role: "admin" | "user" | "ecosystem" | "jfc" | "wc" | "owner" | "coordinator" | "network_admin" | null; name?: string | null; district?: string | null; program?: string | null; node_type?: string | null; node_name?: string | null; fault?: boolean }> => {
     const email = (data.email || "").trim().toLowerCase();
     const password = data.password || "";
     const client = await sb();
@@ -26,7 +26,7 @@ export const resolveLogin = createServerFn({ method: "POST" })
       const row = (Array.isArray(rows) ? rows[0] : rows) as Record<string, string> | undefined;
       if (row?.role) {
         return {
-          role: row.role as "admin" | "user" | "ecosystem" | "jfc" | "wc" | "owner" | "coordinator",
+          role: row.role as "admin" | "user" | "ecosystem" | "jfc" | "wc" | "owner" | "coordinator" | "network_admin",
           name: row.name ?? null,
           district: row.district ?? null,
           program: row.program ?? null,
