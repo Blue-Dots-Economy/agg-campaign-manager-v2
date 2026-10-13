@@ -88,6 +88,10 @@ export interface RegionRollup {
   isSample: true;
   total: number;
   status: StatusCounts;
+  /** Mean completion over ALL in-scope participants (never a mean of district/org means). */
+  avgCompletion: number;
+  /** Same formula as orgs/coordinators, computed from all in-scope participants. */
+  activityScore: number;
   needsAttention: {
     inactiveSharePct: number;
     coordinatorsWithZeroNewOnboards: number;
@@ -433,6 +437,8 @@ export function getRegionRollup(opts: {
     isSample: true,
     total: all.total,
     status: all.status,
+    avgCompletion: all.avgCompletion,
+    activityScore: all.activityScore,
     needsAttention: {
       inactiveSharePct: all.inactivePct,
       coordinatorsWithZeroNewOnboards: coords.filter((c) => c.newInPeriod === 0).length,
