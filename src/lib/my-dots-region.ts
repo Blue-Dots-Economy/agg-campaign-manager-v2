@@ -157,10 +157,9 @@ interface DistrictSpec {
 
 const DISTRICTS: DistrictSpec[] = [
   { name: "Basti", state: "Uttar Pradesh", seed: 0xb4571, seekerStart: 400, providerStart: 30, prefix: "BST" },
-  { name: "Gorakhpur", state: "Uttar Pradesh", seed: 0x60a4f, seekerStart: 100, providerStart: 10, prefix: "GKP" },
-  { name: "Madurai", state: "Tamil Nadu", seed: 0x3ad41, seekerStart: 100, providerStart: 10, prefix: "MDU" },
-  { name: "Nagpur", state: "Maharashtra", seed: 0x9a6f2, seekerStart: 100, providerStart: 10, prefix: "NGP" },
-  { name: "Bahraich", state: "Uttar Pradesh", seed: 0xb4a1c, seekerStart: 100, providerStart: 10, prefix: "BRH" },
+  { name: "Lucknow", state: "Uttar Pradesh", seed: 0x10c40, seekerStart: 100, providerStart: 10, prefix: "LKO" },
+  { name: "Pune", state: "Maharashtra", seed: 0x9a6e1, seekerStart: 100, providerStart: 10, prefix: "PNE" },
+  { name: "Doddaballapura", state: "Karnataka", seed: 0xdb9a7, seekerStart: 100, providerStart: 10, prefix: "DBP" },
 ];
 
 /** Canonical district list — the Ecosystem View imports this so both pages agree. */
@@ -215,70 +214,66 @@ const ORGS: OrgSpec[] = [
     ],
   },
 
-  // --- Gorakhpur: large and healthy ---
+  // --- Lucknow: largest and healthiest ---
   {
-    id: "ORG-GKP-DRC", district: "Gorakhpur", name: "District Disability Rehabilitation Centre Gorakhpur", kind: "Association", health: 0.9,
+    id: "ORG-LKO-DSMRU", district: "Lucknow", name: "Dr. Shakuntala Misra National Rehabilitation University", kind: "College", health: 0.92,
     coordinators: [
-      { code: "GKP-C01", size: 30, recentOnboards: true },
-      { code: "GKP-C02", size: 28, recentOnboards: true },
-      { code: "GKP-C03", size: 26, recentOnboards: true },
+      { code: "LKO-C01", size: 32, recentOnboards: true },
+      { code: "LKO-C02", size: 30, recentOnboards: true },
+      { code: "LKO-C03", size: 28, recentOnboards: true },
     ],
   },
   {
-    id: "ORG-GKP-ITI", district: "Gorakhpur", name: "Govt. ITI Gorakhpur", kind: "College", health: 0.8,
+    id: "ORG-LKO-DDRC", district: "Lucknow", name: "District Disability Rehabilitation Centre Lucknow", kind: "Association", health: 0.88,
     coordinators: [
-      { code: "GKP-C04", size: 32, recentOnboards: true },
-      { code: "GKP-C05", size: 24, recentOnboards: true },
+      { code: "LKO-C04", size: 30, recentOnboards: true },
+      { code: "LKO-C05", size: 26, recentOnboards: true },
     ],
   },
   {
-    id: "ORG-GKP-SMS", district: "Gorakhpur", name: "Saksham Gorakhpur", kind: "Association", health: 0.75,
+    id: "ORG-LKO-ITI", district: "Lucknow", name: "Govt. ITI Aliganj Lucknow", kind: "College", health: 0.85,
     coordinators: [
-      { code: "GKP-C06", size: 34, recentOnboards: true },
-      { code: "GKP-C07", size: 30, recentOnboards: true },
-    ],
-  },
-  // --- Madurai: mid-sized, middling ---
-  {
-    id: "ORG-MDU-AVI", district: "Madurai", name: "Amar Seva Vocational Institute Madurai", kind: "College", health: 0.55,
-    coordinators: [
-      { code: "MDU-C01", size: 24, recentOnboards: true },
-      { code: "MDU-C02", size: 22, recentOnboards: true },
+      { code: "LKO-C06", size: 32, recentOnboards: true },
+      { code: "LKO-C07", size: 28, recentOnboards: true },
     ],
   },
   {
-    id: "ORG-MDU-DPA", district: "Madurai", name: "Madurai Differently Abled Association", kind: "Association", health: 0.45,
+    id: "ORG-LKO-UPVS", district: "Lucknow", name: "Uttar Pradesh Viklang Sangh", kind: "Association", health: 0.8,
     coordinators: [
-      { code: "MDU-C03", size: 20, recentOnboards: true },
-      { code: "MDU-C04", size: 18, recentOnboards: false },
+      { code: "LKO-C08", size: 30, recentOnboards: true },
+      { code: "LKO-C09", size: 24, recentOnboards: true },
     ],
   },
-  // --- Nagpur: decent engagement, almost no new onboards ---
+  // --- Pune: mid-sized, middling, almost no new onboards ---
   {
-    id: "ORG-NGP-NCS", district: "Nagpur", name: "Nagpur Composite Regional Centre", kind: "Association", health: 0.6,
+    id: "ORG-PNE-PBA", district: "Pune", name: "Poona Blind Men's Association", kind: "Association", health: 0.55,
     coordinators: [
-      { code: "NGP-C01", size: 30, recentOnboards: false },
-      { code: "NGP-C02", size: 28, recentOnboards: false },
-    ],
-  },
-  {
-    id: "ORG-NGP-GPN", district: "Nagpur", name: "Govt. Polytechnic Nagpur", kind: "College", health: 0.55,
-    coordinators: [
-      { code: "NGP-C03", size: 26, recentOnboards: false },
-      { code: "NGP-C04", size: 24, recentOnboards: true, sparse: true },
-    ],
-  },
-  // --- Bahraich: small and struggling ---
-  {
-    id: "ORG-BRH-VSS", district: "Bahraich", name: "Viklang Sahayata Samiti Bahraich", kind: "Association", health: 0.15,
-    coordinators: [
-      { code: "BRH-C01", size: 22, recentOnboards: true },
-      { code: "BRH-C02", size: 18, recentOnboards: false },
+      { code: "PNE-C01", size: 28, recentOnboards: false },
+      { code: "PNE-C02", size: 24, recentOnboards: true, sparse: true },
     ],
   },
   {
-    id: "ORG-BRH-ITI", district: "Bahraich", name: "Govt. ITI Bahraich", kind: "College", health: 0.2,
-    coordinators: [{ code: "BRH-C03", size: 16, recentOnboards: false }],
+    id: "ORG-PNE-GPP", district: "Pune", name: "Govt. Polytechnic Pune", kind: "College", health: 0.5,
+    coordinators: [
+      { code: "PNE-C03", size: 26, recentOnboards: false },
+      { code: "PNE-C04", size: 22, recentOnboards: true, sparse: true },
+    ],
+  },
+  {
+    id: "ORG-PNE-ITI", district: "Pune", name: "Govt. ITI Aundh Pune", kind: "College", health: 0.48,
+    coordinators: [{ code: "PNE-C05", size: 20, recentOnboards: false }],
+  },
+  // --- Doddaballapura: smallest and struggling ---
+  {
+    id: "ORG-DBP-ITI", district: "Doddaballapura", name: "Govt. ITI Doddaballapura", kind: "College", health: 0.15,
+    coordinators: [
+      { code: "DBP-C01", size: 18, recentOnboards: true },
+      { code: "DBP-C02", size: 14, recentOnboards: false },
+    ],
+  },
+  {
+    id: "ORG-DBP-VRC", district: "Doddaballapura", name: "Doddaballapura Vikalachetanara Sangha", kind: "Association", health: 0.2,
+    coordinators: [{ code: "DBP-C03", size: 16, recentOnboards: false }],
   },
 ];
 
