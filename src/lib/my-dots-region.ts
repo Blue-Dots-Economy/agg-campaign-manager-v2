@@ -163,6 +163,9 @@ const DISTRICTS: DistrictSpec[] = [
   { name: "Bahraich", state: "Uttar Pradesh", seed: 0xb4a1c, seekerStart: 100, providerStart: 10, prefix: "BRH" },
 ];
 
+/** Canonical district list — the Ecosystem View imports this so both pages agree. */
+export const DISTRICT_LIST: { name: string; state: string }[] = DISTRICTS.map(({ name, state }) => ({ name, state }));
+
 const ORGS: OrgSpec[] = [
   {
     id: "ORG-BDSS",
