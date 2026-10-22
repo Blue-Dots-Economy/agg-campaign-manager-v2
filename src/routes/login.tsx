@@ -18,19 +18,19 @@ export const Route = createFileRoute("/login")({
 });
 
 function LoginPage() {
-  const { login } = useAuth();
+  const { login, authProvider } = useAuth();
   const navigate = useNavigate();
   const { theme } = useTheme();
   const isDark = resolveDark(theme);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const s = await login(email, password);
-    if (!s) setError(true);
-    else navigate({ to: s.mustChangePassword ? "/change-password" : landingFor(s.role) });
+    const res = await login(email, password);
+    if ("error" in res) setError(res.error);
+    else navigate({ to: res.session.mustChangePassword ? "/change-password" : landingFor(res.session.role) });
   };
 
   return (
@@ -49,38 +49,55 @@ function LoginPage() {
           <h1 className="sr-only">Purple Dots</h1>
         </div>
 
-        <form onSubmit={onSubmit} className="mt-6 space-y-4">
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-foreground" htmlFor="email">Email</label>
-            <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => { setEmail(e.target.value); setError(false); }}
-              required
-              aria-invalid={error || undefined}
-              aria-describedby={error ? "login-error" : undefined}
-            />
+        {authProvider === "none" && (
+          <form onSubmit={onSubmit} className="mt-6 space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground" htmlFor="email">Email</label>
+              <Input
+                id="email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setError(null); }}
+                required
+                aria-invalid={!!error || undefined}
+                aria-describedby={error ? "login-error" : undefined}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground" htmlFor="password">Password</label>
+              <Input
+                id="password"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); setError(null); }}
+                required
+                aria-invalid={!!error || undefined}
+                aria-describedby={error ? "login-error" : undefined}
+              />
+            </div>
+            {error && (
+              <p id="login-error" role="alert" className="text-xs text-rose-600">{error}.</p>
+            )}
+            <Button type="submit" className="w-full">Sign in</Button>
+          </form>
+        )}
+
+        {authProvider === "keycloak" && (
+          <div className="mt-6">
+            {/* A full page load: the server redirects on to Keycloak. */}
+            <Button asChild className="w-full">
+              <a href="/auth/keycloak/login">Sign in with Keycloak</a>
+            </Button>
           </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-foreground" htmlFor="password">Password</label>
-            <Input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => { setPassword(e.target.value); setError(false); }}
-              required
-              aria-invalid={error || undefined}
-              aria-describedby={error ? "login-error" : undefined}
-            />
-          </div>
-          {error && (
-            <p id="login-error" role="alert" className="text-xs text-rose-600">Email or password is incorrect.</p>
-          )}
-          <Button type="submit" className="w-full">Sign in</Button>
-        </form>
+        )}
+
+        {authProvider === null && (
+          <p role="alert" className="mt-6 text-center text-sm text-rose-600">
+            Can't reach the server. Refresh the page to try again.
+          </p>
+        )}
       </div>
     </div>
   );

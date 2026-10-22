@@ -2,9 +2,11 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
+  GENERIC_LOGIN_ERROR,
   login as loginFn,
   logout as logoutFn,
   me as meFn,
+  TOO_MANY_ATTEMPTS,
   type AuthProvider as AuthFlow,
   type SessionUser,
 } from "@/lib/auth.functions";
@@ -22,10 +24,15 @@ type AuthContextValue = {
   isAuthenticated: boolean;
   isAdmin: boolean;
   hydrated: boolean;
-  login: (email: string, password: string) => Promise<Session | null>;
+  login: (email: string, password: string) => Promise<LoginResult>;
   logout: () => Promise<void>;
   refresh: () => Promise<Session | null>;
 };
+
+export type LoginResult = { session: Session } | { error: string };
+
+// Only these server messages are shown as they are; anything else gets the generic one.
+const SHOWN_LOGIN_ERRORS = [GENERIC_LOGIN_ERROR, TOO_MANY_ATTEMPTS];
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -58,14 +65,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void refresh().finally(() => setHydrated(true));
   }, [refresh]);
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string): Promise<LoginResult> => {
     try {
       await callLogin({ data: { email, password } });
-    } catch {
-      return null;
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "";
+      return { error: SHOWN_LOGIN_ERRORS.includes(message) ? message : GENERIC_LOGIN_ERROR };
     }
     queryClient.clear();
-    return refresh();
+    const s = await refresh();
+    return s ? { session: s } : { error: GENERIC_LOGIN_ERROR };
   };
 
   // A full page load to wherever logout points, which also clears all client state.
