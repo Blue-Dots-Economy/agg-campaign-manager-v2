@@ -8,20 +8,24 @@ async function fail(status: 401 | 403, message: string): Promise<never> {
   throw new Error(message);
 }
 
+// POSTs from a browser on another site are refused. Compared with APP_BASE_URL,
+// not the request's Host, so a proxy rewriting Host can't widen it. A missing
+// APP_BASE_URL throws, so the check fails closed.
 async function assertSameOrigin(): Promise<void> {
   const { getRequest } = await import("@tanstack/react-start/server");
+  const { appOrigin } = await import("@/server/auth/config.server");
   const req = getRequest();
   if (req.method !== "POST") return;
+  const expected = appOrigin();
   const origin = req.headers.get("origin");
   if (!origin) return;
-  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
-  let originHost: string | null = null;
+  let actual: string | null = null;
   try {
-    originHost = new URL(origin).host;
+    actual = new URL(origin).origin;
   } catch {
     /* malformed: refused below */
   }
-  if (!host || originHost !== host) await fail(403, "Cross-site request refused");
+  if (actual !== expected) await fail(403, "Cross-site request refused");
 }
 
 // Public functions only (login, me, logout): the cross-site check, no session.

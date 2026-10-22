@@ -276,7 +276,8 @@ export const getCallDetailFn = createServerFn({ method: "POST" })
     return { ok: false as const, error: "Not found" };
   });
 
-export const fetchProgramRows = createServerFn({ method: "GET" })
+// POST: it also records each connection's sync status.
+export const fetchProgramRows = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.dashboard)])
   .inputValidator((d: { program: ProgramId }) => d)
   .handler(async ({ data }) => {
