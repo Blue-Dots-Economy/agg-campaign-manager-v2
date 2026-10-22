@@ -177,8 +177,6 @@ function TranscriptReview() {
     const review = {
       job_id: jobIdStr ?? callIdStr ?? "unknown",
       call_id: callIdStr ?? jobIdStr ?? "unknown",
-      reviewer_email: reviewerEmail,
-      reviewer_name: reviewerEmail,
       campaign_day: call.campaign_day, campaign_type: call.campaign_type, language: call.language,
       city_campaign: call.city_campaign, company_name: call.company_name,
       contact_phone: callAny.contact_phone ?? null,

@@ -1,38 +1,22 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { resolveLogin } from "@/lib/reviewers.functions";
+import { login as loginFn, logout as logoutFn, me as meFn, type MeResult } from "@/lib/auth.functions";
+import type { Role } from "@/auth/roles";
 
-const STORAGE_KEY = "rozgar-auth";
-const COOKIE_KEY = "rozgar_auth";
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
-export type Role = "admin" | "user" | "ecosystem" | "jfc" | "owner" | "coordinator";
-export type Session = { email: string; role: Role; name?: string | null; district?: string | null; program?: string | null; nodeType?: string | null; nodeName?: string | null };
+export type { Role };
 
-function readCookie(name: string): string | null {
-  if (typeof document === "undefined") return null;
-  const match = document.cookie.split("; ").find((c) => c.startsWith(name + "="));
-  return match ? decodeURIComponent(match.split("=")[1] ?? "") : null;
-}
-
-function writeCookie(name: string, value: string) {
-  if (typeof document === "undefined") return;
-  const secure = window.location.protocol === "https:" ? "; Secure" : "";
-  document.cookie = `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${COOKIE_MAX_AGE}; SameSite=Lax${secure}`;
-}
-
-function clearCookie(name: string) {
-  if (typeof document === "undefined") return;
-  document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax`;
-}
+// Session is the httpOnly cm_session cookie; the user comes from me().
+export type Session = MeResult;
 
 type AuthContextValue = {
   session: Session | null;
   isAuthenticated: boolean;
   isAdmin: boolean;
   hydrated: boolean;
-  login: (email: string, password: string) => Promise<Role | null>;
-  logout: () => void;
+  login: (email: string, password: string) => Promise<Session | null>;
+  logout: () => Promise<void>;
+  refresh: () => Promise<Session | null>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -41,66 +25,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const queryClient = useQueryClient();
-  const resolve = useServerFn(resolveLogin);
+  const callMe = useServerFn(meFn);
+  const callLogin = useServerFn(loginFn);
+  const callLogout = useServerFn(logoutFn);
+
+  const refresh = useCallback(async () => {
+    let s: Session | null = null;
+    try {
+      s = await callMe();
+    } catch {
+      /* 401: not signed in */
+    }
+    setSession(s);
+    return s;
+  }, [callMe]);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      try {
-        let raw = window.localStorage.getItem(STORAGE_KEY);
-        if (!raw) raw = readCookie(COOKIE_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (parsed?.email && parsed.role && parsed.role !== "admin") {
-            // Non-admin sessions restore normally. The rozgar_auth cookie must
-            // survive reloads: the server reads it to identify the actor and
-            // decide which database the session reads.
-            setSession(parsed);
-            // Re-sync both stores so whichever was missing gets refilled.
-            try { window.localStorage.setItem(STORAGE_KEY, raw); } catch { /* ignore */ }
-            writeCookie(COOKIE_KEY, raw);
-          } else {
-            // Admin requires an explicit login every time so a shared browser
-            // can't leave the next person signed in as admin. Malformed or
-            // role-less values take the same path. Clearing the query cache
-            // too, so a previous user's cached data never shows to the next.
-            try { window.localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
-            clearCookie(COOKIE_KEY);
-            queryClient.clear();
-          }
-        }
-      } catch { /* ignore */ }
-    }
-    setHydrated(true);
-  }, []);
+    void refresh().finally(() => setHydrated(true));
+  }, [refresh]);
 
   const login = async (email: string, password: string) => {
-    const res = await resolve({ data: { email, password } });
-    if (res?.role) {
-      const s: Session = { email: email.trim().toLowerCase(), role: res.role, name: res.name ?? null, district: res.district ?? null, program: res.program ?? null, nodeType: res.node_type ?? null, nodeName: res.node_name ?? null };
-      const raw = JSON.stringify(s);
-      if (typeof window !== "undefined") {
-        try { window.localStorage.setItem(STORAGE_KEY, raw); } catch { /* ignore */ }
-        writeCookie(COOKIE_KEY, raw);
-      }
-      setSession(s);
-      queryClient.clear();
-      return s.role;
+    try {
+      await callLogin({ data: { email, password } });
+    } catch {
+      return null;
     }
-    return null;
+    queryClient.clear();
+    return refresh();
   };
 
-  const logout = () => {
-    if (typeof window !== "undefined") {
-      try { window.localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
-      clearCookie(COOKIE_KEY);
+  const logout = async () => {
+    try {
+      await callLogout();
+    } catch {
+      /* already signed out */
     }
     setSession(null);
     queryClient.clear();
   };
 
-
   return (
-    <AuthContext.Provider value={{ session, isAuthenticated: !!session, isAdmin: session?.role === "admin", hydrated, login, logout }}>
+    <AuthContext.Provider
+      value={{ session, isAuthenticated: !!session, isAdmin: session?.role === "admin", hydrated, login, logout, refresh }}
+    >
       {children}
     </AuthContext.Provider>
   );

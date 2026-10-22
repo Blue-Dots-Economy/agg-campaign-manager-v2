@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { AggregatePayload } from "@/lib/snapshot.functions";
-import { useServerFn } from "@tanstack/react-start";
 import { Upload, Rocket, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useProgram } from "@/programs/context";
@@ -10,12 +9,7 @@ import { useAuth } from "@/auth/context";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { MobileNav } from "./MobileNav";
 import { AccountMenu } from "./AccountMenu";
-import {
-  useSyncProgram,
-  useProgramAggregates,
-  useAutoFreshness,
-} from "@/programs/useProgramAggregates";
-import { fetchActiveSource } from "@/lib/snapshot.functions";
+import { useProgramAggregates, useAutoFreshness } from "@/programs/useProgramAggregates";
 import { ConcurrencyChip } from "@/components/ConcurrencyChip";
 
 export function TopBar() {
@@ -24,37 +18,14 @@ export function TopBar() {
   const canDirectLaunch = session?.role === "admin" || session?.role === "jfc";
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isUserOverview = pathname === "/user-level-analysis";
-  // TEMPORARY ROUTING DIAGNOSTIC — remove once the routing issue is resolved.
-  // location.search is normally a parsed object in TanStack Router, but be
-  // tolerant of a raw query string too so the chip cannot silently never render.
-  const rawSearch = useRouterState({ select: (s) => (s.location as { search: unknown }).search });
-  const diagParam =
-    typeof rawSearch === "string"
-      ? new URLSearchParams(rawSearch).get("diag")
-      : (rawSearch as unknown as Record<string, unknown> | null)?.diag;
-  const showDiag = diagParam === "1";
-  const sync = useSyncProgram(config.id);
   const query = useProgramAggregates(config);
   const lastSynced = query.data?.lastSyncedAt ?? null;
-
-  const getActiveSource = useServerFn(fetchActiveSource);
-  const { data: activeSource } = useQuery({
-    queryKey: ["active-source"],
-    queryFn: () => getActiveSource(),
-    staleTime: Infinity,
-  });
-  const sourceIsPurple = activeSource?.source === "purple";
-  // TEMPORARY ROUTING DIAGNOSTIC — remove once the routing issue is resolved.
-  // Chip shows only with ?diag=1; never exposes URL/key values, booleans only.
-  const diag =
-    activeSource &&
-    `source=${activeSource.source} hasUrl=${activeSource.hasUrl} hasKey=${activeSource.hasKey} cutover=${activeSource.cutover} actor=${activeSource.actor ?? "null"} pilot=${activeSource.pilotMatch}`;
 
   // On-load freshness: kick off a silent background sync if the snapshot is stale.
   const autoSync = useAutoFreshness(config.id, lastSynced);
   const qc = useQueryClient();
   const [isRefetching, setIsRefetching] = useState(false);
-  const isSyncing = sync.isPending || autoSync.isPending || isRefetching;
+  const isSyncing = autoSync.isPending || isRefetching;
 
   // Pipeline source: sheet sync does not apply, so Refresh refetches the
   // dashboard's cached queries instead. Does NOT touch last_synced_at — that
@@ -137,13 +108,12 @@ export function TopBar() {
               variant="outline"
               size="sm"
               className="gap-1.5"
-              onClick={() => (sourceIsPurple ? void refetchFromPipeline() : sync.mutate({ force: true }))}
+              onClick={() => void refetchFromPipeline()}
               disabled={isSyncing}
               title={`Last synced ${ago}`}
             >
               <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
-              {/* Pipeline source refetches — "sync" only describes the sheet path. */}
-              {isSyncing ? (sourceIsPurple ? "Refreshing…" : "Syncing…") : "Refresh"}
+              {isSyncing ? "Refreshing…" : "Refresh"}
             </Button>
             {canDirectLaunch && (
               <Link to="/launch">
@@ -158,12 +128,6 @@ export function TopBar() {
               </Button>
             </Link>
           </>
-        )}
-        {/* TEMPORARY ROUTING DIAGNOSTIC — remove once the routing issue is resolved. */}
-        {showDiag && diag && (
-          <span className="font-mono text-[11px] text-muted-foreground border border-border rounded px-2 py-0.5">
-            {diag}
-          </span>
         )}
         <AccountMenu />
       </div>

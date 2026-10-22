@@ -28,9 +28,9 @@ function LoginPage() {
 
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const role = await login(email, password);
-    if (role) navigate({ to: landingFor(role) });
-    else setError(true);
+    const s = await login(email, password);
+    if (!s) setError(true);
+    else navigate({ to: s.mustChangePassword ? "/change-password" : landingFor(s.role) });
   };
 
   return (
@@ -64,19 +64,20 @@ function LoginPage() {
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-foreground" htmlFor="password">Password (admin only)</label>
+            <label className="text-xs font-medium text-foreground" htmlFor="password">Password</label>
             <Input
               id="password"
               type="password"
               autoComplete="current-password"
               value={password}
               onChange={(e) => { setPassword(e.target.value); setError(false); }}
+              required
               aria-invalid={error || undefined}
               aria-describedby={error ? "login-error" : undefined}
             />
           </div>
           {error && (
-            <p id="login-error" role="alert" className="text-xs text-rose-600">Not an authorised email, or wrong admin password.</p>
+            <p id="login-error" role="alert" className="text-xs text-rose-600">Email or password is incorrect.</p>
           )}
           <Button type="submit" className="w-full">Sign in</Button>
         </form>

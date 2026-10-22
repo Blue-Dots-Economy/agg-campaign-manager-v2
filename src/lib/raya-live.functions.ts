@@ -1,14 +1,13 @@
 // Live campaign reads from Raya. Sequential + delayed to respect the rate limit.
 
 import { createServerFn } from "@tanstack/react-start";
-import { sbFor } from "./db.server";
+import { eq } from "drizzle-orm";
+import { requireRole } from "@/auth/middleware";
+import { FN_ROLES } from "@/auth/roles";
+import { getDb } from "@/server/db/client.server";
+import { programAgents } from "@/server/db/schema";
 import { delay, rayaFetch } from "./raya-api";
 import type { ProgramId } from "@/programs/registry";
-
-// Per-request client: sbFor() picks the database for the current actor.
-function sb() {
-  return sbFor();
-}
 
 export interface LiveBatch {
   batchId: string;
@@ -104,6 +103,7 @@ const STATUS_PRIORITY: Record<string, number> = {
 };
 
 export const listProgramLiveBatches = createServerFn({ method: "GET" })
+  .middleware([requireRole(FN_ROLES.campaigns)])
   .inputValidator((d: { program: ProgramId }) => {
     if (!d.program) throw new Error("program required");
     return d;
@@ -112,13 +112,14 @@ export const listProgramLiveBatches = createServerFn({ method: "GET" })
     if (!process.env.RAYA_API_KEY) {
       return { ok: false as const, batches: [] as LiveBatch[], error: "RAYA_API_KEY not set" };
     }
-    const c = sb();
-    const { data: agents, error } = await c
-      .from("program_agents")
-      .select("agent_id,name")
-      .eq("program", data.program);
-    if (error) {
-      return { ok: false as const, batches: [] as LiveBatch[], error: error.message };
+    let agents: Array<{ agent_id: string; name: string }>;
+    try {
+      agents = await getDb()
+        .select({ agent_id: programAgents.agentId, name: programAgents.name })
+        .from(programAgents)
+        .where(eq(programAgents.program, data.program));
+    } catch (e) {
+      return { ok: false as const, batches: [] as LiveBatch[], error: e instanceof Error ? e.message : String(e) };
     }
     const all: LiveBatch[] = [];
     for (const a of agents ?? []) {
@@ -191,6 +192,7 @@ function contactDuration(c: any): number {
 }
 
 export const getBatchLiveDetail = createServerFn({ method: "GET" })
+  .middleware([requireRole(FN_ROLES.campaigns)])
   .inputValidator((d: { batchId: string; agentName?: string; batchName?: string }) => {
     if (!d.batchId) throw new Error("batchId required");
     return d;

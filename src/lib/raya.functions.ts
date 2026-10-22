@@ -2,6 +2,8 @@
 // inside .handler() and never sent to the browser.
 
 import { createServerFn } from "@tanstack/react-start";
+import { requireRole } from "@/auth/middleware";
+import { FN_ROLES } from "@/auth/roles";
 import { delay, rayaFetch, RayaApiError } from "./raya-api";
 
 export interface RayaContact {
@@ -20,6 +22,7 @@ export interface RayaSchedule {
 
 // ---------- createBatch ----------
 export const rayaCreateBatch = createServerFn({ method: "POST" })
+  .middleware([requireRole(FN_ROLES.launch)])
   .inputValidator(
     (data: { agentId: string; batchName: string; contacts: RayaContact[] }) => {
       if (!data.agentId) throw new Error("Missing agent id for this program. Set it in Settings.");
@@ -100,6 +103,7 @@ export const rayaCreateBatch = createServerFn({ method: "POST" })
 
 // ---------- startBatch ----------
 export const rayaStartBatch = createServerFn({ method: "POST" })
+  .middleware([requireRole(FN_ROLES.launch)])
   .inputValidator(
     (data: {
       batchId: string;
@@ -140,6 +144,7 @@ export const rayaStartBatch = createServerFn({ method: "POST" })
 
 // ---------- listAgents ----------
 export const rayaListAgents = createServerFn({ method: "GET" })
+  .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator((data: { page?: number; pageSize?: number }) => data)
   .handler(async ({ data }) => {
     const qs = new URLSearchParams();
@@ -160,6 +165,7 @@ export const rayaListAgents = createServerFn({ method: "GET" })
 
 // ---------- validateContacts (no Raya call — pure validation) ----------
 export const validateContacts = createServerFn({ method: "POST" })
+  .middleware([requireRole(FN_ROLES.launch)])
   .inputValidator(
     (data: { headers: string[]; rows: string[][] }) => {
       if (!Array.isArray(data.headers)) throw new Error("headers required");
@@ -233,6 +239,7 @@ export const validateContacts = createServerFn({ method: "POST" })
 
 // ---------- updateBatch ----------
 export const rayaUpdateBatch = createServerFn({ method: "POST" })
+  .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator(
     (data: {
       batchId: string;
@@ -261,6 +268,7 @@ export const rayaUpdateBatch = createServerFn({ method: "POST" })
 
 // ---------- stopBatch ----------
 export const rayaStopBatch = createServerFn({ method: "POST" })
+  .middleware([requireRole(FN_ROLES.campaigns)])
   .inputValidator((data: { batchId: string }) => {
     if (!data.batchId) throw new Error("Missing batch id.");
     return data;
@@ -274,6 +282,7 @@ export const rayaStopBatch = createServerFn({ method: "POST" })
 
 // ---------- listBatches ----------
 export const rayaListBatches = createServerFn({ method: "GET" })
+  .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator((data: { agentId?: string; page?: number; pageSize?: number }) => data)
   .handler(async ({ data }) => {
     const qs = new URLSearchParams();
@@ -287,6 +296,7 @@ export const rayaListBatches = createServerFn({ method: "GET" })
 
 // ---------- getBatchContacts ----------
 export const rayaGetBatchContacts = createServerFn({ method: "GET" })
+  .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator((data: { batchId: string; page?: number; pageSize?: number }) => {
     if (!data.batchId) throw new Error("Missing batch id.");
     return data;
@@ -304,6 +314,7 @@ export const rayaGetBatchContacts = createServerFn({ method: "GET" })
 
 // ---------- initiateCall ----------
 export const rayaInitiateCall = createServerFn({ method: "POST" })
+  .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator(
     (data: {
       agentId: string;
@@ -327,6 +338,8 @@ export const rayaInitiateCall = createServerFn({ method: "POST" })
   });
 
 // ---------- key status (does not expose the key) ----------
-export const rayaKeyStatus = createServerFn({ method: "GET" }).handler(async () => {
-  return { configured: Boolean(process.env.RAYA_API_KEY) };
-});
+export const rayaKeyStatus = createServerFn({ method: "GET" })
+  .middleware([requireRole(FN_ROLES.admin)])
+  .handler(async () => {
+    return { configured: Boolean(process.env.RAYA_API_KEY) };
+  });

@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { LogOut } from "lucide-react";
+import { KeyRound, LogOut } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,8 +35,12 @@ export function AccountMenu() {
           <span className="text-xs font-normal text-muted-foreground">{{ admin: "Admin", jfc: "JFC", owner: "Owner", coordinator: "Coordinator", ecosystem: "Ecosystem", user: "Reviewer" }[session.role] ?? session.role}</span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => navigate({ to: "/change-password" })}>
+          <KeyRound className="h-4 w-4" />
+          Change password
+        </DropdownMenuItem>
         <DropdownMenuItem
-          onClick={() => { logout(); navigate({ to: "/login" }); }}
+          onClick={() => { void logout().then(() => navigate({ to: "/login" })); }}
           className="text-rose-600 focus:text-rose-600"
         >
           <LogOut className="h-4 w-4" />

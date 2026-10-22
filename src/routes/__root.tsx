@@ -11,7 +11,6 @@ import type { ErrorComponentProps } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
-import { reportLovableError } from "../lib/lovable-error-reporting";
 
 function NotFoundComponent() {
   return (
@@ -38,9 +37,6 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: ErrorComponentProps) {
   console.error(error);
   const router = useRouter();
-  useEffect(() => {
-    reportLovableError(error, { boundary: "tanstack_root_error_component" });
-  }, [error]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -140,20 +136,24 @@ function AuthGate({ children }: { children: ReactNode }) {
   const { isAuthenticated, hydrated, session } = useAuth();
   const navigate = useNavigate();
   const isLogin = pathname === "/login";
+  const isChangePassword = pathname === "/change-password";
   const role = session?.role;
+  const mustChange = !!session?.mustChangePassword;
   const allowed = isLogin || canAccess(role, pathname);
 
   useEffect(() => {
     if (!hydrated) return;
     if (!isAuthenticated && !isLogin) navigate({ to: "/login" });
+    else if (mustChange && !isChangePassword) navigate({ to: "/change-password" });
     else if (isAuthenticated && isLogin) navigate({ to: landingFor(role) });
     else if (isAuthenticated && !allowed) navigate({ to: landingFor(role) });
-  }, [hydrated, isAuthenticated, isLogin, allowed, role, navigate]);
+  }, [hydrated, isAuthenticated, isLogin, isChangePassword, mustChange, allowed, role, navigate]);
 
   if (!hydrated) return null;
   if (isLogin) return <>{children}</>;
   if (!isAuthenticated) return null;
-  if (!allowed) return null;
+  if (isChangePassword) return <>{children}</>;
+  if (mustChange || !allowed) return null;
   return <AppShell>{children}</AppShell>;
 }
 
