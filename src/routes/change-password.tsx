@@ -14,7 +14,7 @@ export const Route = createFileRoute("/change-password")({
 });
 
 function ChangePasswordPage() {
-  const { session, refresh } = useAuth();
+  const { session, refresh, authProvider } = useAuth();
   const navigate = useNavigate();
   const change = useServerFn(changePassword);
   const [current, setCurrent] = useState("");
@@ -27,6 +27,14 @@ function ChangePasswordPage() {
     set(v);
     setError(null);
   };
+
+  if (authProvider === "keycloak") {
+    return (
+      <p className="mx-auto max-w-sm py-16 text-center text-sm text-muted-foreground">
+        Passwords are managed in Keycloak. Change yours there.
+      </p>
+    );
+  }
 
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();

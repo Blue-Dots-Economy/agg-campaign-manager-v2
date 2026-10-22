@@ -85,6 +85,12 @@ export const login = createServerFn({ method: "POST" })
     return { role: u.role as Role, mustChangePassword: u.mustChangePassword };
   });
 
+// Passwords are managed in Keycloak in that flow.
+async function refuseInKeycloakFlow(): Promise<void> {
+  const { authProvider } = await import("@/server/auth/config.server");
+  if (authProvider() === "keycloak") throw new Error("Passwords are managed in Keycloak.");
+}
+
 async function refuseLogin(status: 401 | 429, message: string): Promise<never> {
   const { setResponseStatus } = await import("@tanstack/react-start/server");
   setResponseStatus(status);
@@ -124,6 +130,7 @@ export const changePassword = createServerFn({ method: "POST" })
     z.object({ currentPassword: z.string().max(200), newPassword: z.string().max(200) }).parse(d),
   )
   .handler(async ({ data, context }) => {
+    await refuseInKeycloakFlow();
     const { db: d, appUsers, eq } = await db();
     const pw = await import("@/server/auth/password.server");
     const problem = pw.passwordProblem(data.newPassword);
@@ -192,12 +199,15 @@ export const listAppUsers = createServerFn({ method: "GET" })
 export const createAppUser = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator((d: unknown) => profile.parse(d))
-  .handler(async ({ data }): Promise<{ temporaryPassword: string }> => {
+  // Basic flow: a temporary password, shown once. Keycloak flow: no password,
+  // the user logs in with a Keycloak account that has the same verified email.
+  .handler(async ({ data }): Promise<{ temporaryPassword: string | null }> => {
     const { db: d, appUsers, eq } = await db();
     const pw = await import("@/server/auth/password.server");
+    const { authProvider } = await import("@/server/auth/config.server");
     const [exists] = await d.select({ id: appUsers.id }).from(appUsers).where(eq(appUsers.email, data.email)).limit(1);
     if (exists) throw new Error("A user with this email already exists.");
-    const temporaryPassword = pw.temporaryPassword();
+    const temporaryPassword = authProvider() === "none" ? pw.temporaryPassword() : null;
     await d.insert(appUsers).values({
       email: data.email,
       name: data.name,
@@ -206,8 +216,8 @@ export const createAppUser = createServerFn({ method: "POST" })
       program: data.program,
       nodeType: data.node_type,
       nodeName: data.node_name,
-      passwordHash: await pw.hashPassword(temporaryPassword),
-      mustChangePassword: true,
+      passwordHash: temporaryPassword ? await pw.hashPassword(temporaryPassword) : null,
+      mustChangePassword: !!temporaryPassword,
     });
     return { temporaryPassword };
   });
@@ -247,6 +257,7 @@ export const resetAppUserPassword = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator((d: unknown) => z.object({ email }).parse(d))
   .handler(async ({ data }): Promise<{ temporaryPassword: string }> => {
+    await refuseInKeycloakFlow();
     const { db: d, appUsers, eq } = await db();
     const pw = await import("@/server/auth/password.server");
     const temporaryPassword = pw.temporaryPassword();
