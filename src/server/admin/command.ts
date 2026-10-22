@@ -75,7 +75,7 @@ async function main(): Promise<void> {
         .where(eq(appUsers.email, email));
     }
 
-    const changed = [plan.create && "created", plan.makeAdmin && "promoted", plan.setPassword && "password", plan.relink && "relinked"]
+    const changed = [plan.create && "created", !plan.create && plan.makeAdmin && "promoted", plan.setPassword && "password", plan.relink && "relinked"]
       .filter(Boolean)
       .join(",");
     console.log(`[admin-command] ${now} email=${email} changes=${changed}`);
