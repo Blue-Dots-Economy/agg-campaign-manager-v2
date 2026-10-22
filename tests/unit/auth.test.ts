@@ -86,15 +86,30 @@ describe("lockout", () => {
 
   test(`${MAX_FAILED_LOGINS} failures lock for ${LOCK_MINUTES} minutes`, () => {
     let count = 0;
+    let last: Date | null = null;
     let lockedUntil: Date | null = null;
-    for (let i = 0; i < MAX_FAILED_LOGINS; i++) ({ failedLoginCount: count, lockedUntil } = afterFailedLogin(count, now));
+    for (let i = 0; i < MAX_FAILED_LOGINS; i++) {
+      ({ failedLoginCount: count, lockedUntil, lastFailedLoginAt: last } = afterFailedLogin(count, last, now));
+    }
     expect(lockedUntil).not.toBeNull();
     expect(isLocked(lockedUntil, now)).toBe(true);
     expect(isLocked(lockedUntil, new Date(now.getTime() + LOCK_MINUTES * 60_000 + 1))).toBe(false);
   });
 
   test("fewer failures do not lock", () => {
-    expect(afterFailedLogin(MAX_FAILED_LOGINS - 2, now).lockedUntil).toBeNull();
+    expect(afterFailedLogin(MAX_FAILED_LOGINS - 2, now, now).lockedUntil).toBeNull();
+  });
+
+  test(`failures older than ${LOCK_MINUTES} minutes no longer count`, () => {
+    const old = new Date(now.getTime() - LOCK_MINUTES * 60_000);
+    const r = afterFailedLogin(MAX_FAILED_LOGINS - 1, old, now);
+    expect(r.lockedUntil).toBeNull();
+    expect(r.failedLoginCount).toBe(1);
+  });
+
+  test("a recent failure still counts", () => {
+    const recent = new Date(now.getTime() - 60_000);
+    expect(afterFailedLogin(MAX_FAILED_LOGINS - 1, recent, now).lockedUntil).not.toBeNull();
   });
 });
 

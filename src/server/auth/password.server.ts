@@ -49,11 +49,18 @@ export function temporaryPassword(length = 14): string {
 export const MAX_FAILED_LOGINS = 5;
 export const LOCK_MINUTES = 15;
 
-export function afterFailedLogin(failedCount: number, now: Date): { failedLoginCount: number; lockedUntil: Date | null } {
-  const next = failedCount + 1;
+// Only failures within the last LOCK_MINUTES count. With the per-source limit in
+// login-limit.server.ts, one address can't add enough to lock an account.
+export function afterFailedLogin(
+  failedCount: number,
+  lastFailedAt: string | Date | null | undefined,
+  now: Date,
+): { failedLoginCount: number; lockedUntil: Date | null; lastFailedLoginAt: Date } {
+  const stale = !lastFailedAt || now.getTime() - new Date(lastFailedAt).getTime() >= LOCK_MINUTES * 60_000;
+  const next = (stale ? 0 : failedCount) + 1;
   return next >= MAX_FAILED_LOGINS
-    ? { failedLoginCount: 0, lockedUntil: new Date(now.getTime() + LOCK_MINUTES * 60_000) }
-    : { failedLoginCount: next, lockedUntil: null };
+    ? { failedLoginCount: 0, lockedUntil: new Date(now.getTime() + LOCK_MINUTES * 60_000), lastFailedLoginAt: now }
+    : { failedLoginCount: next, lockedUntil: null, lastFailedLoginAt: now };
 }
 
 export function isLocked(lockedUntil: string | Date | null | undefined, now: Date): boolean {

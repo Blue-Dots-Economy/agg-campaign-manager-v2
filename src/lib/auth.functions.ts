@@ -3,7 +3,8 @@ import { z } from "zod";
 import { FN_ROLES, ROLES, type Role } from "@/auth/roles";
 import { publicMiddleware, requireRole, sessionMiddleware } from "@/auth/middleware";
 
-const GENERIC_LOGIN_ERROR = "Email or password is incorrect";
+export const GENERIC_LOGIN_ERROR = "Email or password is incorrect";
+export const TOO_MANY_ATTEMPTS = "Too many attempts. Try again later";
 
 const email = z.string().trim().toLowerCase().email().max(320);
 const optText = z.string().trim().max(200).optional().transform((v) => (v ? v : null));
@@ -44,32 +45,50 @@ export const login = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<{ role: Role; mustChangePassword: boolean }> => {
     const { db: d, appUsers, eq } = await db();
     const pw = await import("@/server/auth/password.server");
+    const limit = await import("@/server/auth/login-limit.server");
+    const { getRequest, getRequestIP } = await import("@tanstack/react-start/server");
     const { startSession } = await import("@/server/auth/session.server");
     const now = new Date();
+    const key = limit.limiterKey(limit.clientAddress(getRequest().headers.get("x-forwarded-for"), getRequestIP()), data.email);
+
+    // Checked before the account, so the answer is the same whether or not the email exists.
+    if (limit.loginLimiter.isBlocked(key)) {
+      await pw.equaliseRefusal(data.password, null);
+      return refuseLogin(429, TOO_MANY_ATTEMPTS);
+    }
     const refuse = async (checkedHash: string | null) => {
+      limit.loginLimiter.recordFailure(key);
       await pw.equaliseRefusal(data.password, checkedHash);
-      return refuseLogin();
+      return refuseLogin(401, GENERIC_LOGIN_ERROR);
     };
     const [u] = await d.select().from(appUsers).where(eq(appUsers.email, data.email)).limit(1);
 
     if (!u || !u.active || !u.passwordHash || pw.isLocked(u.lockedUntil, now)) return refuse(null);
     if (!(await pw.verifyPassword(data.password, u.passwordHash))) {
-      const next = pw.afterFailedLogin(u.failedLoginCount, now);
+      const next = pw.afterFailedLogin(u.failedLoginCount, u.lastFailedLoginAt, now);
       await d
         .update(appUsers)
-        .set({ failedLoginCount: next.failedLoginCount, lockedUntil: next.lockedUntil?.toISOString() ?? null })
+        .set({
+          failedLoginCount: next.failedLoginCount,
+          lockedUntil: next.lockedUntil?.toISOString() ?? null,
+          lastFailedLoginAt: next.lastFailedLoginAt.toISOString(),
+        })
         .where(eq(appUsers.id, u.id));
       return refuse(u.passwordHash);
     }
-    await d.update(appUsers).set({ failedLoginCount: 0, lockedUntil: null }).where(eq(appUsers.id, u.id));
+    limit.loginLimiter.clear(key);
+    await d
+      .update(appUsers)
+      .set({ failedLoginCount: 0, lockedUntil: null, lastFailedLoginAt: null, lastLoginAt: now.toISOString() })
+      .where(eq(appUsers.id, u.id));
     await startSession(u.id);
     return { role: u.role as Role, mustChangePassword: u.mustChangePassword };
   });
 
-async function refuseLogin(): Promise<never> {
+async function refuseLogin(status: 401 | 429, message: string): Promise<never> {
   const { setResponseStatus } = await import("@tanstack/react-start/server");
-  setResponseStatus(401);
-  throw new Error(GENERIC_LOGIN_ERROR);
+  setResponseStatus(status);
+  throw new Error(message);
 }
 
 // Works without a valid session, so an expired one can still clear its cookie.
