@@ -2,6 +2,9 @@
 import { createMiddleware } from "@tanstack/react-start";
 import type { Role } from "./roles";
 
+// The client sends the user to login when it sees this message (see router.tsx).
+export const NOT_SIGNED_IN = "Not signed in";
+
 async function fail(status: 401 | 403, message: string): Promise<never> {
   const { setResponseStatus } = await import("@tanstack/react-start/server");
   setResponseStatus(status);
@@ -39,7 +42,7 @@ export const sessionMiddleware = createMiddleware({ type: "function" }).server(a
   await assertSameOrigin();
   const { currentUser } = await import("@/server/auth/session.server");
   const user = await currentUser();
-  if (!user) return fail(401, "Not signed in");
+  if (!user) return fail(401, NOT_SIGNED_IN);
   return next({ context: { user } });
 });
 
