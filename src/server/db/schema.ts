@@ -9,7 +9,8 @@ export const appUsers = pgTable("app_users", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	email: text().notNull(),
 	name: text(),
-	role: text().notNull(),
+	// Empty only for users waiting for approval, who are never active.
+	role: text(),
 	district: text(),
 	program: text(),
 	nodeType: text("node_type"),
@@ -21,9 +22,15 @@ export const appUsers = pgTable("app_users", {
 	mustChangePassword: boolean("must_change_password").default(false).notNull(),
 	failedLoginCount: integer("failed_login_count").default(0).notNull(),
 	lockedUntil: timestamp("locked_until", { withTimezone: true, mode: 'string' }),
+	lastFailedLoginAt: timestamp("last_failed_login_at", { withTimezone: true, mode: 'string' }),
+	lastLoginAt: timestamp("last_login_at", { withTimezone: true, mode: 'string' }),
+	keycloakSub: text("keycloak_sub"),
+	rejectedAt: timestamp("rejected_at", { withTimezone: true, mode: 'string' }),
 }, (table) => [
 	unique("app_users_email_key").on(table.email),
+	unique("app_users_keycloak_sub_key").on(table.keycloakSub),
 	check("app_users_role_check", sql`role = ANY (ARRAY['admin'::text, 'jfc'::text, 'owner'::text, 'coordinator'::text, 'ecosystem'::text, 'user'::text])`),
+	check("app_users_active_needs_role", sql`(NOT active) OR role IS NOT NULL`),
 ]);
 
 export const purpleDotsCalls = pgTable("purple_dots_calls", {

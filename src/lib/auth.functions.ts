@@ -124,7 +124,8 @@ export const changePassword = createServerFn({ method: "POST" })
 export interface AppUser {
   email: string;
   name: string | null;
-  role: string;
+  // null for a user waiting for approval.
+  role: string | null;
   district: string | null;
   program: string | null;
   node_type: string | null;

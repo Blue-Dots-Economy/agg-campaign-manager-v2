@@ -146,7 +146,7 @@ export function UsersRolesSection() {
     setForm({
       email: u.email,
       name: u.name ?? "",
-      role: u.role,
+      role: u.role ?? "user",
       district: u.district || NONE,
       program: u.program || NONE,
       node_type: u.node_type || NONE,
@@ -200,7 +200,7 @@ export function UsersRolesSection() {
                 <TableCell className="text-sm">{u.name || "—"}</TableCell>
                 <TableCell>
                   <Badge variant="secondary" className="bg-brand-soft text-brand">
-                    {ROLE_OPTIONS.find((r) => r.value === u.role)?.label ?? u.role}
+                    {ROLE_OPTIONS.find((r) => r.value === u.role)?.label ?? u.role ?? "No role"}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground">
