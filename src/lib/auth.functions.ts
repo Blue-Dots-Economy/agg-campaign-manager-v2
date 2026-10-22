@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { FN_ROLES, ROLES, type Role } from "@/auth/roles";
-import { requireRole, sessionMiddleware } from "@/auth/middleware";
+import { publicMiddleware, requireRole, sessionMiddleware } from "@/auth/middleware";
 
 const GENERIC_LOGIN_ERROR = "Email or password is incorrect";
 
@@ -17,7 +17,11 @@ async function db() {
   return { db: getDb(), appUsers: schema.appUsers, ...orm };
 }
 
-export interface MeResult {
+import type { AuthProvider } from "@/server/auth/config.server";
+
+export type { AuthProvider };
+
+export interface SessionUser {
   email: string;
   name: string | null;
   role: Role;
@@ -28,8 +32,14 @@ export interface MeResult {
   mustChangePassword: boolean;
 }
 
-// The only public server function.
+// authProvider is always there, so the login screen knows which flow to show.
+export type MeResult =
+  | ({ loggedIn: true; authProvider: AuthProvider } & SessionUser)
+  | { loggedIn: false; authProvider: AuthProvider };
+
+// Public: login, me, logout.
 export const login = createServerFn({ method: "POST" })
+  .middleware([publicMiddleware])
   .inputValidator((d: unknown) => z.object({ email, password: z.string().max(200) }).parse(d))
   .handler(async ({ data }): Promise<{ role: Role; mustChangePassword: boolean }> => {
     const { db: d, appUsers, eq } = await db();
@@ -62,19 +72,31 @@ async function refuseLogin(): Promise<never> {
   throw new Error(GENERIC_LOGIN_ERROR);
 }
 
+// Works without a valid session, so an expired one can still clear its cookie.
+// Returns where the browser should go next.
 export const logout = createServerFn({ method: "POST" })
-  .middleware([sessionMiddleware])
-  .handler(async () => {
+  .middleware([publicMiddleware])
+  .handler(async (): Promise<{ redirectTo: string }> => {
     const { endSession } = await import("@/server/auth/session.server");
     endSession();
-    return { ok: true };
+    return { redirectTo: "/login" };
   });
 
 export const me = createServerFn({ method: "GET" })
-  .middleware([sessionMiddleware])
-  .handler(async ({ context }): Promise<MeResult> => {
-    const { id: _id, ...rest } = context.user;
-    return rest;
+  .middleware([publicMiddleware])
+  .handler(async (): Promise<MeResult> => {
+    const { authProvider } = await import("@/server/auth/config.server");
+    const { currentUser } = await import("@/server/auth/session.server");
+    const provider = authProvider();
+    const user = await currentUser();
+    if (!user) return { loggedIn: false, authProvider: provider };
+    const { id: _id, ...rest } = user;
+    return {
+      loggedIn: true,
+      authProvider: provider,
+      ...rest,
+      mustChangePassword: provider === "none" && rest.mustChangePassword,
+    };
   });
 
 export const changePassword = createServerFn({ method: "POST" })

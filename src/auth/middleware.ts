@@ -24,7 +24,13 @@ async function assertSameOrigin(): Promise<void> {
   if (!host || originHost !== host) await fail(403, "Cross-site request refused");
 }
 
-// No password-change gate: me, logout, changePassword only.
+// Public functions only (login, me, logout): the cross-site check, no session.
+export const publicMiddleware = createMiddleware({ type: "function" }).server(async ({ next }) => {
+  await assertSameOrigin();
+  return next();
+});
+
+// No password-change gate: changePassword only.
 export const sessionMiddleware = createMiddleware({ type: "function" }).server(async ({ next }) => {
   await assertSameOrigin();
   const { currentUser } = await import("@/server/auth/session.server");
@@ -33,10 +39,15 @@ export const sessionMiddleware = createMiddleware({ type: "function" }).server(a
   return next({ context: { user } });
 });
 
+// The password-change gate applies to the basic flow only: in the Keycloak flow
+// passwords live in Keycloak, so a leftover flag must not lock anyone out.
 export const authMiddleware = createMiddleware({ type: "function" })
   .middleware([sessionMiddleware])
   .server(async ({ next, context }) => {
-    if (context.user.mustChangePassword) await fail(403, "Change your password to continue");
+    const { authProvider } = await import("@/server/auth/config.server");
+    if (context.user.mustChangePassword && authProvider() === "none") {
+      await fail(403, "Change your password to continue");
+    }
     return next();
   });
 

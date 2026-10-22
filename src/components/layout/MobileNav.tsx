@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard,
@@ -148,7 +148,6 @@ export function MobileNav() {
   const [open, setOpen] = useState(false);
   const { programId, setProgramId } = useProgram();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const navigate = useNavigate();
   const { logout, session } = useAuth();
   const isEcosystem = session?.role === "ecosystem";
   const groups = isEcosystem
@@ -275,7 +274,7 @@ export function MobileNav() {
           <button
             onClick={() => {
               setOpen(false);
-              void logout().then(() => navigate({ to: "/login" }));
+              void logout();
             }}
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >

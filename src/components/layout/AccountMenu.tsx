@@ -40,7 +40,7 @@ export function AccountMenu() {
           Change password
         </DropdownMenuItem>
         <DropdownMenuItem
-          onClick={() => { void logout().then(() => navigate({ to: "/login" })); }}
+          onClick={() => { void logout(); }}
           className="text-rose-600 focus:text-rose-600"
         >
           <LogOut className="h-4 w-4" />

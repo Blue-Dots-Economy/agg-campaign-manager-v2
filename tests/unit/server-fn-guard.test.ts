@@ -3,8 +3,9 @@ import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
-const PUBLIC = new Set(["login"]);
-const SESSION_ONLY = new Set(["me", "logout", "changePassword"]);
+// Public functions run only the cross-site check (publicMiddleware), no session.
+const PUBLIC = new Set(["login", "me", "logout"]);
+const SESSION_ONLY = new Set(["changePassword"]);
 
 const SRC = join(import.meta.dir, "../../src");
 
@@ -62,8 +63,16 @@ describe("server functions", () => {
     expect(sessionOnly.sort()).toEqual([...SESSION_ONLY].sort());
   });
 
-  test("the public allowlist is exactly login", () => {
-    const open = fns.filter((f) => f.middleware.length === 0).map((f) => f.name);
-    expect(open).toEqual([...PUBLIC]);
+  test("the public allowlist is exactly login, me and logout", () => {
+    const open = fns
+      .filter((f) => !f.middleware.some((m) => m === "requireRole" || m === "authMiddleware" || m === "sessionMiddleware"))
+      .map((f) => f.name);
+    expect(open.sort()).toEqual([...PUBLIC].sort());
+  });
+
+  test("public functions run the cross-site check and nothing else", () => {
+    for (const f of fns.filter((x) => PUBLIC.has(x.name))) {
+      expect([f.name, f.middleware]).toEqual([f.name, ["publicMiddleware"]]);
+    }
   });
 });
