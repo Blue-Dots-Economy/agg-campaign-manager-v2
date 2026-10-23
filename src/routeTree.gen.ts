@@ -22,6 +22,9 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as UserLevelAnalysisRouteImport } from './routes/user-level-analysis'
 import { Route as CampaignsCampaignRouteImport } from './routes/campaigns_.$campaign'
 import { Route as ReviewCallIdRouteImport } from './routes/review_.$callId'
+import { Route as AuthKeycloakCallbackRouteImport } from './routes/auth/keycloak/callback'
+import { Route as AuthKeycloakLoginRouteImport } from './routes/auth/keycloak/login'
+import { Route as AuthKeycloakSignOutRouteImport } from './routes/auth/keycloak/sign-out'
 import { Route as ApiPublicHooksSyncSnapshotsRouteImport } from './routes/api/public/hooks/sync-snapshots'
 
 const IndexRoute = IndexRouteImport.update({
@@ -89,6 +92,21 @@ const ReviewCallIdRoute = ReviewCallIdRouteImport.update({
   path: '/review/$callId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthKeycloakCallbackRoute = AuthKeycloakCallbackRouteImport.update({
+  id: '/auth/keycloak/callback',
+  path: '/auth/keycloak/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthKeycloakLoginRoute = AuthKeycloakLoginRouteImport.update({
+  id: '/auth/keycloak/login',
+  path: '/auth/keycloak/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthKeycloakSignOutRoute = AuthKeycloakSignOutRouteImport.update({
+  id: '/auth/keycloak/sign-out',
+  path: '/auth/keycloak/sign-out',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicHooksSyncSnapshotsRoute =
   ApiPublicHooksSyncSnapshotsRouteImport.update({
     id: '/api/public/hooks/sync-snapshots',
@@ -110,6 +128,9 @@ export interface FileRoutesByFullPath {
   '/user-level-analysis': typeof UserLevelAnalysisRoute
   '/campaigns/$campaign': typeof CampaignsCampaignRoute
   '/review/$callId': typeof ReviewCallIdRoute
+  '/auth/keycloak/callback': typeof AuthKeycloakCallbackRoute
+  '/auth/keycloak/login': typeof AuthKeycloakLoginRoute
+  '/auth/keycloak/sign-out': typeof AuthKeycloakSignOutRoute
   '/api/public/hooks/sync-snapshots': typeof ApiPublicHooksSyncSnapshotsRoute
 }
 export interface FileRoutesByTo {
@@ -126,6 +147,9 @@ export interface FileRoutesByTo {
   '/user-level-analysis': typeof UserLevelAnalysisRoute
   '/campaigns/$campaign': typeof CampaignsCampaignRoute
   '/review/$callId': typeof ReviewCallIdRoute
+  '/auth/keycloak/callback': typeof AuthKeycloakCallbackRoute
+  '/auth/keycloak/login': typeof AuthKeycloakLoginRoute
+  '/auth/keycloak/sign-out': typeof AuthKeycloakSignOutRoute
   '/api/public/hooks/sync-snapshots': typeof ApiPublicHooksSyncSnapshotsRoute
 }
 export interface FileRoutesById {
@@ -143,6 +167,9 @@ export interface FileRoutesById {
   '/user-level-analysis': typeof UserLevelAnalysisRoute
   '/campaigns_/$campaign': typeof CampaignsCampaignRoute
   '/review_/$callId': typeof ReviewCallIdRoute
+  '/auth/keycloak/callback': typeof AuthKeycloakCallbackRoute
+  '/auth/keycloak/login': typeof AuthKeycloakLoginRoute
+  '/auth/keycloak/sign-out': typeof AuthKeycloakSignOutRoute
   '/api/public/hooks/sync-snapshots': typeof ApiPublicHooksSyncSnapshotsRoute
 }
 export interface FileRouteTypes {
@@ -161,6 +188,9 @@ export interface FileRouteTypes {
     | '/user-level-analysis'
     | '/campaigns/$campaign'
     | '/review/$callId'
+    | '/auth/keycloak/callback'
+    | '/auth/keycloak/login'
+    | '/auth/keycloak/sign-out'
     | '/api/public/hooks/sync-snapshots'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -177,6 +207,9 @@ export interface FileRouteTypes {
     | '/user-level-analysis'
     | '/campaigns/$campaign'
     | '/review/$callId'
+    | '/auth/keycloak/callback'
+    | '/auth/keycloak/login'
+    | '/auth/keycloak/sign-out'
     | '/api/public/hooks/sync-snapshots'
   id:
     | '__root__'
@@ -193,6 +226,9 @@ export interface FileRouteTypes {
     | '/user-level-analysis'
     | '/campaigns_/$campaign'
     | '/review_/$callId'
+    | '/auth/keycloak/callback'
+    | '/auth/keycloak/login'
+    | '/auth/keycloak/sign-out'
     | '/api/public/hooks/sync-snapshots'
   fileRoutesById: FileRoutesById
 }
@@ -210,6 +246,9 @@ export interface RootRouteChildren {
   UserLevelAnalysisRoute: typeof UserLevelAnalysisRoute
   CampaignsCampaignRoute: typeof CampaignsCampaignRoute
   ReviewCallIdRoute: typeof ReviewCallIdRoute
+  AuthKeycloakCallbackRoute: typeof AuthKeycloakCallbackRoute
+  AuthKeycloakLoginRoute: typeof AuthKeycloakLoginRoute
+  AuthKeycloakSignOutRoute: typeof AuthKeycloakSignOutRoute
   ApiPublicHooksSyncSnapshotsRoute: typeof ApiPublicHooksSyncSnapshotsRoute
 }
 
@@ -306,6 +345,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReviewCallIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth/keycloak/callback': {
+      id: '/auth/keycloak/callback'
+      path: '/auth/keycloak/callback'
+      fullPath: '/auth/keycloak/callback'
+      preLoaderRoute: typeof AuthKeycloakCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/keycloak/login': {
+      id: '/auth/keycloak/login'
+      path: '/auth/keycloak/login'
+      fullPath: '/auth/keycloak/login'
+      preLoaderRoute: typeof AuthKeycloakLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/keycloak/sign-out': {
+      id: '/auth/keycloak/sign-out'
+      path: '/auth/keycloak/sign-out'
+      fullPath: '/auth/keycloak/sign-out'
+      preLoaderRoute: typeof AuthKeycloakSignOutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/sync-snapshots': {
       id: '/api/public/hooks/sync-snapshots'
       path: '/api/public/hooks/sync-snapshots'
@@ -330,6 +390,9 @@ const rootRouteChildren: RootRouteChildren = {
   UserLevelAnalysisRoute: UserLevelAnalysisRoute,
   CampaignsCampaignRoute: CampaignsCampaignRoute,
   ReviewCallIdRoute: ReviewCallIdRoute,
+  AuthKeycloakCallbackRoute: AuthKeycloakCallbackRoute,
+  AuthKeycloakLoginRoute: AuthKeycloakLoginRoute,
+  AuthKeycloakSignOutRoute: AuthKeycloakSignOutRoute,
   ApiPublicHooksSyncSnapshotsRoute: ApiPublicHooksSyncSnapshotsRoute,
 }
 export const routeTree = rootRouteImport

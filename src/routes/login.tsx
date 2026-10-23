@@ -1,9 +1,5 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
-import { Input } from "@/components/ui/input";
+import { createFileRoute } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/auth/context";
-import { landingFor } from "@/auth/permissions";
 import { AuroraFlow } from "@/components/AuroraFlow";
 import { useTheme, resolveDark } from "@/lib/theme";
 
@@ -13,25 +9,27 @@ import { useTheme, resolveDark } from "@/lib/theme";
 const LOGO = "/purple-dots-logo.png";
 const LOGO_DARK = "/purple-dots-logo-dark.png";
 
+// Reasons the Keycloak callback sends back, and what the user is told.
+const MESSAGES: Record<string, string> = {
+  pending: "Your access is pending. An admin needs to approve it.",
+  denied: "You don't have access to Campaign Manager. Contact an admin.",
+  conflict: "There is a problem with your account. Contact an admin.",
+  unverified: "Your email is not verified in Keycloak. Contact an admin.",
+  failed: "Login did not complete. Try again.",
+  expired: "Login did not complete. Try again.",
+};
+
 export const Route = createFileRoute("/login")({
+  validateSearch: (search: Record<string, unknown>): { error?: string } =>
+    typeof search.error === "string" ? { error: search.error } : {},
   component: LoginPage,
 });
 
 function LoginPage() {
-  const { login } = useAuth();
-  const navigate = useNavigate();
+  const { error } = Route.useSearch();
+  const message = error ? (MESSAGES[error] ?? MESSAGES.failed) : null;
   const { theme } = useTheme();
   const isDark = resolveDark(theme);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState(false);
-
-  const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const s = await login(email, password);
-    if (!s) setError(true);
-    else navigate({ to: s.mustChangePassword ? "/change-password" : landingFor(s.role) });
-  };
 
   return (
     <div className="relative overflow-hidden flex min-h-screen w-full items-center justify-center bg-background px-4">
@@ -49,38 +47,21 @@ function LoginPage() {
           <h1 className="sr-only">Purple Dots</h1>
         </div>
 
-        <form onSubmit={onSubmit} className="mt-6 space-y-4">
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-foreground" htmlFor="email">Email</label>
-            <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => { setEmail(e.target.value); setError(false); }}
-              required
-              aria-invalid={error || undefined}
-              aria-describedby={error ? "login-error" : undefined}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-foreground" htmlFor="password">Password</label>
-            <Input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => { setPassword(e.target.value); setError(false); }}
-              required
-              aria-invalid={error || undefined}
-              aria-describedby={error ? "login-error" : undefined}
-            />
-          </div>
-          {error && (
-            <p id="login-error" role="alert" className="text-xs text-rose-600">Email or password is incorrect.</p>
+        <div className="mt-6 space-y-4">
+          {message && (
+            <p role="alert" className="text-center text-sm text-rose-600">{message}</p>
           )}
-          <Button type="submit" className="w-full">Sign in</Button>
-        </form>
+          {/* Full page loads: the server redirects on to Keycloak. */}
+          <Button asChild className="w-full">
+            <a href="/auth/keycloak/login">Sign in</a>
+          </Button>
+          <p className="text-center text-xs text-muted-foreground">
+            Not you?{" "}
+            <a href="/auth/keycloak/sign-out" className="underline underline-offset-2 hover:text-foreground">
+              Sign out of Keycloak
+            </a>
+          </p>
+        </div>
       </div>
     </div>
   );
