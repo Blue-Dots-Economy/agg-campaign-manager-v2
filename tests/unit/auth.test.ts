@@ -124,9 +124,6 @@ describe("roles", () => {
     for (const page of all) expect([page, canAccess(role, page)]).toEqual([page, pages[role].includes(page)]);
   });
 
-  test("every role can change its own password", () => {
-    for (const role of ROLES) expect(canAccess(role, "/change-password")).toBe(true);
-  });
 
   test("server function groups follow the pages", () => {
     expect(FN_ROLES.admin).toEqual(["admin"]);

@@ -26,7 +26,6 @@ export interface MeResult {
   program: string | null;
   nodeType: string | null;
   nodeName: string | null;
-  mustChangePassword: boolean;
 }
 
 // Password login is switched off: people sign in through Keycloak
@@ -67,23 +66,7 @@ export const changePassword = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) =>
     z.object({ currentPassword: z.string().max(200), newPassword: z.string().max(200) }).parse(d),
   )
-  .handler(async ({ data, context }) => {
-    await refusePasswords();
-    const { db: d, appUsers, eq } = await db();
-    const pw = await import("@/server/auth/password.server");
-    const problem = pw.passwordProblem(data.newPassword);
-    if (problem) throw new Error(problem);
-    const [u] = await d.select().from(appUsers).where(eq(appUsers.id, context.user.id)).limit(1);
-    if (!u || !(await pw.verifyPassword(data.currentPassword, u.passwordHash))) {
-      throw new Error("Current password is incorrect");
-    }
-    if (data.newPassword === data.currentPassword) throw new Error("Choose a password different from the current one.");
-    await d
-      .update(appUsers)
-      .set({ passwordHash: await pw.hashPassword(data.newPassword), mustChangePassword: false, updatedAt: new Date().toISOString() })
-      .where(eq(appUsers.id, u.id));
-    return { ok: true };
-  });
+  .handler(async (): Promise<never> => refusePasswords());
 
 export interface AppUser {
   email: string;

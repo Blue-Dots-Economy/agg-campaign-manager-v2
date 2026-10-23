@@ -43,10 +43,10 @@ export function ReviewersSection() {
     <div className="space-y-6 max-w-2xl">
       <div>
         <h2 className="text-lg font-semibold">Reviewers</h2>
-        <p className="text-sm text-muted-foreground mt-1">Manage who can sign in to review calls. Reviewers sign in with their email (no password); admins use the admin password.</p>
+        <p className="text-sm text-muted-foreground mt-1">A list of reviewer emails. It does not control who can sign in; that is managed in Users &amp; Roles.</p>
       </div>
 
-      <Panel title="Add a reviewer" description="Enter a work email to grant review access.">
+      <Panel title="Add a reviewer" description="Enter a work email to add it to the list.">
         <form onSubmit={(ev) => { ev.preventDefault(); add(); }} className="flex gap-2">
           <Input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="name@bluedots.com" className="flex-1" />
           <Button type="submit" disabled={busy} className="gap-1.5"><UserPlus className="h-4 w-4" /> Add</Button>

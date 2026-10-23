@@ -74,7 +74,6 @@ export interface SessionUser {
   program: string | null;
   nodeType: string | null;
   nodeName: string | null;
-  mustChangePassword: boolean;
 }
 
 export async function currentUser(): Promise<SessionUser | null> {
@@ -91,6 +90,5 @@ export async function currentUser(): Promise<SessionUser | null> {
     program: u.program,
     nodeType: u.nodeType,
     nodeName: u.nodeName,
-    mustChangePassword: u.mustChangePassword,
   };
 }

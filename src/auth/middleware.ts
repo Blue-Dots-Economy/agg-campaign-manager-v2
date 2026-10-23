@@ -33,7 +33,7 @@ export const publicMiddleware = createMiddleware({ type: "function" }).server(as
   return next();
 });
 
-// No password-change gate: changePassword only.
+// A signed-in user, nothing more: changePassword only.
 export const sessionMiddleware = createMiddleware({ type: "function" }).server(async ({ next }) => {
   await assertSameOrigin();
   const { currentUser } = await import("@/server/auth/session.server");
@@ -42,12 +42,10 @@ export const sessionMiddleware = createMiddleware({ type: "function" }).server(a
   return next({ context: { user } });
 });
 
+// No password-change gate: passwords are not used (login is through Keycloak).
 export const authMiddleware = createMiddleware({ type: "function" })
   .middleware([sessionMiddleware])
-  .server(async ({ next, context }) => {
-    if (context.user.mustChangePassword) await fail(403, "Change your password to continue");
-    return next();
-  });
+  .server(async ({ next }) => next());
 
 export function requireRole(roles: readonly Role[]) {
   return createMiddleware({ type: "function" })
