@@ -1,9 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { FN_ROLES, ROLES, type Role } from "@/auth/roles";
-import { requireRole, sessionMiddleware } from "@/auth/middleware";
+import { publicMiddleware, requireRole, sessionMiddleware } from "@/auth/middleware";
 
-const GENERIC_LOGIN_ERROR = "Email or password is incorrect";
+export const GENERIC_LOGIN_ERROR = "Email or password is incorrect";
+export const TOO_MANY_ATTEMPTS = "Too many attempts. Try again later";
 
 const email = z.string().trim().toLowerCase().email().max(320);
 const optText = z.string().trim().max(200).optional().transform((v) => (v ? v : null));
@@ -17,7 +18,11 @@ async function db() {
   return { db: getDb(), appUsers: schema.appUsers, ...orm };
 }
 
-export interface MeResult {
+import type { AuthProvider } from "@/server/auth/config.server";
+
+export type { AuthProvider };
+
+export interface SessionUser {
   email: string;
   name: string | null;
   role: Role;
@@ -28,53 +33,95 @@ export interface MeResult {
   mustChangePassword: boolean;
 }
 
-// The only public server function.
+// authProvider is always there, so the login screen knows which flow to show.
+export type MeResult =
+  | ({ loggedIn: true; authProvider: AuthProvider } & SessionUser)
+  | { loggedIn: false; authProvider: AuthProvider };
+
+// Public: login, me, logout.
 export const login = createServerFn({ method: "POST" })
+  .middleware([publicMiddleware])
   .inputValidator((d: unknown) => z.object({ email, password: z.string().max(200) }).parse(d))
   .handler(async ({ data }): Promise<{ role: Role; mustChangePassword: boolean }> => {
     const { db: d, appUsers, eq } = await db();
     const pw = await import("@/server/auth/password.server");
+    const limit = await import("@/server/auth/login-limit.server");
+    const { getRequest, getRequestIP } = await import("@tanstack/react-start/server");
     const { startSession } = await import("@/server/auth/session.server");
     const now = new Date();
+    const key = limit.limiterKey(limit.clientAddress(getRequest().headers.get("x-forwarded-for"), getRequestIP()), data.email);
+
+    // Checked before the account, so the answer is the same whether or not the email exists.
+    if (limit.loginLimiter.isBlocked(key)) {
+      await pw.equaliseRefusal(data.password, null);
+      return refuseLogin(429, TOO_MANY_ATTEMPTS);
+    }
     const refuse = async (checkedHash: string | null) => {
+      limit.loginLimiter.recordFailure(key);
       await pw.equaliseRefusal(data.password, checkedHash);
-      return refuseLogin();
+      return refuseLogin(401, GENERIC_LOGIN_ERROR);
     };
     const [u] = await d.select().from(appUsers).where(eq(appUsers.email, data.email)).limit(1);
 
     if (!u || !u.active || !u.passwordHash || pw.isLocked(u.lockedUntil, now)) return refuse(null);
     if (!(await pw.verifyPassword(data.password, u.passwordHash))) {
-      const next = pw.afterFailedLogin(u.failedLoginCount, now);
+      const next = pw.afterFailedLogin(u.failedLoginCount, u.lastFailedLoginAt, now);
       await d
         .update(appUsers)
-        .set({ failedLoginCount: next.failedLoginCount, lockedUntil: next.lockedUntil?.toISOString() ?? null })
+        .set({
+          failedLoginCount: next.failedLoginCount,
+          lockedUntil: next.lockedUntil?.toISOString() ?? null,
+          lastFailedLoginAt: next.lastFailedLoginAt.toISOString(),
+        })
         .where(eq(appUsers.id, u.id));
       return refuse(u.passwordHash);
     }
-    await d.update(appUsers).set({ failedLoginCount: 0, lockedUntil: null }).where(eq(appUsers.id, u.id));
+    limit.loginLimiter.clear(key);
+    await d
+      .update(appUsers)
+      .set({ failedLoginCount: 0, lockedUntil: null, lastFailedLoginAt: null, lastLoginAt: now.toISOString() })
+      .where(eq(appUsers.id, u.id));
     await startSession(u.id);
     return { role: u.role as Role, mustChangePassword: u.mustChangePassword };
   });
 
-async function refuseLogin(): Promise<never> {
-  const { setResponseStatus } = await import("@tanstack/react-start/server");
-  setResponseStatus(401);
-  throw new Error(GENERIC_LOGIN_ERROR);
+// Passwords are managed in Keycloak in that flow.
+async function refuseInKeycloakFlow(): Promise<void> {
+  const { authProvider } = await import("@/server/auth/config.server");
+  if (authProvider() === "keycloak") throw new Error("Passwords are managed in Keycloak.");
 }
 
+async function refuseLogin(status: 401 | 429, message: string): Promise<never> {
+  const { setResponseStatus } = await import("@tanstack/react-start/server");
+  setResponseStatus(status);
+  throw new Error(message);
+}
+
+// Works without a valid session, so an expired one can still clear its cookie.
+// Returns where the browser should go next.
 export const logout = createServerFn({ method: "POST" })
-  .middleware([sessionMiddleware])
-  .handler(async () => {
+  .middleware([publicMiddleware])
+  .handler(async (): Promise<{ redirectTo: string }> => {
     const { endSession } = await import("@/server/auth/session.server");
     endSession();
-    return { ok: true };
+    return { redirectTo: "/login" };
   });
 
 export const me = createServerFn({ method: "GET" })
-  .middleware([sessionMiddleware])
-  .handler(async ({ context }): Promise<MeResult> => {
-    const { id: _id, ...rest } = context.user;
-    return rest;
+  .middleware([publicMiddleware])
+  .handler(async (): Promise<MeResult> => {
+    const { authProvider } = await import("@/server/auth/config.server");
+    const { currentUser } = await import("@/server/auth/session.server");
+    const provider = authProvider();
+    const user = await currentUser();
+    if (!user) return { loggedIn: false, authProvider: provider };
+    const { id: _id, ...rest } = user;
+    return {
+      loggedIn: true,
+      authProvider: provider,
+      ...rest,
+      mustChangePassword: provider === "none" && rest.mustChangePassword,
+    };
   });
 
 export const changePassword = createServerFn({ method: "POST" })
@@ -83,6 +130,7 @@ export const changePassword = createServerFn({ method: "POST" })
     z.object({ currentPassword: z.string().max(200), newPassword: z.string().max(200) }).parse(d),
   )
   .handler(async ({ data, context }) => {
+    await refuseInKeycloakFlow();
     const { db: d, appUsers, eq } = await db();
     const pw = await import("@/server/auth/password.server");
     const problem = pw.passwordProblem(data.newPassword);
@@ -102,7 +150,8 @@ export const changePassword = createServerFn({ method: "POST" })
 export interface AppUser {
   email: string;
   name: string | null;
-  role: string;
+  // null for a user waiting for approval.
+  role: string | null;
   district: string | null;
   program: string | null;
   node_type: string | null;
@@ -150,12 +199,15 @@ export const listAppUsers = createServerFn({ method: "GET" })
 export const createAppUser = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator((d: unknown) => profile.parse(d))
-  .handler(async ({ data }): Promise<{ temporaryPassword: string }> => {
+  // Basic flow: a temporary password, shown once. Keycloak flow: no password,
+  // the user logs in with a Keycloak account that has the same verified email.
+  .handler(async ({ data }): Promise<{ temporaryPassword: string | null }> => {
     const { db: d, appUsers, eq } = await db();
     const pw = await import("@/server/auth/password.server");
+    const { authProvider } = await import("@/server/auth/config.server");
     const [exists] = await d.select({ id: appUsers.id }).from(appUsers).where(eq(appUsers.email, data.email)).limit(1);
     if (exists) throw new Error("A user with this email already exists.");
-    const temporaryPassword = pw.temporaryPassword();
+    const temporaryPassword = authProvider() === "none" ? pw.temporaryPassword() : null;
     await d.insert(appUsers).values({
       email: data.email,
       name: data.name,
@@ -164,8 +216,8 @@ export const createAppUser = createServerFn({ method: "POST" })
       program: data.program,
       nodeType: data.node_type,
       nodeName: data.node_name,
-      passwordHash: await pw.hashPassword(temporaryPassword),
-      mustChangePassword: true,
+      passwordHash: temporaryPassword ? await pw.hashPassword(temporaryPassword) : null,
+      mustChangePassword: !!temporaryPassword,
     });
     return { temporaryPassword };
   });
@@ -205,6 +257,7 @@ export const resetAppUserPassword = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator((d: unknown) => z.object({ email }).parse(d))
   .handler(async ({ data }): Promise<{ temporaryPassword: string }> => {
+    await refuseInKeycloakFlow();
     const { db: d, appUsers, eq } = await db();
     const pw = await import("@/server/auth/password.server");
     const temporaryPassword = pw.temporaryPassword();

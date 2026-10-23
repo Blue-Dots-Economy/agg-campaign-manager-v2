@@ -11,7 +11,7 @@ import {
 import { useAuth } from "@/auth/context";
 
 export function AccountMenu() {
-  const { session, logout } = useAuth();
+  const { session, logout, authProvider } = useAuth();
   const navigate = useNavigate();
   if (!session) return null;
   const local = session.email.split("@")[0] || session.email;
@@ -35,12 +35,14 @@ export function AccountMenu() {
           <span className="text-xs font-normal text-muted-foreground">{{ admin: "Admin", jfc: "JFC", owner: "Owner", coordinator: "Coordinator", ecosystem: "Ecosystem", user: "Reviewer" }[session.role] ?? session.role}</span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => navigate({ to: "/change-password" })}>
-          <KeyRound className="h-4 w-4" />
-          Change password
-        </DropdownMenuItem>
+        {authProvider === "none" && (
+          <DropdownMenuItem onClick={() => navigate({ to: "/change-password" })}>
+            <KeyRound className="h-4 w-4" />
+            Change password
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem
-          onClick={() => { void logout().then(() => navigate({ to: "/login" })); }}
+          onClick={() => { void logout(); }}
           className="text-rose-600 focus:text-rose-600"
         >
           <LogOut className="h-4 w-4" />

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useAuth } from "@/auth/context";
 import { Panel } from "@/components/Panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -77,6 +78,8 @@ export function UsersRolesSection() {
   const updateFn = useServerFn(updateAppUser);
   const resetFn = useServerFn(resetAppUserPassword);
   const activeFn = useServerFn(setAppUserActive);
+  // Password actions exist only in the basic flow; in the Keycloak flow passwords live in Keycloak.
+  const passwords = useAuth().authProvider === "none";
 
   const { data: users, isLoading } = useQuery({
     queryKey: ["app-users"],
@@ -106,7 +109,7 @@ export function UsersRolesSection() {
         return null;
       }
       const { temporaryPassword } = await createFn({ data });
-      return { email: data.email, password: temporaryPassword };
+      return temporaryPassword ? { email: data.email, password: temporaryPassword } : null;
     },
     onSuccess: (created) => {
       toast.success(editingEmail ? "User updated" : "User added");
@@ -146,7 +149,7 @@ export function UsersRolesSection() {
     setForm({
       email: u.email,
       name: u.name ?? "",
-      role: u.role,
+      role: u.role ?? "user",
       district: u.district || NONE,
       program: u.program || NONE,
       node_type: u.node_type || NONE,
@@ -200,7 +203,7 @@ export function UsersRolesSection() {
                 <TableCell className="text-sm">{u.name || "—"}</TableCell>
                 <TableCell>
                   <Badge variant="secondary" className="bg-brand-soft text-brand">
-                    {ROLE_OPTIONS.find((r) => r.value === u.role)?.label ?? u.role}
+                    {ROLE_OPTIONS.find((r) => r.value === u.role)?.label ?? u.role ?? "No role"}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground">
@@ -209,19 +212,21 @@ export function UsersRolesSection() {
                 <TableCell className="text-xs text-muted-foreground">
                   {[u.node_type, u.node_name].filter(Boolean).join(" · ") || "—"}
                 </TableCell>
-                <TableCell className="text-xs">{statusOf(u)}</TableCell>
+                <TableCell className="text-xs">{statusOf(u, passwords)}</TableCell>
                 <TableCell className="text-right whitespace-nowrap">
                   <Button variant="ghost" size="sm" onClick={() => openEdit(u)}>
                     Edit
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={resetPassword.isPending}
-                    onClick={() => resetPassword.mutate(u.email)}
-                  >
-                    Reset password
-                  </Button>
+                  {passwords && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={resetPassword.isPending}
+                      onClick={() => resetPassword.mutate(u.email)}
+                    >
+                      Reset password
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="sm"
@@ -319,7 +324,9 @@ export function UsersRolesSection() {
             </div>
             {!editingEmail && (
               <p className="sm:col-span-2 text-xs text-muted-foreground">
-                A temporary password is generated and shown once. The user sets their own at first sign-in.
+                {passwords
+                  ? "A temporary password is generated and shown once. The user sets their own at first sign-in."
+                  : "They sign in with their Keycloak account, which must use this email, verified."}
               </p>
             )}
           </div>
@@ -364,8 +371,9 @@ export function UsersRolesSection() {
   );
 }
 
-function statusOf(u: AppUser): string {
+function statusOf(u: AppUser, passwords: boolean): string {
   if (!u.active) return "Inactive";
+  if (!passwords) return "Active";
   if (u.locked) return "Locked";
   if (!u.has_password) return "No password";
   if (u.must_change_password) return "Must change password";
