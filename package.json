@@ -12,6 +12,7 @@
     "format": "prettier --write .",
     "db:migrate": "bun src/server/db/migrate.ts",
     "db:generate": "drizzle-kit generate",
+    "admin": "bun src/server/admin/command.ts",
     "test": "bun test tests/unit",
     "test:db": "bun test tests/db"
   },
