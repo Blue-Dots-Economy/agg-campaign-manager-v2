@@ -13,7 +13,7 @@ describe("AUTH_PROVIDER", () => {
   });
 
   test("rejects anything else", () => {
-    expect(() => authProvider({ AUTH_PROVIDER: "betterauth" })).toThrow(/AUTH_PROVIDER/);
+    expect(() => authProvider({ AUTH_PROVIDER: "ldap" })).toThrow(/AUTH_PROVIDER/);
   });
 });
 
