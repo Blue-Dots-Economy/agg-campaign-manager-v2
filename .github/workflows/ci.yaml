@@ -224,7 +224,15 @@ jobs:
         if: steps.changes.outputs.image == 'true' && env.DOCKERHUB_TOKEN != ''
         run: |
           set -euo pipefail
-          docker run -d --name cm -p 3000:3000 agg-campaign-manager-v2:ci
+          # The app refuses to start without its login settings. Placeholders are
+          # enough here: nothing signs in, and no real secret is involved.
+          docker run -d --name cm -p 3000:3000 \
+            -e APP_BASE_URL=http://127.0.0.1:3000 \
+            -e KEYCLOAK_BASE_URL=http://keycloak.invalid \
+            -e KEYCLOAK_REALM=ci \
+            -e KEYCLOAK_CLIENT_ID=ci \
+            -e KEYCLOAK_CLIENT_SECRET=ci-placeholder \
+            agg-campaign-manager-v2:ci
           trap 'docker logs cm || true; docker rm -f cm >/dev/null 2>&1 || true' EXIT
 
           for i in $(seq 1 30); do
