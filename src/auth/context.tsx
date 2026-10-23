@@ -44,9 +44,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void refresh().finally(() => setHydrated(true));
   }, [refresh]);
 
-  const login = async (email: string, password: string) => {
+  const login = async (_email: string, _password: string) => {
     try {
-      await callLogin({ data: { email, password } });
+      await callLogin();
     } catch {
       return null;
     }

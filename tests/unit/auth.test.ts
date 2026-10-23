@@ -44,6 +44,17 @@ describe("session", () => {
     expect(await session.verifySession(other)).toBeNull();
   });
 
+  test("a token signed with the same secret but not meant as a session is rejected", async () => {
+    const key = new TextEncoder().encode(SECRET);
+    const sign = (aud?: string) => {
+      const t = new SignJWT({ uid: "u-1" }).setProtectedHeader({ alg: "HS256" }).setExpirationTime("1h");
+      return (aud ? t.setAudience(aud) : t).sign(key);
+    };
+    expect(await session.verifySession(await sign())).toBeNull();
+    expect(await session.verifySession(await sign("cm_oidc"))).toBeNull();
+    expect(await session.verifySession(await sign("cm_session"))).toBe("u-1");
+  });
+
   test("garbage and missing tokens are rejected", async () => {
     expect(await session.verifySession(undefined)).toBeNull();
     expect(await session.verifySession("not.a.jwt")).toBeNull();

@@ -2,6 +2,9 @@
 import { createMiddleware } from "@tanstack/react-start";
 import type { Role } from "./roles";
 
+// The client sends the user to login when it sees this message (see router.tsx).
+export const NOT_SIGNED_IN = "Not signed in";
+
 async function fail(status: 401 | 403, message: string): Promise<never> {
   const { setResponseStatus } = await import("@tanstack/react-start/server");
   setResponseStatus(status);
@@ -24,12 +27,18 @@ async function assertSameOrigin(): Promise<void> {
   if (!host || originHost !== host) await fail(403, "Cross-site request refused");
 }
 
-// No password-change gate: me, logout, changePassword only.
+// Public functions only (me, logout, login): the cross-site check, no session.
+export const publicMiddleware = createMiddleware({ type: "function" }).server(async ({ next }) => {
+  await assertSameOrigin();
+  return next();
+});
+
+// No password-change gate: changePassword only.
 export const sessionMiddleware = createMiddleware({ type: "function" }).server(async ({ next }) => {
   await assertSameOrigin();
   const { currentUser } = await import("@/server/auth/session.server");
   const user = await currentUser();
-  if (!user) return fail(401, "Not signed in");
+  if (!user) return fail(401, NOT_SIGNED_IN);
   return next({ context: { user } });
 });
 

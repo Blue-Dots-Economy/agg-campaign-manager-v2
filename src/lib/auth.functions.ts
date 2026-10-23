@@ -1,9 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { FN_ROLES, ROLES, type Role } from "@/auth/roles";
-import { requireRole, sessionMiddleware } from "@/auth/middleware";
+import { publicMiddleware, requireRole, sessionMiddleware } from "@/auth/middleware";
 
-const GENERIC_LOGIN_ERROR = "Email or password is incorrect";
+export const PASSWORDS_OFF = "Sign in with Keycloak. Passwords are not used.";
 
 const email = z.string().trim().toLowerCase().email().max(320);
 const optText = z.string().trim().max(200).optional().transform((v) => (v ? v : null));
@@ -28,52 +28,36 @@ export interface MeResult {
   mustChangePassword: boolean;
 }
 
-// The only public server function.
+// Password login is switched off: people sign in through Keycloak
+// (/auth/keycloak/login). Kept so an old client gets a clear answer.
 export const login = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ email, password: z.string().max(200) }).parse(d))
-  .handler(async ({ data }): Promise<{ role: Role; mustChangePassword: boolean }> => {
-    const { db: d, appUsers, eq } = await db();
-    const pw = await import("@/server/auth/password.server");
-    const { startSession } = await import("@/server/auth/session.server");
-    const now = new Date();
-    const refuse = async (checkedHash: string | null) => {
-      await pw.equaliseRefusal(data.password, checkedHash);
-      return refuseLogin();
-    };
-    const [u] = await d.select().from(appUsers).where(eq(appUsers.email, data.email)).limit(1);
+  .middleware([publicMiddleware])
+  .handler(async (): Promise<never> => refusePasswords());
 
-    if (!u || !u.active || !u.passwordHash || pw.isLocked(u.lockedUntil, now)) return refuse(null);
-    if (!(await pw.verifyPassword(data.password, u.passwordHash))) {
-      const next = pw.afterFailedLogin(u.failedLoginCount, now);
-      await d
-        .update(appUsers)
-        .set({ failedLoginCount: next.failedLoginCount, lockedUntil: next.lockedUntil?.toISOString() ?? null })
-        .where(eq(appUsers.id, u.id));
-      return refuse(u.passwordHash);
-    }
-    await d.update(appUsers).set({ failedLoginCount: 0, lockedUntil: null }).where(eq(appUsers.id, u.id));
-    await startSession(u.id);
-    return { role: u.role as Role, mustChangePassword: u.mustChangePassword };
-  });
-
-async function refuseLogin(): Promise<never> {
+async function refusePasswords(): Promise<never> {
   const { setResponseStatus } = await import("@tanstack/react-start/server");
-  setResponseStatus(401);
-  throw new Error(GENERIC_LOGIN_ERROR);
+  setResponseStatus(403);
+  throw new Error(PASSWORDS_OFF);
 }
 
+// Works without a valid session, so an expired one can still clear its cookie.
+// Ends the Campaign Manager session only; the Keycloak session stays.
 export const logout = createServerFn({ method: "POST" })
-  .middleware([sessionMiddleware])
+  .middleware([publicMiddleware])
   .handler(async () => {
     const { endSession } = await import("@/server/auth/session.server");
     endSession();
     return { ok: true };
   });
 
+// Public, so the login screen can load: null when nobody is signed in.
 export const me = createServerFn({ method: "GET" })
-  .middleware([sessionMiddleware])
-  .handler(async ({ context }): Promise<MeResult> => {
-    const { id: _id, ...rest } = context.user;
+  .middleware([publicMiddleware])
+  .handler(async (): Promise<MeResult | null> => {
+    const { currentUser } = await import("@/server/auth/session.server");
+    const user = await currentUser();
+    if (!user) return null;
+    const { id: _id, ...rest } = user;
     return rest;
   });
 
@@ -83,6 +67,7 @@ export const changePassword = createServerFn({ method: "POST" })
     z.object({ currentPassword: z.string().max(200), newPassword: z.string().max(200) }).parse(d),
   )
   .handler(async ({ data, context }) => {
+    await refusePasswords();
     const { db: d, appUsers, eq } = await db();
     const pw = await import("@/server/auth/password.server");
     const problem = pw.passwordProblem(data.newPassword);
@@ -205,6 +190,7 @@ export const resetAppUserPassword = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator((d: unknown) => z.object({ email }).parse(d))
   .handler(async ({ data }): Promise<{ temporaryPassword: string }> => {
+    await refusePasswords();
     const { db: d, appUsers, eq } = await db();
     const pw = await import("@/server/auth/password.server");
     const temporaryPassword = pw.temporaryPassword();
