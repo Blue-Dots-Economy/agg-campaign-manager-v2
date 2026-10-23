@@ -146,7 +146,7 @@ export function UsersRolesSection() {
     setForm({
       email: u.email,
       name: u.name ?? "",
-      role: u.role,
+      role: u.role ?? EMPTY.role,
       district: u.district || NONE,
       program: u.program || NONE,
       node_type: u.node_type || NONE,

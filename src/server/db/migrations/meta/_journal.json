@@ -15,6 +15,13 @@
       "when": 1791444955685,
       "tag": "0001_up_seekers_upload",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792757757063,
+      "tag": "0002_keycloak_login",
+      "breakpoints": true
     }
   ]
 }
