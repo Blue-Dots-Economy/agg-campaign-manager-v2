@@ -101,11 +101,12 @@ describe("lockout", () => {
 describe("roles", () => {
   const pages: Record<Role, string[]> = {
     admin: ["/", "/campaigns", "/review", "/launch", "/ecosystem-view", "/campaign-requests", "/request-campaign", "/user-level-analysis", "/settings"],
-    jfc: ["/", "/campaigns", "/review", "/launch", "/ecosystem-view", "/campaign-requests", "/request-campaign", "/user-level-analysis"],
+    wc: ["/", "/campaigns", "/review", "/launch", "/ecosystem-view", "/campaign-requests", "/request-campaign", "/user-level-analysis"],
     coordinator: ["/", "/campaigns", "/review", "/request-campaign", "/user-level-analysis"],
     user: ["/", "/campaigns", "/review", "/user-level-analysis"],
     owner: ["/", "/user-level-analysis"],
     ecosystem: ["/ecosystem-view", "/", "/user-level-analysis"],
+    network_admin: ["/ecosystem-view", "/", "/campaigns", "/review", "/user-level-analysis"],
   };
   const all = pages.admin;
 
@@ -119,10 +120,11 @@ describe("roles", () => {
 
   test("server function groups follow the pages", () => {
     expect(FN_ROLES.admin).toEqual(["admin"]);
-    expect(FN_ROLES.launch.sort()).toEqual(["admin", "jfc"]);
-    expect(FN_ROLES.requestCampaign.sort()).toEqual(["admin", "coordinator", "jfc"]);
-    expect(FN_ROLES.campaigns.sort()).toEqual(["admin", "coordinator", "jfc", "user"]);
+    expect(FN_ROLES.launch.sort()).toEqual(["admin", "wc"]);
+    expect(FN_ROLES.requestCampaign.sort()).toEqual(["admin", "coordinator", "wc"]);
+    expect(FN_ROLES.campaigns.sort()).toEqual(["admin", "coordinator", "network_admin", "user", "wc"]);
+    expect(FN_ROLES.campaignWrites.sort()).toEqual(["admin", "coordinator", "user", "wc"]);
     expect(FN_ROLES.dashboard.sort()).toEqual([...ROLES].sort());
-    expect(FN_ROLES.editors.sort()).toEqual(["admin", "jfc"]);
+    expect(FN_ROLES.editors.sort()).toEqual(["admin", "wc"]);
   });
 });

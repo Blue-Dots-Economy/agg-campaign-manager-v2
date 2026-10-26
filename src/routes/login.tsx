@@ -24,13 +24,17 @@ function LoginPage() {
   const isDark = resolveDark(theme);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<"credentials" | "fault" | false>(false);
 
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const s = await login(email, password);
-    if (!s) setError(true);
-    else navigate({ to: s.mustChangePassword ? "/change-password" : landingFor(s.role) });
+    try {
+      const s = await login(email, password);
+      if (!s) setError("credentials");
+      else navigate({ to: s.mustChangePassword ? "/change-password" : landingFor(s.role) });
+    } catch {
+      setError("fault");
+    }
   };
 
   return (
@@ -59,7 +63,7 @@ function LoginPage() {
               value={email}
               onChange={(e) => { setEmail(e.target.value); setError(false); }}
               required
-              aria-invalid={error || undefined}
+              aria-invalid={!!error || undefined}
               aria-describedby={error ? "login-error" : undefined}
             />
           </div>
@@ -72,12 +76,12 @@ function LoginPage() {
               value={password}
               onChange={(e) => { setPassword(e.target.value); setError(false); }}
               required
-              aria-invalid={error || undefined}
+              aria-invalid={!!error || undefined}
               aria-describedby={error ? "login-error" : undefined}
             />
           </div>
           {error && (
-            <p id="login-error" role="alert" className="text-xs text-rose-600">Email or password is incorrect.</p>
+            <p id="login-error" role="alert" className="text-xs text-rose-600">{error === "fault" ? "Something went wrong signing in. Please try again or contact support." : "Email or password is incorrect."}</p>
           )}
           <Button type="submit" className="w-full">Sign in</Button>
         </form>

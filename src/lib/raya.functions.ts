@@ -268,7 +268,7 @@ export const rayaUpdateBatch = createServerFn({ method: "POST" })
 
 // ---------- stopBatch ----------
 export const rayaStopBatch = createServerFn({ method: "POST" })
-  .middleware([requireRole(FN_ROLES.campaigns)])
+  .middleware([requireRole(FN_ROLES.campaignWrites)])
   .inputValidator((data: { batchId: string }) => {
     if (!data.batchId) throw new Error("Missing batch id.");
     return data;

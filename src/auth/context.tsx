@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { login as loginFn, logout as logoutFn, me as meFn, type MeResult } from "@/lib/auth.functions";
+import { GENERIC_LOGIN_ERROR, login as loginFn, logout as logoutFn, me as meFn, type MeResult } from "@/lib/auth.functions";
 import type { Role } from "@/auth/roles";
 
 export type { Role };
@@ -47,8 +47,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     try {
       await callLogin({ data: { email, password } });
-    } catch {
-      return null;
+    } catch (e) {
+      // Wrong credentials resolve to null; anything else is a fault the user should report.
+      if (e instanceof Error && e.message === GENERIC_LOGIN_ERROR) return null;
+      throw new Error("auth-fault");
     }
     queryClient.clear();
     return refresh();

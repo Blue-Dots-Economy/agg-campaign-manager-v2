@@ -3,7 +3,7 @@ import { z } from "zod";
 import { FN_ROLES, ROLES, type Role } from "@/auth/roles";
 import { requireRole, sessionMiddleware } from "@/auth/middleware";
 
-const GENERIC_LOGIN_ERROR = "Email or password is incorrect";
+export const GENERIC_LOGIN_ERROR = "Email or password is incorrect";
 
 const email = z.string().trim().toLowerCase().email().max(320);
 const optText = z.string().trim().max(200).optional().transform((v) => (v ? v : null));

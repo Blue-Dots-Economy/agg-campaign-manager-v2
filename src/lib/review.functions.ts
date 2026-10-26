@@ -239,7 +239,7 @@ const FEEDBACK_COLUMNS = [
 ];
 
 export const submitReview = createServerFn({ method: "POST" })
-  .middleware([requireRole(FN_ROLES.campaigns)])
+  .middleware([requireRole(FN_ROLES.campaignWrites)])
   .inputValidator((data: { review: ReviewInput }) => data)
   .handler(async ({ data, context }) => {
     // The reviewer is the signed-in user, never what the browser sends.

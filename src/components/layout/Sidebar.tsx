@@ -146,7 +146,7 @@ export function Sidebar() {
       .flatMap((item) => {
         if (item.to !== "/launch") return [item];
         const launchItem: NavItem =
-          role === "admin" || role === "jfc"
+          role === "admin" || role === "wc"
             ? item
             : { to: "/request-campaign", label: "Request a campaign", icon: Rocket };
         return [launchItem, { to: "/campaign-requests", label: "Campaign Requests", icon: Inbox } as NavItem];

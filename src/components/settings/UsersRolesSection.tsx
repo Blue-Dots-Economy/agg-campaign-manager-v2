@@ -41,10 +41,11 @@ import { registry } from "@/programs/registry";
 
 const ROLE_OPTIONS = [
   { value: "admin", label: "Admin" },
-  { value: "jfc", label: "JFC" },
+  { value: "wc", label: "WC (Working Committee)" },
   { value: "owner", label: "Owner" },
   { value: "coordinator", label: "Coordinator" },
   { value: "ecosystem", label: "Ecosystem" },
+  { value: "network_admin", label: "Network Administrator" },
   { value: "user", label: "Reviewer" },
 ];
 

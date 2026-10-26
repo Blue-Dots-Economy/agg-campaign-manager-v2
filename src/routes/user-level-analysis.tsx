@@ -68,6 +68,12 @@ import {
 import { useProgram } from "@/programs/context";
 import { useAuth } from "@/auth/context";
 import { canEditShared } from "@/auth/roles";
+import { RegionRollupView } from "@/components/my-dots/RegionRollupView";
+import { NationalRollupView } from "@/components/my-dots/NationalRollupView";
+import { OwnerRollupView } from "@/components/my-dots/OwnerRollupView";
+import { CoordinatorRollupView } from "@/components/my-dots/CoordinatorRollupView";
+import { getScopeForActor } from "@/lib/my-dots-region";
+import { useRouterState } from "@tanstack/react-router";
 import {
   getProviderParticipants,
   getProviderSummary,
@@ -81,7 +87,7 @@ import {
 } from "@/lib/purple-dots-participants";
 
 export const Route = createFileRoute("/user-level-analysis")({
-  component: UserLevelAnalysis,
+  component: MyPurpleDotsRoute,
   head: () => ({
     meta: [
       { title: "My Purple Dots · Participant network" },
@@ -270,6 +276,32 @@ function MetricTile({
       </div>
     </div>
   );
+}
+
+// Persona views: owner → own organisation, coordinator → own caseload,
+// admin/ecosystem/network_admin → national, wc → district. Admin may preview with ?persona=owner|coordinator|national|wc.
+// Every other role keeps the roster below.
+function MyPurpleDotsRoute() {
+  const { session } = useAuth();
+  const role = session?.role;
+  const search = useRouterState({ select: (s) => s.location.search }) as Record<string, unknown>;
+  const persona =
+    role === "admin" &&
+    (search?.persona === "owner" || search?.persona === "coordinator" || search?.persona === "national" || search?.persona === "wc")
+      ? search.persona
+      : role;
+  if (persona === "owner" || persona === "coordinator") {
+    const scope = getScopeForActor(persona, session?.email);
+    if (scope.kind === "org") return <OwnerRollupView scope={scope} />;
+    if (scope.kind === "coordinator") return <CoordinatorRollupView scope={scope} />;
+  }
+  if (persona === "national" || persona === "network_admin") return <NationalRollupView />;
+  if (persona === "admin" || persona === "ecosystem") {
+    if (getScopeForActor(persona, session?.email).kind === "national") return <NationalRollupView />;
+    return <RegionRollupView />;
+  }
+  if (persona === "wc") return <RegionRollupView />;
+  return <UserLevelAnalysis />;
 }
 
 function UserLevelAnalysis() {

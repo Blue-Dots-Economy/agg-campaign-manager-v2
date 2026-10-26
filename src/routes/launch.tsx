@@ -137,7 +137,7 @@ function LaunchWizard() {
   const [startPending, setStartPending] = useState(false);
   const [requested, setRequested] = useState(false);
   const { session } = useAuth();
-  const canDirectLaunch = session?.role === "admin" || session?.role === "jfc";
+  const canDirectLaunch = session?.role === "admin" || session?.role === "wc";
 
   const listAgentsFn = useServerFn(listProgramAgents);
   const validateFn = useServerFn(validateContacts);
@@ -354,7 +354,7 @@ function LaunchWizard() {
         },
       });
       setRequested(true);
-      toast.success("Request submitted — it'll appear in Campaign Requests for a JFC/admin to review and launch.");
+      toast.success("Request submitted — it'll appear in Campaign Requests for a WC/admin to review and launch.");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Request failed");
     }

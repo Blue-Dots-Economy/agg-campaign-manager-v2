@@ -691,7 +691,7 @@ function campaignTypeFor(program: ProgramId, language: string, campaignDay: stri
 
 // ---------- main export ----------
 export const exportBatchToStaging = createServerFn({ method: "POST" })
-  .middleware([requireRole(FN_ROLES.campaigns)])
+  .middleware([requireRole(FN_ROLES.campaignWrites)])
   .inputValidator(
     (d: { program: ProgramId; batchId: string; batchName?: string; agentName?: string }) => {
       if (!d.program) throw new Error("program required");

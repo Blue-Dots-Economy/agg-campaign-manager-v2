@@ -24,9 +24,9 @@ export const Route = createFileRoute("/request-campaign")({
   head: () => ({
     meta: [
       { title: "Request a campaign · Operation Rozgar" },
-      { name: "description", content: "Coordinators request an outreach campaign: pick the goal, audience and call window for a JFC to review and launch." },
+      { name: "description", content: "Coordinators request an outreach campaign: pick the goal, audience and call window for a WC to review and launch." },
       { property: "og:title", content: "Request a campaign · Operation Rozgar" },
-      { property: "og:description", content: "Coordinators request an outreach campaign: pick the goal, audience and call window for a JFC to review and launch." },
+      { property: "og:description", content: "Coordinators request an outreach campaign: pick the goal, audience and call window for a WC to review and launch." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -141,7 +141,7 @@ function RequestCampaignForm() {
         },
       });
       setSubmitted(true);
-      toast.success("Request submitted — it'll appear in Campaign Requests for a JFC/admin to review and launch.");
+      toast.success("Request submitted — it'll appear in Campaign Requests for a WC/admin to review and launch.");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Request failed");
     } finally {
@@ -159,7 +159,7 @@ function RequestCampaignForm() {
               <h2 className="text-lg font-semibold">Request submitted</h2>
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
-              "{campaignName}" is now pending review. A JFC or admin will set the calling details and launch it. You'll see it in the Campaign Requests queue.
+              "{campaignName}" is now pending review. A WC or admin will set the calling details and launch it. You'll see it in the Campaign Requests queue.
             </p>
             <Button className="mt-4" variant="outline" onClick={() => { setSubmitted(false); setCampaignName(""); setNote(""); }}>
               Request another
@@ -176,14 +176,14 @@ function RequestCampaignForm() {
         <div className="mb-6">
           <h1 className="text-xl font-semibold flex items-center gap-2"><Rocket className="h-5 w-5" /> Request a campaign</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Tell us the goal and who to call. A JFC or admin sets the calling details and launches it.
+            Tell us the goal and who to call. A WC or admin sets the calling details and launches it.
           </p>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
           {/* LEFT · the form */}
           <div className="space-y-5 min-w-0">
-            <Panel title="Campaign name" description="A short name so the JFC knows what this is">
+            <Panel title="Campaign name" description="A short name so the WC knows what this is">
               <Input value={campaignName} onChange={(e) => setCampaignName(e.target.value)} placeholder="e.g. Ghaziabad Day 3 — drive applications" className="max-w-lg" />
             </Panel>
 
@@ -257,11 +257,11 @@ function RequestCampaignForm() {
               </div>
             </Panel>
 
-            <Panel title="When" description="Preferred call window (the JFC can fine-tune this)">
+            <Panel title="When" description="Preferred call window (the WC can fine-tune this)">
               <ScheduleEditor value={schedule} onChange={setSchedule} />
             </Panel>
 
-            <Panel title="Note for the JFC" description="Optional — anything the reviewer should know">
+            <Panel title="Note for the WC" description="Optional — anything the reviewer should know">
               <Textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} placeholder="e.g. Please prioritise this week; these seekers went quiet after Day 1." />
             </Panel>
           </div>

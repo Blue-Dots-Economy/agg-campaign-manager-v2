@@ -15,6 +15,13 @@
       "when": 1791444955685,
       "tag": "0001_up_seekers_upload",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793000642669,
+      "tag": "0002_wc_network_admin_roles",
+      "breakpoints": true
     }
   ]
 }

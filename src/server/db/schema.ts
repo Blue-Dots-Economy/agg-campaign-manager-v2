@@ -23,7 +23,7 @@ export const appUsers = pgTable("app_users", {
 	lockedUntil: timestamp("locked_until", { withTimezone: true, mode: 'string' }),
 }, (table) => [
 	unique("app_users_email_key").on(table.email),
-	check("app_users_role_check", sql`role = ANY (ARRAY['admin'::text, 'jfc'::text, 'owner'::text, 'coordinator'::text, 'ecosystem'::text, 'user'::text])`),
+	check("app_users_role_check", sql`role = ANY (ARRAY['admin'::text, 'wc'::text, 'owner'::text, 'coordinator'::text, 'ecosystem'::text, 'network_admin'::text, 'user'::text])`),
 ]);
 
 export const purpleDotsCalls = pgTable("purple_dots_calls", {
