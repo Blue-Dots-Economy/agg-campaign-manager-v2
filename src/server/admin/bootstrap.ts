@@ -10,9 +10,20 @@ import { appUsers } from "../db/schema";
 import { keycloakConfig } from "../auth/config.server";
 import { KeycloakAdmin } from "../auth/keycloak-admin.server";
 import { applyPlan, lookUp } from "./apply";
-import { planAdminCommand } from "./plan";
+import { planAdminCommand, type StopReason } from "./plan";
 
 const OPERATOR = "bootstrap";
+
+// Worded for a deploy log; the admin command's own messages refer to its flags.
+const STOPPED: Record<StopReason, string> = {
+  options: "invalid options.",
+  disabled: "its Keycloak account is disabled. Enable it in Keycloak, then deploy again.",
+  "linked-elsewhere":
+    "its Keycloak account is already linked to another Campaign Manager user. Clear that link, then deploy again.",
+  unverified:
+    "its Keycloak account exists but the email is not verified. Check whose account it is; if it is theirs, " +
+    "verify the email in Keycloak, then deploy again.",
+};
 
 export async function bootstrapAdmin(
   db: NodePgDatabase,
@@ -35,9 +46,7 @@ export async function bootstrapAdmin(
   const keycloak = makeKeycloak();
   const { existing, account, linkedToOther } = await lookUp(db, keycloak, email);
   const plan = planAdminCommand(existing, account, linkedToOther, { promote: true, relink: false, verifyEmail: false });
-  if (plan.error) {
-    throw new Error(`Admin bootstrap stopped for ${email}: ${plan.error} Fix it in Keycloak or use the admin command.`);
-  }
+  if (plan.reason) throw new Error(`Admin bootstrap stopped for ${email}: ${STOPPED[plan.reason]}`);
   await applyPlan(db, keycloak, email, existing, plan, OPERATOR);
   return `Admin bootstrap for ${email}: ${plan.notes.join(" ")}`;
 }

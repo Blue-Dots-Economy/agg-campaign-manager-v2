@@ -109,7 +109,10 @@ describe.skipIf(!URL)("admin bootstrap after migrations", () => {
 
   test("stops on an unverified Keycloak account and changes nothing", async () => {
     const kc = fakeKeycloak([json([account({ emailVerified: false })])]);
-    await expect(bootstrapAdmin(db, env, kc.make)).rejects.toThrow(/stopped for boss@bootstrap\.test.*not verified/);
+    const err = await bootstrapAdmin(db, env, kc.make).catch((e: Error) => e);
+    expect((err as Error).message).toMatch(/stopped for boss@bootstrap\.test.*not verified.*verify the email in Keycloak/);
+    // Worded for a deploy log, not the admin command.
+    expect((err as Error).message).not.toMatch(/--verify-email|details above/);
     expect(await row()).toBeUndefined();
     expect(await actions()).toEqual([]);
   });

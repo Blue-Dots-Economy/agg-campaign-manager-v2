@@ -20,9 +20,13 @@ export interface AdminOptions {
   verifyEmail: boolean;
 }
 
+export type StopReason = "options" | "disabled" | "linked-elsewhere" | "unverified";
+
 export interface AdminPlan {
   // Set when the command must stop; nothing is changed.
   error: string | null;
+  // Why it stopped, for callers that word the message themselves.
+  reason: StopReason | null;
   notes: string[];
   createKeycloak: boolean;
   verifyEmail: boolean;
@@ -42,11 +46,11 @@ export function planAdminCommand(
   o: AdminOptions,
 ): AdminPlan {
   const plan: AdminPlan = {
-    error: null, notes: [], createKeycloak: false, verifyEmail: false, linkTo: null, createAdmin: false, promote: false, relink: false,
+    error: null, reason: null, notes: [], createKeycloak: false, verifyEmail: false, linkTo: null, createAdmin: false, promote: false, relink: false,
   };
-  const stop = (error: string): AdminPlan => ({ ...plan, error });
+  const stop = (reason: StopReason, error: string): AdminPlan => ({ ...plan, error, reason });
 
-  if (o.verifyEmail && o.relink) return stop("--verify-email can't be used with --relink, which only clears a link.");
+  if (o.verifyEmail && o.relink) return stop("options", "--verify-email can't be used with --relink, which only clears a link.");
 
   // Whether this run links a Keycloak account: a new admin, or promoting a user with no link.
   let needsAccount = false;
@@ -69,11 +73,12 @@ export function planAdminCommand(
       plan.createKeycloak = true;
       plan.notes.push("Create a Keycloak account with this email, marked verified, and link it.");
     } else {
-      if (!account.enabled) return stop("The Keycloak account with this email is disabled. Enable it in Keycloak first.");
-      if (accountLinkedToOther) return stop("The Keycloak account with this email is already linked to another user.");
+      if (!account.enabled) return stop("disabled", "The Keycloak account with this email is disabled. Enable it in Keycloak first.");
+      if (accountLinkedToOther) return stop("linked-elsewhere", "The Keycloak account with this email is already linked to another user.");
       if (!account.emailVerified) {
         if (!o.verifyEmail) {
           return stop(
+            "unverified",
             "The Keycloak account with this email exists but its email is not verified. Check whose account it is " +
               "(details above); only if it belongs to this person, re-run with --verify-email.",
           );

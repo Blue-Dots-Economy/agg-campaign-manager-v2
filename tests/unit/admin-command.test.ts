@@ -19,17 +19,21 @@ describe("admin command plan", () => {
   });
 
   test("stops on an unverified account unless --verify-email", () => {
-    expect(planAdminCommand(null, kc({ emailVerified: false }), false, none).error).toMatch(/not verified.*--verify-email/);
+    const stopped = planAdminCommand(null, kc({ emailVerified: false }), false, none);
+    expect(stopped).toMatchObject({ reason: "unverified" });
+    expect(stopped.error).toMatch(/not verified.*--verify-email/);
     const p = planAdminCommand(null, kc({ emailVerified: false }), false, { ...none, verifyEmail: true });
     expect(p).toMatchObject({ error: null, verifyEmail: true, linkTo: "kc-1", createAdmin: true });
   });
 
   test("refuses a disabled account, even with --verify-email", () => {
-    expect(planAdminCommand(null, kc({ enabled: false }), false, { ...none, verifyEmail: true }).error).toMatch(/disabled/);
+    const p = planAdminCommand(null, kc({ enabled: false }), false, { ...none, verifyEmail: true });
+    expect(p).toMatchObject({ reason: "disabled" });
+    expect(p.error).toMatch(/disabled/);
   });
 
   test("refuses an account linked to another user", () => {
-    expect(planAdminCommand(null, kc(), true, none).error).toMatch(/linked to another user/);
+    expect(planAdminCommand(null, kc(), true, none)).toMatchObject({ reason: "linked-elsewhere", error: expect.stringMatching(/linked to another user/) });
   });
 
   test("an existing user needs --promote", () => {
