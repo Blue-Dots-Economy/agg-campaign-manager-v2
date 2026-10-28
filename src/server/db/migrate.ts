@@ -1,10 +1,12 @@
 // Reads DATABASE_URL (or the old name, MIGRATOR_DATABASE_URL). With
 // ADMIN_DATABASE_URL (a superuser) it first creates the login, database and
-// schemas if missing; leave it unset where they already exist.
+// schemas if missing; leave it unset where they already exist. Then it creates
+// the first admin from BOOTSTRAP_ADMIN_EMAIL, if there is no active admin.
 import { fileURLToPath } from "node:url";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import pg from "pg";
+import { bootstrapAdmin } from "../admin/bootstrap";
 import { setUpDatabase } from "./setup";
 
 export const migrationsFolder = fileURLToPath(new URL("./migrations", import.meta.url));
@@ -32,6 +34,12 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     }
     await runMigrations(url);
     console.log("migrations applied");
+    const pool = new pg.Pool({ connectionString: url, max: 1 });
+    try {
+      console.log(await bootstrapAdmin(drizzle(pool)));
+    } finally {
+      await pool.end();
+    }
   } catch (e) {
     // Drizzle wraps database errors; the cause says what actually went wrong.
     const cause = (e as Error).cause;

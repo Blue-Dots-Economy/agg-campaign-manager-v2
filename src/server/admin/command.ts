@@ -4,13 +4,12 @@
 // what it would change. Every applied change is saved in admin_actions.
 import { createInterface } from "node:readline/promises";
 import { parseArgs } from "node:util";
-import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import { z } from "zod";
-import { adminActions, appUsers } from "../db/schema";
 import { keycloakConfig } from "../auth/config.server";
 import { KeycloakAdmin, type KeycloakUser } from "../auth/keycloak-admin.server";
+import { applyPlan, lookUp } from "./apply";
 import { planAdminCommand, planChangesAnything } from "./plan";
 
 const USAGE =
@@ -57,22 +56,13 @@ async function main(): Promise<void> {
   const keycloak = new KeycloakAdmin(keycloakConfig());
   const pool = new pg.Pool({ connectionString: url, max: 1 });
   const db = drizzle(pool);
-  const record = (action: "create_admin" | "promote" | "relink" | "verify_email", keycloakUserId: string | null) =>
-    db.insert(adminActions).values({ action, email, keycloakUserId, operator });
 
   try {
-    const [existing] = await db.select().from(appUsers).where(eq(appUsers.email, email)).limit(1);
-    const account = await keycloak.findByEmail(email);
-    let linkedToOther = false;
-    if (account) {
-      showAccount(account);
-      const [owner] = await db.select({ email: appUsers.email }).from(appUsers).where(eq(appUsers.keycloakSub, account.id)).limit(1);
-      linkedToOther = !!owner && owner.email !== email;
-    } else {
-      console.log("No Keycloak account with this email.");
-    }
+    const { existing, account, linkedToOther } = await lookUp(db, keycloak, email);
+    if (account) showAccount(account);
+    else console.log("No Keycloak account with this email.");
 
-    const plan = planAdminCommand(existing ?? null, account, linkedToOther, {
+    const plan = planAdminCommand(existing, account, linkedToOther, {
       promote: values.promote,
       relink: values.relink,
       verifyEmail: values["verify-email"],
@@ -93,37 +83,11 @@ async function main(): Promise<void> {
       if (typed.toLowerCase() !== email) fail("The email did not match. Nothing was changed.");
     }
 
-    const now = new Date().toISOString();
-    let keycloakSub = plan.linkTo;
-    if (plan.createKeycloak) {
-      const made = await keycloak.create(email, existing?.name ?? null);
-      if (made === "exists") fail("A Keycloak account with this email or username appeared just now. Run the command again.");
-      keycloakSub = made.id;
-    }
-    if (plan.verifyEmail && plan.linkTo) {
-      await keycloak.markEmailVerified(plan.linkTo);
-      // Saved straight away, so a later failure can't leave this change unrecorded.
-      await record("verify_email", plan.linkTo);
-    }
-
-    if (plan.createAdmin) {
-      await db.insert(appUsers).values({ email, role: "admin", active: true, keycloakSub });
-      await record("create_admin", keycloakSub);
-    } else if (plan.promote) {
-      await db
-        .update(appUsers)
-        .set({ role: "admin", active: true, rejectedAt: null, ...(keycloakSub ? { keycloakSub } : {}), updatedAt: now })
-        .where(eq(appUsers.email, email));
-      await record("promote", keycloakSub ?? existing?.keycloakSub ?? null);
-    }
-    if (plan.relink) {
-      await db.update(appUsers).set({ keycloakSub: null, updatedAt: now }).where(eq(appUsers.email, email));
-      await record("relink", existing?.keycloakSub ?? null);
-    }
+    await applyPlan(db, keycloak, email, existing, plan, operator);
     console.log(`Done. Saved in admin_actions by "${operator}". ${email} can sign in with Keycloak.`);
   } finally {
     await pool.end();
   }
 }
 
-await main();
+await main().catch((e: Error) => fail(e.message));
