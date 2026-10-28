@@ -118,7 +118,7 @@ jobs:
           set -euo pipefail
           pw=$(openssl rand -hex 16)
           echo "::add-mask::$pw"
-          url="postgresql://campaign_manager:$pw@localhost:5432/campaign-manager-purpledots"
+          url="postgresql://campaign_manager:$pw@localhost:5432/campaign_manager"
           {
             echo "ADMIN_DATABASE_URL=postgresql://postgres@localhost:5432/postgres"
             echo "DATABASE_URL=$url"
