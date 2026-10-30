@@ -54,4 +54,7 @@ function httpUrl(name: string, raw: string, originOnly = false): string {
 export function assertAuthConfig(env: Env = process.env): void {
   appOrigin(env);
   keycloakConfig(env);
+  // Checked here too, so a bad value stops the server instead of the first login.
+  const secret = env.SESSION_SECRET;
+  if (!secret || secret.length < 32) throw new Error("SESSION_SECRET must be set (at least 32 characters)");
 }

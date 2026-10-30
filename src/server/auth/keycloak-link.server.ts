@@ -1,6 +1,7 @@
 // Database side of matching a Keycloak identity to an app user.
 import { eq } from "drizzle-orm";
 import { getDb } from "../db/client.server";
+import { isUniqueViolation } from "../db/errors";
 import { appUsers } from "../db/schema";
 import { decideLink, type LinkCandidate, type LinkDecision, type RefusalReason, type VerifiedIdentity } from "./keycloak-link";
 
@@ -56,8 +57,11 @@ export async function linkKeycloakIdentity(id: VerifiedIdentity, name: string | 
       .returning({ role: appUsers.role });
     if (!row?.role) return { kind: "refused", reason: "pending" };
     return { kind: "login", userId: decision.userId, role: row.role };
-  } catch {
-    // Unique keycloak_sub or email taken by a concurrent change: an admin sorts it out.
+  } catch (e) {
+    // Unique keycloak_sub or email taken by a concurrent change: an admin sorts it
+    // out. Anything else is a real failure, not a conflict.
+    if (!isUniqueViolation(e)) throw e;
+    console.error(`[keycloak] login for ${id.sub} refused as a conflict: ${(e as Error).message}`);
     return { kind: "refused", reason: "conflict" };
   }
 }

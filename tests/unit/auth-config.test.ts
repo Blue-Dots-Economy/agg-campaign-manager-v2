@@ -46,12 +46,19 @@ describe("APP_BASE_URL", () => {
 });
 
 describe("startup check", () => {
+  const FULL = { ...ENV, SESSION_SECRET: "x".repeat(32) };
+
   test("passes with every setting", () => {
-    expect(() => assertAuthConfig(ENV)).not.toThrow();
+    expect(() => assertAuthConfig(FULL)).not.toThrow();
   });
 
   test("stops when a setting is missing", () => {
-    expect(() => assertAuthConfig({ ...ENV, KEYCLOAK_CLIENT_SECRET: "" })).toThrow(/KEYCLOAK_CLIENT_SECRET/);
-    expect(() => assertAuthConfig({ ...ENV, APP_BASE_URL: "" })).toThrow(/APP_BASE_URL/);
+    expect(() => assertAuthConfig({ ...FULL, KEYCLOAK_CLIENT_SECRET: "" })).toThrow(/KEYCLOAK_CLIENT_SECRET/);
+    expect(() => assertAuthConfig({ ...FULL, APP_BASE_URL: "" })).toThrow(/APP_BASE_URL/);
+  });
+
+  test("stops when SESSION_SECRET is missing or short", () => {
+    expect(() => assertAuthConfig(ENV)).toThrow(/SESSION_SECRET/);
+    expect(() => assertAuthConfig({ ...FULL, SESSION_SECRET: "x".repeat(31) })).toThrow(/SESSION_SECRET/);
   });
 });

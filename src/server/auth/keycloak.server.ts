@@ -100,7 +100,19 @@ export async function exchangeCode(
       code_verifier: verifier,
     }),
   });
-  if (!res.ok) throw new Error(`Keycloak code exchange failed: HTTP ${res.status}`);
+  if (!res.ok) {
+    // Keycloak's error code tells a wrong client secret (invalid_client) apart from
+    // an expired or reused code (invalid_grant). The body never carries the code.
+    let detail = "";
+    try {
+      const err = (await res.json()) as { error?: unknown; error_description?: unknown };
+      const text = [err.error, err.error_description].filter((v) => typeof v === "string" && v).join(": ");
+      if (text) detail = ` (${text.replace(/[\r\n]+/g, " ").slice(0, 300)})`;
+    } catch {
+      // Not JSON: the status is all there is.
+    }
+    throw new Error(`Keycloak code exchange failed: HTTP ${res.status}${detail}`);
+  }
   const body = (await res.json()) as { id_token?: unknown };
   if (typeof body.id_token !== "string") throw new Error("Keycloak returned no ID token");
   return body.id_token;

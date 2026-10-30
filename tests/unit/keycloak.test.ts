@@ -126,6 +126,17 @@ describe("code exchange", () => {
     const fakeFetch = (async () => new Response("{}", { status: 400 })) as unknown as typeof fetch;
     await expect(exchangeCode(cfg, APP, "bad", "v", fakeFetch)).rejects.toThrow(/HTTP 400/);
   });
+
+  test("names Keycloak's error, so a wrong secret and a used code differ", async () => {
+    const refuse = (body: unknown, status: number) =>
+      (async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch;
+    await expect(
+      exchangeCode(cfg, APP, "c", "v", refuse({ error: "invalid_client", error_description: "Invalid client credentials" }, 401)),
+    ).rejects.toThrow("HTTP 401 (invalid_client: Invalid client credentials)");
+    await expect(exchangeCode(cfg, APP, "c", "v", refuse({ error: "invalid_grant" }, 400))).rejects.toThrow(
+      "HTTP 400 (invalid_grant)",
+    );
+  });
 });
 
 describe("ID token check", () => {
