@@ -113,19 +113,20 @@ jobs:
 
       - run: bun install --frozen-lockfile --ignore-scripts
 
-      - name: Bootstrap the database and its login
+      - name: Database settings
         run: |
           set -euo pipefail
           pw=$(openssl rand -hex 16)
           echo "::add-mask::$pw"
-          psql "postgresql://postgres@localhost:5432/postgres" -v ON_ERROR_STOP=1 \
-            -v campaign_manager_password="$pw" -f db/bootstrap.sql
-          url="postgresql://campaign_manager:$pw@localhost:5432/campaign-manager-purpledots"
+          url="postgresql://campaign_manager:$pw@localhost:5432/campaign_manager"
           {
+            echo "ADMIN_DATABASE_URL=postgresql://postgres@localhost:5432/postgres"
             echo "DATABASE_URL=$url"
             echo "TEST_DATABASE_URL=$url"
           } >> "$GITHUB_ENV"
 
+      # The first run creates the login, database and schemas; the second must change nothing.
+      - run: bun run db:migrate
       - run: bun run db:migrate
 
       - name: Schema drift
@@ -224,7 +225,16 @@ jobs:
         if: steps.changes.outputs.image == 'true' && env.DOCKERHUB_TOKEN != ''
         run: |
           set -euo pipefail
-          docker run -d --name cm -p 3000:3000 agg-campaign-manager-v2:ci
+          # The app refuses to start without its login settings. Placeholders are
+          # enough here: nothing signs in, and no real secret is involved.
+          docker run -d --name cm -p 3000:3000 \
+            -e APP_BASE_URL=http://127.0.0.1:3000 \
+            -e KEYCLOAK_BASE_URL=http://keycloak.invalid \
+            -e KEYCLOAK_REALM=ci \
+            -e KEYCLOAK_CLIENT_ID=ci \
+            -e KEYCLOAK_CLIENT_SECRET=ci-placeholder \
+            -e SESSION_SECRET="$(openssl rand -hex 32)" \
+            agg-campaign-manager-v2:ci
           trap 'docker logs cm || true; docker rm -f cm >/dev/null 2>&1 || true' EXIT
 
           for i in $(seq 1 30); do

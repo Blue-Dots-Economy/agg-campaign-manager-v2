@@ -18,6 +18,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -33,10 +34,15 @@ import {
   listAppUsers,
   createAppUser,
   updateAppUser,
-  resetAppUserPassword,
   setAppUserActive,
+  approveAppUser,
+  rejectAppUser,
+  unlinkKeycloakAccount,
+  setUpKeycloakLogin,
   type AppUser,
 } from "@/lib/auth.functions";
+import { isRole, type Role } from "@/auth/roles";
+import { useAuth } from "@/auth/context";
 import { registry } from "@/programs/registry";
 
 const ROLE_OPTIONS = [
@@ -70,23 +76,32 @@ const EMPTY: FormState = {
   node_name: "",
 };
 
+const errorText = (e: unknown, fallback: string) => (e instanceof Error ? e.message : fallback);
+
 export function UsersRolesSection() {
   const qc = useQueryClient();
+  const { session } = useAuth();
   const listFn = useServerFn(listAppUsers);
   const createFn = useServerFn(createAppUser);
   const updateFn = useServerFn(updateAppUser);
-  const resetFn = useServerFn(resetAppUserPassword);
   const activeFn = useServerFn(setAppUserActive);
+  const approveFn = useServerFn(approveAppUser);
+  const rejectFn = useServerFn(rejectAppUser);
+  const unlinkFn = useServerFn(unlinkKeycloakAccount);
+  const setUpFn = useServerFn(setUpKeycloakLogin);
 
   const { data: users, isLoading } = useQuery({
     queryKey: ["app-users"],
     queryFn: () => listFn(),
   });
+  const waiting = (users ?? []).filter((u) => u.state === "pending" || u.state === "rejected");
+  const members = (users ?? []).filter((u) => u.state === "active" || u.state === "deactivated");
 
   const [open, setOpen] = useState(false);
   const [editingEmail, setEditingEmail] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY);
-  const [issued, setIssued] = useState<{ email: string; password: string } | null>(null);
+  const [approving, setApproving] = useState<AppUser | null>(null);
+  const [approveRole, setApproveRole] = useState<Role>("user");
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["app-users"] });
 
@@ -101,30 +116,26 @@ export function UsersRolesSection() {
         node_type: form.node_type === NONE ? "" : form.node_type,
         node_name: form.node_name,
       };
-      if (editingEmail) {
-        await updateFn({ data });
-        return null;
-      }
-      const { temporaryPassword } = await createFn({ data });
-      return { email: data.email, password: temporaryPassword };
+      if (editingEmail) await updateFn({ data });
+      else await createFn({ data });
     },
-    onSuccess: (created) => {
-      toast.success(editingEmail ? "User updated" : "User added");
+    onSuccess: () => {
+      toast.success(editingEmail ? "User updated" : "User added. They can sign in with Keycloak now.");
       setOpen(false);
-      if (created) setIssued(created);
       refresh();
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to save user"),
+    onError: (e) => toast.error(errorText(e, "Failed to save user")),
   });
 
-  const resetPassword = useMutation({
-    mutationFn: async (email: string) => ({ email, password: (await resetFn({ data: { email } })).temporaryPassword }),
-    onSuccess: (r) => {
-      setIssued(r);
-      refresh();
-    },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to reset password"),
-  });
+  const useUserAction = (run: (email: string) => Promise<unknown>, done: string | ((email: string) => string)) =>
+    useMutation({
+      mutationFn: run,
+      onSuccess: (_d, email) => {
+        toast.success(typeof done === "function" ? done(email) : done);
+        refresh();
+      },
+      onError: (e) => toast.error(errorText(e, "Failed to update user")),
+    });
 
   const toggleActive = useMutation({
     mutationFn: (v: { email: string; active: boolean }) => activeFn({ data: v }),
@@ -132,7 +143,26 @@ export function UsersRolesSection() {
       toast.success(v.active ? "User reactivated" : "User deactivated");
       refresh();
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to update user"),
+    onError: (e) => toast.error(errorText(e, "Failed to update user")),
+  });
+  const reject = useUserAction((email) => rejectFn({ data: { email } }), "Request rejected");
+  // An admin isn't linked again at login, so say what to do next.
+  const unlink = useUserAction(
+    (email) => unlinkFn({ data: { email } }),
+    (email) =>
+      users?.find((u) => u.email === email)?.role === "admin"
+        ? "Keycloak login unlinked. Use Set up login to link this admin again."
+        : "Keycloak login unlinked",
+  );
+  const setUp = useUserAction((email) => setUpFn({ data: { email } }), "Keycloak login set up");
+  const approve = useMutation({
+    mutationFn: (v: { email: string; role: Role }) => approveFn({ data: v }),
+    onSuccess: () => {
+      toast.success("Approved. They can sign in now.");
+      setApproving(null);
+      refresh();
+    },
+    onError: (e) => toast.error(errorText(e, "Failed to approve")),
   });
 
   const openAdd = () => {
@@ -146,7 +176,7 @@ export function UsersRolesSection() {
     setForm({
       email: u.email,
       name: u.name ?? "",
-      role: u.role,
+      role: u.role ?? EMPTY.role,
       district: u.district || NONE,
       program: u.program || NONE,
       node_type: u.node_type || NONE,
@@ -158,8 +188,52 @@ export function UsersRolesSection() {
   return (
     <Panel
       title="Users & Roles"
-      description="Manage who can sign in and what each role can access."
+      description="People sign in with Keycloak. Add them here to give them a role; their Keycloak account is created if they don't have one."
     >
+      {waiting.length > 0 && (
+        <div className="mb-5">
+          <h3 className="mb-2 text-sm font-medium text-foreground">Waiting for approval</h3>
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {waiting.map((u) => (
+                  <TableRow key={u.email}>
+                    <TableCell className="font-mono text-xs">{u.email}</TableCell>
+                    <TableCell className="text-sm">{u.name || "—"}</TableCell>
+                    <TableCell className="text-xs">{u.state === "rejected" ? "Rejected" : "Signed in, waiting for approval"}</TableCell>
+                    <TableCell className="text-right whitespace-nowrap">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setApproveRole("user");
+                          setApproving(u);
+                        }}
+                      >
+                        Approve
+                      </Button>
+                      {u.state === "pending" && (
+                        <Button variant="ghost" size="sm" disabled={reject.isPending} onClick={() => reject.mutate(u.email)}>
+                          Reject
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      )}
+
       <div className="mb-3 flex justify-end">
         <Button className="bg-brand text-brand-foreground hover:bg-brand/90" onClick={openAdd}>
           Add user
@@ -187,15 +261,15 @@ export function UsersRolesSection() {
                 </TableCell>
               </TableRow>
             )}
-            {!isLoading && (users ?? []).length === 0 && (
+            {!isLoading && members.length === 0 && (
               <TableRow>
                 <TableCell colSpan={7} className="text-sm text-muted-foreground">
                   No users yet.
                 </TableCell>
               </TableRow>
             )}
-            {(users ?? []).map((u) => (
-              <TableRow key={u.email} className={u.active ? "" : "opacity-60"}>
+            {members.map((u) => (
+              <TableRow key={u.email} className={u.state === "active" ? "" : "opacity-60"}>
                 <TableCell className="font-mono text-xs">{u.email}</TableCell>
                 <TableCell className="text-sm">{u.name || "—"}</TableCell>
                 <TableCell>
@@ -214,21 +288,24 @@ export function UsersRolesSection() {
                   <Button variant="ghost" size="sm" onClick={() => openEdit(u)}>
                     Edit
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={resetPassword.isPending}
-                    onClick={() => resetPassword.mutate(u.email)}
-                  >
-                    Reset password
-                  </Button>
+                  {u.keycloak_linked ? (
+                    u.email !== session?.email && (
+                      <Button variant="ghost" size="sm" disabled={unlink.isPending} onClick={() => unlink.mutate(u.email)}>
+                        Unlink Keycloak
+                      </Button>
+                    )
+                  ) : (
+                    <Button variant="ghost" size="sm" disabled={setUp.isPending} onClick={() => setUp.mutate(u.email)}>
+                      Set up login
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="sm"
                     disabled={toggleActive.isPending}
-                    onClick={() => toggleActive.mutate({ email: u.email, active: !u.active })}
+                    onClick={() => toggleActive.mutate({ email: u.email, active: u.state !== "active" })}
                   >
-                    {u.active ? "Deactivate" : "Reactivate"}
+                    {u.state === "active" ? "Deactivate" : "Reactivate"}
                   </Button>
                 </TableCell>
               </TableRow>
@@ -319,7 +396,8 @@ export function UsersRolesSection() {
             </div>
             {!editingEmail && (
               <p className="sm:col-span-2 text-xs text-muted-foreground">
-                A temporary password is generated and shown once. The user sets their own at first sign-in.
+                They sign in with Keycloak using this email and a one-time code. If they have no Keycloak account, one is
+                created with this email.
               </p>
             )}
           </div>
@@ -336,27 +414,31 @@ export function UsersRolesSection() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!issued} onOpenChange={(v) => !v && setIssued(null)}>
+      <Dialog open={!!approving} onOpenChange={(v) => !v && setApproving(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Temporary password</DialogTitle>
+            <DialogTitle>Approve access</DialogTitle>
+            <DialogDescription>
+              Choose a role for <span className="font-mono text-foreground">{approving?.email}</span>. They can sign in
+              as soon as you approve.
+            </DialogDescription>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Send this to <span className="font-mono text-foreground">{issued?.email}</span>. It is shown only once;
-            they will be asked to change it when they sign in.
-          </p>
-          <Input readOnly value={issued?.password ?? ""} className="font-mono" onFocus={(e) => e.currentTarget.select()} />
+          <Select value={approveRole} onValueChange={(v) => isRole(v) && setApproveRole(v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {ROLE_OPTIONS.map((r) => (
+                <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <DialogFooter>
+            <Button variant="outline" onClick={() => setApproving(null)}>Cancel</Button>
             <Button
-              variant="outline"
-              onClick={() => {
-                void navigator.clipboard?.writeText(issued?.password ?? "");
-                toast.success("Copied");
-              }}
+              disabled={approve.isPending}
+              onClick={() => approving && approve.mutate({ email: approving.email, role: approveRole })}
             >
-              Copy
+              {approve.isPending ? "Approving…" : "Approve"}
             </Button>
-            <Button onClick={() => setIssued(null)}>Done</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -365,9 +447,8 @@ export function UsersRolesSection() {
 }
 
 function statusOf(u: AppUser): string {
-  if (!u.active) return "Inactive";
-  if (u.locked) return "Locked";
-  if (!u.has_password) return "No password";
-  if (u.must_change_password) return "Must change password";
-  return "Active";
+  if (u.state === "deactivated") return "Deactivated";
+  if (!u.keycloak_linked) return "No Keycloak login";
+  if (!u.last_login_at) return "Active · not signed in yet";
+  return `Active · last signed in ${new Date(u.last_login_at).toLocaleDateString()}`;
 }

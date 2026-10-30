@@ -26,8 +26,6 @@ export const DEFAULT_LANDING: Record<Role, string> = {
   user: "/",
 };
 
-export const ACCOUNT_ROUTES = ["/change-password"];
-
 export function landingFor(role: Role | undefined): string {
   return role ? (DEFAULT_LANDING[role] ?? "/user-level-analysis") : "/login";
 }
@@ -35,7 +33,6 @@ export function landingFor(role: Role | undefined): string {
 // "/" must match exactly (it's Campaign Overview), everything else is a prefix match.
 export function canAccess(role: Role | undefined, pathname: string): boolean {
   if (!role) return false;
-  if (ACCOUNT_ROUTES.includes(pathname)) return true;
   const allowed = ROLE_ROUTES[role] ?? [];
   if (allowed.includes("*")) return true;
   return allowed.some((r) => (r === "/" ? pathname === "/" : pathname === r || pathname.startsWith(r + "/")));

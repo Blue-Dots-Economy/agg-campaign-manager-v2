@@ -7,17 +7,35 @@ import { isRole, type Role } from "@/auth/roles";
 
 export const SESSION_COOKIE = "cm_session";
 export const SESSION_TTL_SECONDS = 12 * 60 * 60;
+// Other tokens are signed with the same secret (the login cookie, cm_oidc), so a
+// session must name itself and be checked for it.
+const SESSION_AUDIENCE = "cm_session";
 
-function secretKey(): Uint8Array {
+export function secretKey(): Uint8Array {
   const s = process.env.SESSION_SECRET;
   if (!s || s.length < 32) throw new Error("SESSION_SECRET must be set (at least 32 characters)");
   return new TextEncoder().encode(s);
+}
+
+// For server routes that answer with a redirect Response: same flags as the
+// session cookie. maxAge 0 deletes the cookie.
+export function cookieHeader(name: string, value: string, maxAgeSeconds: number): string {
+  return `${name}=${encodeURIComponent(value)}; Max-Age=${maxAgeSeconds}; Path=/; HttpOnly; Secure; SameSite=Lax`;
+}
+
+export function readCookie(request: Request, name: string): string | undefined {
+  for (const part of (request.headers.get("cookie") ?? "").split(";")) {
+    const [k, ...v] = part.trim().split("=");
+    if (k === name) return decodeURIComponent(v.join("="));
+  }
+  return undefined;
 }
 
 export async function signSession(uid: string, now = Date.now()): Promise<string> {
   const iat = Math.floor(now / 1000);
   return new SignJWT({ uid })
     .setProtectedHeader({ alg: "HS256" })
+    .setAudience(SESSION_AUDIENCE)
     .setIssuedAt(iat)
     .setExpirationTime(iat + SESSION_TTL_SECONDS)
     .sign(secretKey());
@@ -26,7 +44,7 @@ export async function signSession(uid: string, now = Date.now()): Promise<string
 export async function verifySession(token: string | undefined): Promise<string | null> {
   if (!token) return null;
   try {
-    const { payload } = await jwtVerify(token, secretKey(), { algorithms: ["HS256"] });
+    const { payload } = await jwtVerify(token, secretKey(), { algorithms: ["HS256"], audience: SESSION_AUDIENCE });
     return typeof payload.uid === "string" ? payload.uid : null;
   } catch {
     return null;
@@ -56,7 +74,6 @@ export interface SessionUser {
   program: string | null;
   nodeType: string | null;
   nodeName: string | null;
-  mustChangePassword: boolean;
 }
 
 export async function currentUser(): Promise<SessionUser | null> {
@@ -73,6 +90,5 @@ export async function currentUser(): Promise<SessionUser | null> {
     program: u.program,
     nodeType: u.nodeType,
     nodeName: u.nodeName,
-    mustChangePassword: u.mustChangePassword,
   };
 }

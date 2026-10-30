@@ -9,7 +9,8 @@ export const appUsers = pgTable("app_users", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	email: text().notNull(),
 	name: text(),
-	role: text().notNull(),
+	// Empty only for users waiting for approval or rejected, who are never active.
+	role: text(),
 	district: text(),
 	program: text(),
 	nodeType: text("node_type"),
@@ -21,9 +22,29 @@ export const appUsers = pgTable("app_users", {
 	mustChangePassword: boolean("must_change_password").default(false).notNull(),
 	failedLoginCount: integer("failed_login_count").default(0).notNull(),
 	lockedUntil: timestamp("locked_until", { withTimezone: true, mode: 'string' }),
+	// Permanent link to the Keycloak account (the ID token's sub).
+	keycloakSub: text("keycloak_sub"),
+	rejectedAt: timestamp("rejected_at", { withTimezone: true, mode: 'string' }),
+	lastLoginAt: timestamp("last_login_at", { withTimezone: true, mode: 'string' }),
 }, (table) => [
 	unique("app_users_email_key").on(table.email),
+	unique("app_users_keycloak_sub_key").on(table.keycloakSub),
 	check("app_users_role_check", sql`role = ANY (ARRAY['admin'::text, 'jfc'::text, 'owner'::text, 'coordinator'::text, 'ecosystem'::text, 'user'::text])`),
+	check("app_users_active_needs_role", sql`(NOT active) OR role IS NOT NULL`),
+]);
+
+// What the server admin command and the admin bootstrap changed, and who says
+// they ran it (--by), plus Keycloak accounts created from Settings, by the admin
+// who added the user.
+export const adminActions = pgTable("admin_actions", {
+	id: bigserial({ mode: "number" }).primaryKey().notNull(),
+	at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	action: text().notNull(),
+	email: text().notNull(),
+	keycloakUserId: text("keycloak_user_id"),
+	operator: text().notNull(),
+}, () => [
+	check("admin_actions_action_check", sql`action = ANY (ARRAY['create_admin'::text, 'promote'::text, 'link'::text, 'relink'::text, 'verify_email'::text, 'create_keycloak_account'::text])`),
 ]);
 
 export const purpleDotsCalls = pgTable("purple_dots_calls", {

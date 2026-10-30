@@ -1,4 +1,4 @@
-// Needs db/bootstrap.sql applied and TEST_DATABASE_URL (the campaign_manager login); skipped otherwise.
+// Needs TEST_DATABASE_URL (the campaign_manager login), set up by the migrate step; skipped otherwise.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import pg from "pg";
@@ -7,7 +7,7 @@ import { migrationsFolder, runMigrations } from "../../src/server/db/migrate";
 const URL = process.env.TEST_DATABASE_URL;
 
 const APP_TABLES = [
-  "app_users", "campaign_requests", "launched_batch_inputs", "launched_batches",
+  "admin_actions", "app_users", "campaign_requests", "launched_batch_inputs", "launched_batches",
   "north_star_config", "program_agents", "program_export_targets",
   "program_sync_state", "reviewers", "sheet_connections", "transcript_reviews",
   "up_seekers_upload",
