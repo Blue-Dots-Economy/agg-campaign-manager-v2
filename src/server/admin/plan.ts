@@ -20,7 +20,7 @@ export interface AdminOptions {
   verifyEmail: boolean;
 }
 
-export type StopReason = "options" | "disabled" | "linked-elsewhere" | "unverified";
+export type StopReason = "options" | "disabled" | "linked-elsewhere" | "unverified" | "stale-link";
 
 export interface AdminPlan {
   // Set when the command must stop; nothing is changed.
@@ -51,6 +51,16 @@ export function planAdminCommand(
   const stop = (reason: StopReason, error: string): AdminPlan => ({ ...plan, error, reason });
 
   if (o.verifyEmail && o.relink) return stop("options", "--verify-email can't be used with --relink, which only clears a link.");
+
+  // Linked to another Keycloak account than the one with this email: signing in
+  // with this email would be refused as a conflict. Only a person can say which
+  // account is right, so stop instead of reporting success.
+  if (existing?.keycloakSub && account && account.id !== existing.keycloakSub && !o.relink) {
+    return stop(
+      "stale-link",
+      "This user is linked to a different Keycloak account than the one with this email. Check which is right; --relink clears the link.",
+    );
+  }
 
   // Whether this run links a Keycloak account: a new admin, or promoting a user with no link.
   let needsAccount = false;

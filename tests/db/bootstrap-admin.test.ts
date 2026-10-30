@@ -125,6 +125,14 @@ describe.skipIf(!URL)("admin bootstrap after migrations", () => {
     expect(await row()).toEqual({ role: "admin", active: true, keycloak_sub: "kc-new" });
   });
 
+  test("stops when the user is linked to another Keycloak account, instead of promoting them", async () => {
+    await owner.query("insert into app_users (email, role, active, keycloak_sub) values ($1, 'admin', false, 'kc-old')", [EMAIL]);
+    const kc = fakeKeycloak([json([account()])]);
+    await expect(bootstrapAdmin(db, env, kc.make)).rejects.toThrow(/stopped for boss@bootstrap\.test.*different Keycloak account/);
+    expect(await row()).toEqual({ role: "admin", active: false, keycloak_sub: "kc-old" });
+    expect(await actions()).toEqual([]);
+  });
+
   test("stops on an unverified Keycloak account and changes nothing", async () => {
     const kc = fakeKeycloak([json([account({ emailVerified: false })])]);
     const err = await bootstrapAdmin(db, env, kc.make).catch((e: Error) => e);

@@ -66,6 +66,14 @@ describe("admin command plan", () => {
     expect(planAdminCommand(user({ role: "admin" }), null, false, none)).toMatchObject({ createKeycloak: true });
   });
 
+  test("stops when the user is linked to another Keycloak account than the one with this email", () => {
+    const stale = user({ role: "admin", active: false, keycloakSub: "kc-old" });
+    expect(planAdminCommand(stale, kc(), false, { ...none, promote: true })).toMatchObject({ reason: "stale-link" });
+    expect(planAdminCommand(user({ role: "admin", keycloakSub: "kc-old" }), kc(), false, none)).toMatchObject({ reason: "stale-link" });
+    // --relink is how it gets cleared.
+    expect(planAdminCommand(stale, kc(), false, { ...none, relink: true })).toMatchObject({ error: null, relink: true });
+  });
+
   test("an active admin is left as is", () => {
     const p = planAdminCommand(user({ role: "admin", keycloakSub: "kc-1" }), kc(), false, { ...none, promote: true });
     expect(planChangesAnything(p)).toBe(false);

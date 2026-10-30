@@ -25,6 +25,9 @@ const STOPPED: Record<StopReason, string> = {
   unverified:
     "its Keycloak account exists but the email is not verified. Check whose account it is; if it is theirs, " +
     "verify the email in Keycloak, then deploy again.",
+  "stale-link":
+    "it is linked to a different Keycloak account than the one with this email. Check which is right and clear the " +
+    "wrong link (Unlink Keycloak in Settings, or the admin command's --relink), then deploy again.",
 };
 
 export async function bootstrapAdmin(
