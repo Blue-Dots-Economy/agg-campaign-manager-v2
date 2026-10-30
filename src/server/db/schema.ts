@@ -33,7 +33,9 @@ export const appUsers = pgTable("app_users", {
 	check("app_users_active_needs_role", sql`(NOT active) OR role IS NOT NULL`),
 ]);
 
-// What the server admin command changed, and who says they ran it (--by).
+// What the server admin command and the admin bootstrap changed, and who says
+// they ran it (--by), plus Keycloak accounts created from Settings, by the admin
+// who added the user.
 export const adminActions = pgTable("admin_actions", {
 	id: bigserial({ mode: "number" }).primaryKey().notNull(),
 	at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -42,7 +44,7 @@ export const adminActions = pgTable("admin_actions", {
 	keycloakUserId: text("keycloak_user_id"),
 	operator: text().notNull(),
 }, () => [
-	check("admin_actions_action_check", sql`action = ANY (ARRAY['create_admin'::text, 'promote'::text, 'link'::text, 'relink'::text, 'verify_email'::text])`),
+	check("admin_actions_action_check", sql`action = ANY (ARRAY['create_admin'::text, 'promote'::text, 'link'::text, 'relink'::text, 'verify_email'::text, 'create_keycloak_account'::text])`),
 ]);
 
 export const purpleDotsCalls = pgTable("purple_dots_calls", {

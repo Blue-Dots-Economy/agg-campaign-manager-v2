@@ -15,7 +15,7 @@ async function db() {
     import("@/server/db/schema"),
     import("drizzle-orm"),
   ]);
-  return { db: getDb(), appUsers: schema.appUsers, ...orm };
+  return { db: getDb(), appUsers: schema.appUsers, adminActions: schema.adminActions, ...orm };
 }
 
 export interface MeResult {
@@ -114,21 +114,32 @@ export const listAppUsers = createServerFn({ method: "GET" })
   });
 
 const KEYCLOAK_DOWN = "Keycloak can't be reached right now. Nothing was saved.";
+const KEYCLOAK_DENIED =
+  "Campaign Manager isn't allowed to manage users in Keycloak. Ask an operator to check its Keycloak client. Nothing was saved.";
 
 // Finds or creates the Keycloak account for an email (reuse only a verified,
 // enabled one), and makes sure it isn't linked to another user. Keycloak first,
-// then the app, so a failed save is fixed by trying again.
-async function keycloakAccountFor(emailAddress: string, name: string | null, forUserId: string | null): Promise<string> {
-  const { keycloakAdmin, ACCOUNT_MESSAGES } = await import("@/server/auth/keycloak-admin.server");
+// then the app, so a failed save is fixed by trying again. A created account is
+// recorded straight away, with the admin who caused it.
+async function keycloakAccountFor(
+  emailAddress: string,
+  name: string | null,
+  forUserId: string | null,
+  operator: string,
+): Promise<string> {
+  const { keycloakAdmin, ACCOUNT_MESSAGES, KeycloakHttpError } = await import("@/server/auth/keycloak-admin.server");
   let account: Awaited<ReturnType<Awaited<ReturnType<typeof keycloakAdmin>>["ensureAccount"]>>;
   try {
     account = await (await keycloakAdmin()).ensureAccount(emailAddress, name);
   } catch (e) {
     console.error(`[keycloak] ${e instanceof Error ? e.message : String(e)}`);
-    throw new Error(KEYCLOAK_DOWN);
+    throw new Error(e instanceof KeycloakHttpError && e.denied ? KEYCLOAK_DENIED : KEYCLOAK_DOWN);
   }
   if (account.kind === "refused") throw new Error(ACCOUNT_MESSAGES[account.reason]);
-  const { db: d, appUsers, eq } = await db();
+  const { db: d, appUsers, adminActions, eq } = await db();
+  if (account.created) {
+    await d.insert(adminActions).values({ action: "create_keycloak_account", email: emailAddress, keycloakUserId: account.id, operator });
+  }
   const [owner] = await d.select({ id: appUsers.id }).from(appUsers).where(eq(appUsers.keycloakSub, account.id)).limit(1);
   if (owner && owner.id !== forUserId) throw new Error(ACCOUNT_MESSAGES["linked-elsewhere"]);
   return account.id;
@@ -151,7 +162,7 @@ function refuseUnless(u: { active: boolean; role: string | null; rejectedAt: str
 export const createAppUser = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator((d: unknown) => profile.parse(d))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { db: d, appUsers, eq } = await db();
     const [exists] = await d.select().from(appUsers).where(eq(appUsers.email, data.email)).limit(1);
     if (exists) {
@@ -160,7 +171,7 @@ export const createAppUser = createServerFn({ method: "POST" })
       if (state === "rejected") throw new Error("This person was rejected. Approve them in the list instead.");
       throw new Error("A user with this email already exists.");
     }
-    const keycloakSub = await keycloakAccountFor(data.email, data.name, null);
+    const keycloakSub = await keycloakAccountFor(data.email, data.name, null, context.user.email);
     try {
       await d.insert(appUsers).values({
         email: data.email,
@@ -172,8 +183,11 @@ export const createAppUser = createServerFn({ method: "POST" })
         nodeName: data.node_name,
         keycloakSub,
       });
-    } catch {
-      throw new Error("Someone else just added this user or linked this Keycloak account. Refresh the list.");
+    } catch (e) {
+      const { isUniqueViolation } = await import("@/server/db/errors");
+      if (isUniqueViolation(e)) throw new Error("Someone else just added this user or linked this Keycloak account. Refresh the list.");
+      console.error(`[users] adding ${data.email} failed: ${e instanceof Error ? e.message : String(e)}`);
+      throw new Error("Saving the user failed. Try again; the Keycloak account is reused.");
     }
     return { ok: true };
   });
@@ -182,10 +196,10 @@ export const createAppUser = createServerFn({ method: "POST" })
 export const setUpKeycloakLogin = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator((d: unknown) => z.object({ email }).parse(d))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const u = await findUser(data.email);
     if (u.keycloakSub) throw new Error("This user already has a Keycloak login.");
-    const keycloakSub = await keycloakAccountFor(u.email, u.name, u.id);
+    const keycloakSub = await keycloakAccountFor(u.email, u.name, u.id, context.user.email);
     const { db: d, appUsers, eq } = await db();
     await d.update(appUsers).set({ keycloakSub, updatedAt: new Date().toISOString() }).where(eq(appUsers.id, u.id));
     return { ok: true };

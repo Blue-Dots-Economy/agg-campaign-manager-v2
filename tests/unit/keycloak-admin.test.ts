@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { keycloakConfig } from "../../src/server/auth/config.server";
-import { decideAccount, KeycloakAdmin, type KeycloakUser } from "../../src/server/auth/keycloak-admin.server";
+import { decideAccount, KeycloakAdmin, KeycloakHttpError, type KeycloakUser } from "../../src/server/auth/keycloak-admin.server";
 
 const cfg = keycloakConfig({
   KEYCLOAK_BASE_URL: "http://keycloak:8080",
@@ -146,5 +146,19 @@ describe("Keycloak admin client", () => {
   test("a Keycloak error is reported, not hidden", async () => {
     const kc = fakeKeycloak([() => new Response("", { status: 503 })]);
     await expect(new KeycloakAdmin(cfg, kc.fetchFn).findByEmail("a@b.c")).rejects.toThrow(/HTTP 503/);
+  });
+
+  // The admin screen tells "not allowed" apart from "can't be reached".
+  test("marks refusals of Campaign Manager's own access as denied", async () => {
+    const err = (p: Promise<unknown>) => p.catch((e: unknown) => e as KeycloakHttpError);
+    const missingRole = await err(new KeycloakAdmin(cfg, fakeKeycloak([() => new Response("", { status: 403 })]).fetchFn).findByEmail("a@b.c"));
+    expect(missingRole).toMatchObject({ status: 403, denied: true });
+
+    const badSecret = (async () => new Response("{}", { status: 401 })) as unknown as typeof fetch;
+    expect(await err(new KeycloakAdmin(cfg, badSecret).findByEmail("a@b.c"))).toMatchObject({ status: 401, denied: true });
+
+    const down = await err(new KeycloakAdmin(cfg, fakeKeycloak([() => new Response("", { status: 503 })]).fetchFn).findByEmail("a@b.c"));
+    expect(down).toBeInstanceOf(KeycloakHttpError);
+    expect(down).toMatchObject({ status: 503, denied: false });
   });
 });

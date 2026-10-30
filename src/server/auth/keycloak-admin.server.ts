@@ -24,6 +24,19 @@ export const ACCOUNT_MESSAGES: Record<AccountRefusal, string> = {
   "linked-elsewhere": "This Keycloak account is already linked to another user.",
 };
 
+// A refused Keycloak call. `denied` marks refusals of Campaign Manager's own
+// access (its service account can't sign in, or lacks a role), as opposed to
+// Keycloak being down or failing.
+export class KeycloakHttpError extends Error {
+  constructor(
+    what: string,
+    readonly status: number,
+    readonly denied = status === 401 || status === 403,
+  ) {
+    super(`${what}: HTTP ${status}`);
+  }
+}
+
 // Reuse a verified, enabled account; create one if there is none.
 export function decideAccount(existing: KeycloakUser | null): { kind: "reuse" } | { kind: "create" } | { kind: "refuse"; reason: AccountRefusal } {
   if (!existing) return { kind: "create" };
@@ -56,7 +69,8 @@ export class KeycloakAdmin {
         body: new URLSearchParams({ grant_type: "client_credentials", client_id: this.c.clientId, client_secret: this.c.clientSecret }),
       },
     );
-    if (!res.ok) throw new Error(`Keycloak service account login failed: HTTP ${res.status}`);
+    // 401 is a wrong client secret, 400 a client without a service account.
+    if (!res.ok) throw new KeycloakHttpError("Keycloak service account login failed", res.status, true);
     const body = (await res.json()) as { access_token?: unknown; expires_in?: unknown };
     if (typeof body.access_token !== "string") throw new Error("Keycloak returned no service account token");
     const ttl = typeof body.expires_in === "number" ? body.expires_in : 60;
@@ -78,7 +92,7 @@ export class KeycloakAdmin {
   // Exact match: a plain search would also match similar emails.
   async findByEmail(email: string): Promise<KeycloakUser | null> {
     const res = await this.call(`/users?${new URLSearchParams({ email, exact: "true" })}`);
-    if (!res.ok) throw new Error(`Keycloak user lookup failed: HTTP ${res.status}`);
+    if (!res.ok) throw new KeycloakHttpError("Keycloak user lookup failed", res.status);
     const list = (await res.json()) as Record<string, unknown>[];
     const match = list.find((u) => typeof u.email === "string" && u.email.toLowerCase() === email.toLowerCase());
     return match ? toUser(match) : null;
@@ -93,7 +107,7 @@ export class KeycloakAdmin {
       body: JSON.stringify({ username: email, email, emailVerified: true, enabled: true, ...(name ? { firstName: name } : {}) }),
     });
     if (res.status === 409) return "exists";
-    if (res.status !== 201) throw new Error(`Keycloak user create failed: HTTP ${res.status}`);
+    if (res.status !== 201) throw new KeycloakHttpError("Keycloak user create failed", res.status);
     const id = res.headers.get("location")?.split("/").pop();
     if (!id) throw new Error("Keycloak did not return the new user's id");
     return { id };
@@ -103,14 +117,14 @@ export class KeycloakAdmin {
   // other field changes.
   async markEmailVerified(id: string): Promise<void> {
     const get = await this.call(`/users/${encodeURIComponent(id)}`);
-    if (!get.ok) throw new Error(`Keycloak user read failed: HTTP ${get.status}`);
+    if (!get.ok) throw new KeycloakHttpError("Keycloak user read failed", get.status);
     const user = (await get.json()) as Record<string, unknown>;
     const put = await this.call(`/users/${encodeURIComponent(id)}`, {
       method: "PUT",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ ...user, emailVerified: true }),
     });
-    if (!put.ok) throw new Error(`Keycloak user update failed: HTTP ${put.status}`);
+    if (!put.ok) throw new KeycloakHttpError("Keycloak user update failed", put.status);
   }
 
   // Finds or creates the account for an email, following §3.5's rules.
