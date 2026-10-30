@@ -15,7 +15,7 @@ export interface VerifiedIdentity {
   email: string;
 }
 
-export type RefusalReason = "pending" | "denied" | "conflict";
+export type RefusalReason = "pending" | "denied" | "conflict" | "admin-unlinked";
 
 export type LinkDecision =
   | { kind: "login"; userId: string; set: { keycloakSub?: string; email?: string } }
@@ -49,6 +49,12 @@ export function decideLink(
     // and recreated. Only an admin can say which one is right.
     if (byEmail.keycloakSub && byEmail.keycloakSub !== id.sub) {
       return { kind: "refused", reason: "conflict", userId: byEmail.id };
+    }
+    // An admin is never linked by a matching email, so a Keycloak account someone
+    // else registered with that email can't become an admin. The admin bootstrap
+    // or another admin's "Set up login" links them by Keycloak id instead.
+    if (!byEmail.keycloakSub && byEmail.role === "admin") {
+      return { kind: "refused", reason: refusalFor(byEmail) ?? "admin-unlinked", userId: byEmail.id };
     }
     const set = { keycloakSub: id.sub };
     const refused = refusalFor(byEmail);

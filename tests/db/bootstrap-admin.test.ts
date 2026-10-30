@@ -61,8 +61,8 @@ describe.skipIf(!URL)("admin bootstrap after migrations", () => {
   });
 
   afterEach(async () => {
-    await owner.query("delete from app_users where email = $1", [EMAIL]);
-    await owner.query("delete from admin_actions where email = $1", [EMAIL]);
+    await owner.query("delete from app_users where email like $1", ["%@bootstrap.test"]);
+    await owner.query("delete from admin_actions where email like $1", ["%@bootstrap.test"]);
   });
 
   afterAll(async () => {
@@ -94,7 +94,7 @@ describe.skipIf(!URL)("admin bootstrap after migrations", () => {
 
     // The next deploy finds an active admin and touches neither Keycloak nor the database.
     const again = fakeKeycloak([]);
-    expect(await bootstrapAdmin(db, env, again.make)).toMatch(/active admin exists/);
+    expect(await bootstrapAdmin(db, env, again.make)).toMatch(/active admin who can sign in exists/);
     expect(again.seen).toEqual([]);
     expect(await actions()).toHaveLength(1);
   });
@@ -105,6 +105,24 @@ describe.skipIf(!URL)("admin bootstrap after migrations", () => {
     await bootstrapAdmin(db, env, kc.make);
     expect(await row()).toEqual({ role: "admin", active: true, keycloak_sub: "kc-boss" });
     expect(await actions()).toEqual([{ action: "promote", keycloak_user_id: "kc-boss", operator: "bootstrap" }]);
+  });
+
+  test("links an active admin from before Keycloak login, by Keycloak id", async () => {
+    await owner.query("insert into app_users (email, role, active) values ($1, 'admin', true)", [EMAIL]);
+    const kc = fakeKeycloak([json([account()])]);
+    await bootstrapAdmin(db, env, kc.make);
+    expect(await row()).toEqual({ role: "admin", active: true, keycloak_sub: "kc-boss" });
+    expect(await actions()).toEqual([{ action: "link", keycloak_user_id: "kc-boss", operator: "bootstrap" }]);
+  });
+
+  test("an unlinked admin can't sign in, so it doesn't stop the bootstrap", async () => {
+    await owner.query("insert into app_users (email, role, active) values ('placeholder@bootstrap.test', 'admin', true)");
+    const kc = fakeKeycloak([
+      json([]),
+      () => new Response(null, { status: 201, headers: { location: "http://keycloak:8080/admin/realms/bluedots/users/kc-new" } }),
+    ]);
+    expect(await bootstrapAdmin(db, env, kc.make)).toMatch(/boss@bootstrap\.test/);
+    expect(await row()).toEqual({ role: "admin", active: true, keycloak_sub: "kc-new" });
   });
 
   test("stops on an unverified Keycloak account and changes nothing", async () => {

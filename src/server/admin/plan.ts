@@ -60,6 +60,8 @@ export function planAdminCommand(
     plan.notes.push("Create the user as an active admin.");
   } else if (existing.role === "admin" && existing.active) {
     plan.notes.push("Already an active admin.");
+    // Logins never link an admin by email, so an unlinked admin is linked here.
+    needsAccount = !existing.keycloakSub;
   } else if (o.promote) {
     plan.promote = true;
     needsAccount = !existing.keycloakSub;
@@ -107,7 +109,7 @@ export function planAdminCommand(
 }
 
 export function planChangesAnything(p: AdminPlan): boolean {
-  return p.createKeycloak || p.verifyEmail || p.createAdmin || p.promote || p.relink;
+  return p.createKeycloak || p.verifyEmail || p.createAdmin || p.promote || p.relink || p.linkTo !== null;
 }
 
 function describe(u: ExistingUser): string {

@@ -35,7 +35,7 @@ export async function applyPlan(
   plan: AdminPlan,
   operator: string,
 ): Promise<void> {
-  const record = (action: "create_admin" | "promote" | "relink" | "verify_email", keycloakUserId: string | null) =>
+  const record = (action: "create_admin" | "promote" | "link" | "relink" | "verify_email", keycloakUserId: string | null) =>
     db.insert(adminActions).values({ action, email, keycloakUserId, operator });
   const now = new Date().toISOString();
 
@@ -60,6 +60,10 @@ export async function applyPlan(
       .set({ role: "admin", active: true, rejectedAt: null, ...(keycloakSub ? { keycloakSub } : {}), updatedAt: now })
       .where(eq(appUsers.email, email));
     await record("promote", keycloakSub ?? existing?.keycloakSub ?? null);
+  } else if (keycloakSub && existing && !existing.keycloakSub) {
+    // An active admin from before Keycloak login, linked by Keycloak id.
+    await db.update(appUsers).set({ keycloakSub, updatedAt: now }).where(eq(appUsers.email, email));
+    await record("link", keycloakSub);
   }
   if (plan.relink) {
     await db.update(appUsers).set({ keycloakSub: null, updatedAt: now }).where(eq(appUsers.email, email));

@@ -59,6 +59,13 @@ describe("admin command plan", () => {
     );
   });
 
+  test("an active admin without a link gets linked, since logins never link an admin by email", () => {
+    const p = planAdminCommand(user({ role: "admin" }), kc(), false, none);
+    expect(p).toMatchObject({ error: null, promote: false, linkTo: "kc-1" });
+    expect(planChangesAnything(p)).toBe(true);
+    expect(planAdminCommand(user({ role: "admin" }), null, false, none)).toMatchObject({ createKeycloak: true });
+  });
+
   test("an active admin is left as is", () => {
     const p = planAdminCommand(user({ role: "admin", keycloakSub: "kc-1" }), kc(), false, { ...none, promote: true });
     expect(planChangesAnything(p)).toBe(false);

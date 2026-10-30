@@ -57,6 +57,16 @@ describe("linking a Keycloak identity", () => {
     expect(decideLink(deactivated, deactivated, id)).toMatchObject({ kind: "refused", reason: "denied" });
   });
 
+  test("an admin is never linked by email", () => {
+    const admin = user({ role: "admin" });
+    expect(decideLink(null, admin, id)).toEqual({ kind: "refused", reason: "admin-unlinked", userId: "u-1" });
+    // Once linked by Keycloak id (bootstrap or Set up login), they log in as usual.
+    const linked = user({ role: "admin", keycloakSub: "sub-1" });
+    expect(decideLink(linked, linked, id)).toEqual({ kind: "login", userId: "u-1", set: {} });
+    // A deactivated admin is still told they have no access.
+    expect(decideLink(null, user({ role: "admin", active: false }), id)).toMatchObject({ reason: "denied" });
+  });
+
   test("a refused user's email is not changed", () => {
     const deactivated = user({ keycloakSub: "sub-1", active: false, email: "old@example.org" });
     expect(decideLink(deactivated, null, id)).toEqual({ kind: "refused", reason: "denied", userId: "u-1" });

@@ -14,6 +14,7 @@ const MESSAGES: Record<string, string> = {
   pending: "Your access is pending. An admin needs to approve it.",
   denied: "You don't have access to Campaign Manager. Contact an admin.",
   conflict: "There is a problem with your account. Contact an admin.",
+  "admin-unlinked": "Your admin account isn't set up for Keycloak login yet. Ask another admin to use Set up login for you.",
   unverified: "Your email is not verified in Keycloak. Contact an admin.",
   failed: "Login did not complete. Try again.",
   expired: "Login did not complete. Try again.",

@@ -1,9 +1,11 @@
 // Creates the first admin after migrations, from BOOTSTRAP_ADMIN_EMAIL, so a new
 // deployment can be signed in to without running the admin command. Does nothing
-// once any active admin exists, or when the setting is empty. Follows the admin
+// once an active admin who can sign in exists (one linked to Keycloak), or when the
+// setting is empty. An unlinked admin doesn't count: logins never link an admin by
+// email, so they can't sign in until someone links them. Follows the admin
 // command's rules (promote on, never --verify-email) and throws when they say
 // stop, so the migrate step fails instead of leaving nobody able to sign in.
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { appUsers } from "../db/schema";
@@ -39,9 +41,9 @@ export async function bootstrapAdmin(
   const [admin] = await db
     .select({ email: appUsers.email })
     .from(appUsers)
-    .where(and(eq(appUsers.role, "admin"), eq(appUsers.active, true)))
+    .where(and(eq(appUsers.role, "admin"), eq(appUsers.active, true), isNotNull(appUsers.keycloakSub)))
     .limit(1);
-  if (admin) return `An active admin exists (${admin.email}); no admin created.`;
+  if (admin) return `An active admin who can sign in exists (${admin.email}); no admin created.`;
 
   const keycloak = makeKeycloak();
   const { existing, account, linkedToOther } = await lookUp(db, keycloak, email);

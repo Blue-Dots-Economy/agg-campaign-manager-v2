@@ -42,7 +42,7 @@ export const adminActions = pgTable("admin_actions", {
 	keycloakUserId: text("keycloak_user_id"),
 	operator: text().notNull(),
 }, () => [
-	check("admin_actions_action_check", sql`action = ANY (ARRAY['create_admin'::text, 'promote'::text, 'relink'::text, 'verify_email'::text])`),
+	check("admin_actions_action_check", sql`action = ANY (ARRAY['create_admin'::text, 'promote'::text, 'link'::text, 'relink'::text, 'verify_email'::text])`),
 ]);
 
 export const purpleDotsCalls = pgTable("purple_dots_calls", {
