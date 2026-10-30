@@ -127,11 +127,11 @@ export function UsersRolesSection() {
     onError: (e) => toast.error(errorText(e, "Failed to save user")),
   });
 
-  const useUserAction = (run: (email: string) => Promise<unknown>, done: string) =>
+  const useUserAction = (run: (email: string) => Promise<unknown>, done: string | ((email: string) => string)) =>
     useMutation({
       mutationFn: run,
-      onSuccess: () => {
-        toast.success(done);
+      onSuccess: (_d, email) => {
+        toast.success(typeof done === "function" ? done(email) : done);
         refresh();
       },
       onError: (e) => toast.error(errorText(e, "Failed to update user")),
@@ -146,7 +146,14 @@ export function UsersRolesSection() {
     onError: (e) => toast.error(errorText(e, "Failed to update user")),
   });
   const reject = useUserAction((email) => rejectFn({ data: { email } }), "Request rejected");
-  const unlink = useUserAction((email) => unlinkFn({ data: { email } }), "Keycloak login unlinked");
+  // An admin isn't linked again at login, so say what to do next.
+  const unlink = useUserAction(
+    (email) => unlinkFn({ data: { email } }),
+    (email) =>
+      users?.find((u) => u.email === email)?.role === "admin"
+        ? "Keycloak login unlinked. Use Set up login to link this admin again."
+        : "Keycloak login unlinked",
+  );
   const setUp = useUserAction((email) => setUpFn({ data: { email } }), "Keycloak login set up");
   const approve = useMutation({
     mutationFn: (v: { email: string; role: Role }) => approveFn({ data: v }),

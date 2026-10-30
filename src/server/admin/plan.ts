@@ -108,7 +108,11 @@ export function planAdminCommand(
   if (o.relink) {
     if (existing?.keycloakSub) {
       plan.relink = true;
-      plan.notes.push("Clear the Keycloak link. The next login links again by verified email.");
+      plan.notes.push(
+        existing.role === "admin"
+          ? "Clear the Keycloak link. An admin isn't linked again at login: run this command again, or use Set up login in Settings."
+          : "Clear the Keycloak link. The next login links again by verified email.",
+      );
     } else {
       plan.notes.push("--relink ignored: not linked to Keycloak.");
     }

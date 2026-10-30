@@ -232,6 +232,7 @@ export const rejectAppUser = createServerFn({ method: "POST" })
   });
 
 // Their next login links again by verified email: fixes a recreated Keycloak account.
+// An admin isn't linked at login, so another admin then uses Set up login.
 export const unlinkKeycloakAccount = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator((d: unknown) => z.object({ email }).parse(d))
