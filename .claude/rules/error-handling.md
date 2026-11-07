@@ -6,7 +6,7 @@ Every call to an external system (Raya, Google Sheets, any other HTTP API) must 
 
 - **Timeout** — an explicit timeout on every call (`AbortSignal.timeout(...)`); never rely on the default.
 - **Retry** — retry transient failures (429, 5xx, timeouts) at least once with exponential backoff. Do not retry a request that is not safe to repeat (for example creating a batch) unless the API supports an idempotency key.
-- **Clear errors** — throw an `Error` subclass the caller can check (for example `RayaApiError` in `src/lib/raya-api.ts`, or a small `class UpstreamError extends Error {}` in the module), with the original error as `cause`. Never pass a raw upstream body or stack trace to the browser.
+- **Clear errors** — throw an `Error` subclass the caller can check (for example `RayaApiError` in `src/lib/raya-api.server.ts`, or a small `class UpstreamError extends Error {}` in the module), with the original error as `cause`. Never pass a raw upstream body or stack trace to the browser.
 - **No silent swallowing** — never use an empty `catch`. Log and re-throw, or return a clear failure value. A `catch` that ignores an error on purpose states why in one line.
 
 ```typescript
