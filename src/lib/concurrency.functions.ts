@@ -2,6 +2,10 @@
 // Raya gives ONE pool (default 20) shared by every agent / program.
 
 import { createServerFn } from "@tanstack/react-start";
+import { requireRole } from "@/auth/middleware";
+import { FN_ROLES } from "@/auth/roles";
+import { getDb } from "@/server/db/client.server";
+import { programAgents } from "@/server/db/schema";
 import { delay, rayaFetch } from "./raya-api";
 
 export const CONCURRENCY_CAP_DEFAULT = 20;
@@ -18,11 +22,6 @@ const ACTIVE_STATUSES = new Set([
   "started",
   "live",
 ]);
-
-async function sb() {
-  const { sbFor } = await import("@/lib/db.server");
-  return sbFor();
-}
 
 interface ActiveBatch {
   program: string;
@@ -56,6 +55,7 @@ function pickConcurrency(item: any): number {
 }
 
 export const getConcurrencyUsage = createServerFn({ method: "GET" })
+  .middleware([requireRole(FN_ROLES.dashboard)])
   .inputValidator((d: { cap?: number }) => d ?? {})
   .handler(async ({ data }) => {
     const cap = Number.isFinite(data?.cap) && (data!.cap as number) > 0
@@ -66,12 +66,13 @@ export const getConcurrencyUsage = createServerFn({ method: "GET" })
       return { cap, used: 0, available: cap, batches: [] as ActiveBatch[], error: "RAYA_API_KEY not set" };
     }
 
-    const c = await sb();
-    const { data: agents, error } = await c
-      .from("program_agents")
-      .select("program,agent_id,name");
-    if (error) {
-      return { cap, used: 0, available: cap, batches: [] as ActiveBatch[], error: error.message };
+    let agents: Array<{ program: string; agent_id: string; name: string }>;
+    try {
+      agents = await getDb()
+        .select({ program: programAgents.program, agent_id: programAgents.agentId, name: programAgents.name })
+        .from(programAgents);
+    } catch (e) {
+      return { cap, used: 0, available: cap, batches: [] as ActiveBatch[], error: e instanceof Error ? e.message : String(e) };
     }
 
     const active: ActiveBatch[] = [];

@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -32,10 +31,12 @@ import {
 } from "@/components/ui/select";
 import {
   listAppUsers,
-  upsertAppUser,
+  createAppUser,
+  updateAppUser,
+  resetAppUserPassword,
   setAppUserActive,
   type AppUser,
-} from "@/lib/app-users.functions";
+} from "@/lib/auth.functions";
 import { registry } from "@/programs/registry";
 
 const ROLE_OPTIONS = [
@@ -57,8 +58,6 @@ type FormState = {
   program: string;
   node_type: string;
   node_name: string;
-  password: string;
-  active: boolean;
 };
 
 const EMPTY: FormState = {
@@ -69,14 +68,14 @@ const EMPTY: FormState = {
   program: NONE,
   node_type: NONE,
   node_name: "",
-  password: "",
-  active: true,
 };
 
 export function UsersRolesSection() {
   const qc = useQueryClient();
   const listFn = useServerFn(listAppUsers);
-  const upsertFn = useServerFn(upsertAppUser);
+  const createFn = useServerFn(createAppUser);
+  const updateFn = useServerFn(updateAppUser);
+  const resetFn = useServerFn(resetAppUserPassword);
   const activeFn = useServerFn(setAppUserActive);
 
   const { data: users, isLoading } = useQuery({
@@ -87,32 +86,44 @@ export function UsersRolesSection() {
   const [open, setOpen] = useState(false);
   const [editingEmail, setEditingEmail] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY);
+  const [issued, setIssued] = useState<{ email: string; password: string } | null>(null);
 
   const refresh = () => qc.invalidateQueries({ queryKey: ["app-users"] });
 
   const save = useMutation({
-    mutationFn: () =>
-      upsertFn({
-        data: {
-          user: {
-            email: form.email.trim().toLowerCase(),
-            name: form.name,
-            role: form.role,
-            district: form.district === NONE ? "" : form.district,
-            program: form.program === NONE ? "" : form.program,
-            node_type: form.node_type === NONE ? "" : form.node_type,
-            node_name: form.node_name,
-            password: form.password || undefined,
-            active: form.active,
-          },
-        },
-      }),
-    onSuccess: () => {
+    mutationFn: async () => {
+      const data = {
+        email: form.email.trim().toLowerCase(),
+        name: form.name,
+        role: form.role,
+        district: form.district === NONE ? "" : form.district,
+        program: form.program === NONE ? "" : form.program,
+        node_type: form.node_type === NONE ? "" : form.node_type,
+        node_name: form.node_name,
+      };
+      if (editingEmail) {
+        await updateFn({ data });
+        return null;
+      }
+      const { temporaryPassword } = await createFn({ data });
+      return { email: data.email, password: temporaryPassword };
+    },
+    onSuccess: (created) => {
       toast.success(editingEmail ? "User updated" : "User added");
       setOpen(false);
+      if (created) setIssued(created);
       refresh();
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to save user"),
+  });
+
+  const resetPassword = useMutation({
+    mutationFn: async (email: string) => ({ email, password: (await resetFn({ data: { email } })).temporaryPassword }),
+    onSuccess: (r) => {
+      setIssued(r);
+      refresh();
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to reset password"),
   });
 
   const toggleActive = useMutation({
@@ -140,8 +151,6 @@ export function UsersRolesSection() {
       program: u.program || NONE,
       node_type: u.node_type || NONE,
       node_name: u.node_name ?? "",
-      password: "",
-      active: u.active,
     });
     setOpen(true);
   };
@@ -166,7 +175,7 @@ export function UsersRolesSection() {
               <TableHead>Role</TableHead>
               <TableHead>District / Program</TableHead>
               <TableHead>Node</TableHead>
-              <TableHead>Active</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -200,10 +209,18 @@ export function UsersRolesSection() {
                 <TableCell className="text-xs text-muted-foreground">
                   {[u.node_type, u.node_name].filter(Boolean).join(" · ") || "—"}
                 </TableCell>
-                <TableCell className="text-xs">{u.active ? "Yes" : "No"}</TableCell>
+                <TableCell className="text-xs">{statusOf(u)}</TableCell>
                 <TableCell className="text-right whitespace-nowrap">
                   <Button variant="ghost" size="sm" onClick={() => openEdit(u)}>
                     Edit
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={resetPassword.isPending}
+                    onClick={() => resetPassword.mutate(u.email)}
+                  >
+                    Reset password
                   </Button>
                   <Button
                     variant="ghost"
@@ -300,24 +317,11 @@ export function UsersRolesSection() {
                 className="mt-1"
               />
             </div>
-            <div className="sm:col-span-2">
-              <Label htmlFor="u-pass" className="text-xs">Password</Label>
-              <Input
-                id="u-pass"
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                className="mt-1"
-                placeholder={editingEmail ? "Leave blank to keep existing password" : "Optional"}
-              />
-            </div>
-            <div className="sm:col-span-2 flex items-center gap-2">
-              <Switch
-                id="u-active"
-                checked={form.active}
-                onCheckedChange={(v) => setForm({ ...form, active: v })}
-              />
-              <Label htmlFor="u-active" className="text-xs">Active</Label>
-            </div>
+            {!editingEmail && (
+              <p className="sm:col-span-2 text-xs text-muted-foreground">
+                A temporary password is generated and shown once. The user sets their own at first sign-in.
+              </p>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
@@ -331,6 +335,39 @@ export function UsersRolesSection() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={!!issued} onOpenChange={(v) => !v && setIssued(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Temporary password</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Send this to <span className="font-mono text-foreground">{issued?.email}</span>. It is shown only once;
+            they will be asked to change it when they sign in.
+          </p>
+          <Input readOnly value={issued?.password ?? ""} className="font-mono" onFocus={(e) => e.currentTarget.select()} />
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                void navigator.clipboard?.writeText(issued?.password ?? "");
+                toast.success("Copied");
+              }}
+            >
+              Copy
+            </Button>
+            <Button onClick={() => setIssued(null)}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Panel>
   );
+}
+
+function statusOf(u: AppUser): string {
+  if (!u.active) return "Inactive";
+  if (u.locked) return "Locked";
+  if (!u.has_password) return "No password";
+  if (u.must_change_password) return "Must change password";
+  return "Active";
 }

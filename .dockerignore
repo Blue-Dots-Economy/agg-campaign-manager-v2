@@ -15,10 +15,10 @@ dist
 
 # Not read by the build. Excluding them keeps them out of the context and stops
 # an edit to one of them invalidating the `COPY . .` layer and rebuilding.
-.lovable
 supabase
 *.md
 sonar-project.properties
+.sonarcloud.properties
 eslint.config.js
 .prettierrc
 .prettierignore
@@ -28,6 +28,5 @@ Dockerfile
 campaign-manager
 global-overrides.yaml
 
-# NOT ignored on purpose: `.env`. The client bundle's VITE_SUPABASE_* values are
-# read from it at build time (see Dockerfile). It never reaches the runtime stage,
-# which receives only .output.
+# Secrets come from the environment at runtime, never from a file in the image.
+.env

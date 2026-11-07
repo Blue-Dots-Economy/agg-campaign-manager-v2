@@ -5,6 +5,8 @@ import { Star, Pencil, Check } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { fetchNorthStar, saveNorthStar } from "@/lib/north-star.functions";
+import { useAuth } from "@/auth/context";
+import { canEditShared } from "@/auth/roles";
 import { cn } from "@/lib/utils";
 
 type Def = { key: string; label: string; num: string; den: string };
@@ -26,6 +28,8 @@ export function NorthStarMetrics({ program, m }: { program: string; m: Record<st
   const qc = useQueryClient();
   const fetchFn = useServerFn(fetchNorthStar);
   const saveFn = useServerFn(saveNorthStar);
+  const { session } = useAuth();
+  const canEdit = canEditShared(session?.role);
   const [edit, setEdit] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
 
@@ -68,9 +72,11 @@ export function NorthStarMetrics({ program, m }: { program: string; m: Record<st
       <PopoverContent align="end" className="w-[400px] p-0">
         <div className="flex items-center justify-between border-b border-border px-3 py-2">
           <span className="text-sm font-semibold">North Star Metrics</span>
-          <button type="button" onClick={() => setEdit((e) => !e)} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-            {edit ? <><Check className="h-3.5 w-3.5" /> Done</> : <><Pencil className="h-3 w-3" /> Edit</>}
-          </button>
+          {canEdit && (
+            <button type="button" onClick={() => setEdit((e) => !e)} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+              {edit ? <><Check className="h-3.5 w-3.5" /> Done</> : <><Pencil className="h-3 w-3" /> Edit</>}
+            </button>
+          )}
         </div>
         <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-4 gap-y-2 px-3 py-3 text-xs">
           <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Metric</div>

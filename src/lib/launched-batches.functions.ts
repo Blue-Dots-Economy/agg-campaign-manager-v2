@@ -2,12 +2,12 @@
 // The staging export joins on batch_id to stamp campaign columns onto rows.
 
 import { createServerFn } from "@tanstack/react-start";
-import { sbFor } from "./db.server";
-
-// Per-request client: sbFor() picks the database for the current actor.
-function sb() {
-  return sbFor();
-}
+import { desc, eq, sql } from "drizzle-orm";
+import { requireRole } from "@/auth/middleware";
+import { FN_ROLES } from "@/auth/roles";
+import { getDb } from "@/server/db/client.server";
+import { sqlNamed } from "@/server/db/columns";
+import { launchedBatches, launchedBatchInputs } from "@/server/db/schema";
 
 function normalizePhone(v: any): string {
   const digits = String(v ?? "").replace(/\D+/g, "");
@@ -45,6 +45,7 @@ export interface LaunchedBatchRow {
 }
 
 export const recordLaunchedBatch = createServerFn({ method: "POST" })
+  .middleware([requireRole(FN_ROLES.launch)])
   .inputValidator(
     (d: {
       batchId: string;
@@ -66,27 +67,26 @@ export const recordLaunchedBatch = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data }) => {
-    const c = sb();
+    const db = getDb();
     const payload = {
-      batch_id: data.batchId,
+      batchId: data.batchId,
       program: data.program,
-      agent_id: data.agentId ?? null,
-      agent_name: data.agentName ?? null,
-      batch_name: data.batchName ?? null,
-      campaign_day: data.campaignDay ?? null,
-      campaign_date: data.campaignDate ?? null,
-      campaign_type: data.campaignType ?? null,
+      agentId: data.agentId ?? null,
+      agentName: data.agentName ?? null,
+      batchName: data.batchName ?? null,
+      campaignDay: data.campaignDay ?? null,
+      campaignDate: data.campaignDate ?? null,
+      campaignType: data.campaignType ?? null,
       language: data.language ?? null,
-      city_campaign: data.cityCampaign ?? null,
+      cityCampaign: data.cityCampaign ?? null,
       region: data.region ?? null,
-      updated_at: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
-    const { data: row, error } = await c
-      .from("launched_batches")
-      .upsert(payload, { onConflict: "batch_id" })
-      .select()
-      .single();
-    if (error) throw new Error(error.message);
+    const [row] = await db
+      .insert(launchedBatches)
+      .values(payload)
+      .onConflictDoUpdate({ target: launchedBatches.batchId, set: payload })
+      .returning(sqlNamed(launchedBatches));
 
     if (Array.isArray(data.inputRows) && data.inputRows.length > 0) {
       const rows = data.inputRows
@@ -96,22 +96,34 @@ export const recordLaunchedBatch = createServerFn({ method: "POST" })
           );
           if (!phone) return null;
           return {
-            batch_id: data.batchId,
+            batchId: data.batchId,
             program: data.program,
-            normalized_phone: phone,
-            contact_name: pickRaw(r, ["contact_name", "name", "seeker_name", "candidate_name"]),
+            normalizedPhone: phone,
+            contactName: pickRaw(r, ["contact_name", "name", "seeker_name", "candidate_name"]),
             recommendations: pickRaw(r, ["recommendations", "jobs_recommended", "recommended_jobs"]),
-            user_intent: pickRaw(r, ["user_intent", "intent"]),
+            userIntent: pickRaw(r, ["user_intent", "intent"]),
             raw: r,
-            updated_at: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
           };
         })
-        .filter(Boolean);
-      if (rows.length > 0) {
-        const { error: inputError } = await sb()
-          .from("launched_batch_inputs")
-          .upsert(rows as any[], { onConflict: "batch_id,normalized_phone" });
-        if (inputError) throw new Error(inputError.message);
+        .filter((r): r is NonNullable<typeof r> => r !== null);
+      // One upsert cannot repeat a key.
+      const unique = [...new Map(rows.map((r) => [r.normalizedPhone, r])).values()];
+      if (unique.length > 0) {
+        await db
+          .insert(launchedBatchInputs)
+          .values(unique)
+          .onConflictDoUpdate({
+            target: [launchedBatchInputs.batchId, launchedBatchInputs.normalizedPhone],
+            set: {
+              program: sql`excluded.program`,
+              contactName: sql`excluded.contact_name`,
+              recommendations: sql`excluded.recommendations`,
+              userIntent: sql`excluded.user_intent`,
+              raw: sql`excluded.raw`,
+              updatedAt: sql`excluded.updated_at`,
+            },
+          });
       }
     }
 
@@ -119,21 +131,21 @@ export const recordLaunchedBatch = createServerFn({ method: "POST" })
   });
 
 export const getNextCampaignDay = createServerFn({ method: "GET" })
+  .middleware([requireRole(FN_ROLES.launch)])
   .inputValidator((d: { program: string }) => {
     if (!d.program) throw new Error("program required");
     return d;
   })
   .handler(async ({ data }) => {
-    const c = sb();
-    const { data: rows } = await c
-      .from("launched_batches")
-      .select("campaign_day")
-      .eq("program", data.program)
-      .order("created_at", { ascending: false })
+    const rows = await getDb()
+      .select({ campaign_day: launchedBatches.campaignDay })
+      .from(launchedBatches)
+      .where(eq(launchedBatches.program, data.program))
+      .orderBy(desc(launchedBatches.createdAt))
       .limit(50);
     let maxN = 0;
-    for (const r of rows ?? []) {
-      const m = String((r as any).campaign_day ?? "").match(/(\d+)/);
+    for (const r of rows) {
+      const m = String(r.campaign_day ?? "").match(/(\d+)/);
       if (m) maxN = Math.max(maxN, Number(m[1]));
     }
     return { next: `Day ${maxN + 1}` };

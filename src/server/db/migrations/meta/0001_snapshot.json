@@ -1,0 +1,1788 @@
+{
+  "id": "04f5e5f0-8c46-45c4-bb38-36252cb4a14f",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.app_users": {
+      "name": "app_users",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "district": {
+          "name": "district",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "program": {
+          "name": "program",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "node_type": {
+          "name": "node_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "node_name": {
+          "name": "node_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "active": {
+          "name": "active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "must_change_password": {
+          "name": "must_change_password",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "failed_login_count": {
+          "name": "failed_login_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "locked_until": {
+          "name": "locked_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "app_users_email_key": {
+          "name": "app_users_email_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "app_users_role_check": {
+          "name": "app_users_role_check",
+          "value": "role = ANY (ARRAY['admin'::text, 'jfc'::text, 'owner'::text, 'coordinator'::text, 'ecosystem'::text, 'user'::text])"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.campaign_requests": {
+      "name": "campaign_requests",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "program": {
+          "name": "program",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "agent_id": {
+          "name": "agent_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "agent_name": {
+          "name": "agent_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "batch_name": {
+          "name": "batch_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "campaign_day": {
+          "name": "campaign_day",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "campaign_date": {
+          "name": "campaign_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "campaign_type": {
+          "name": "campaign_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "region": {
+          "name": "region",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "language": {
+          "name": "language",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "city_campaign": {
+          "name": "city_campaign",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "channel": {
+          "name": "channel",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'outbound'"
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cohort_intent": {
+          "name": "cohort_intent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cohort_filters": {
+          "name": "cohort_filters",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contacts": {
+          "name": "contacts",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "contact_count": {
+          "name": "contact_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "schedule": {
+          "name": "schedule",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "concurrency": {
+          "name": "concurrency",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "max_retries": {
+          "name": "max_retries",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "retry_after_hrs": {
+          "name": "retry_after_hrs",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "selected_statuses": {
+          "name": "selected_statuses",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "requested_by": {
+          "name": "requested_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "reviewer_email": {
+          "name": "reviewer_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "decline_reason": {
+          "name": "decline_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "batch_id": {
+          "name": "batch_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.launched_batch_inputs": {
+      "name": "launched_batch_inputs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "batch_id": {
+          "name": "batch_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "program": {
+          "name": "program",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "normalized_phone": {
+          "name": "normalized_phone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "contact_name": {
+          "name": "contact_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "recommendations": {
+          "name": "recommendations",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_intent": {
+          "name": "user_intent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "raw": {
+          "name": "raw",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "launched_batch_inputs_batch_id_normalized_phone_key": {
+          "name": "launched_batch_inputs_batch_id_normalized_phone_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "batch_id",
+            "normalized_phone"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.launched_batches": {
+      "name": "launched_batches",
+      "schema": "",
+      "columns": {
+        "batch_id": {
+          "name": "batch_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "program": {
+          "name": "program",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "agent_id": {
+          "name": "agent_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "agent_name": {
+          "name": "agent_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "batch_name": {
+          "name": "batch_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "campaign_day": {
+          "name": "campaign_day",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "campaign_date": {
+          "name": "campaign_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "campaign_type": {
+          "name": "campaign_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "language": {
+          "name": "language",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "city_campaign": {
+          "name": "city_campaign",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "region": {
+          "name": "region",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.north_star_config": {
+      "name": "north_star_config",
+      "schema": "",
+      "columns": {
+        "program": {
+          "name": "program",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "threshold": {
+          "name": "threshold",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "sort": {
+          "name": "sort",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {
+        "north_star_config_pkey": {
+          "name": "north_star_config_pkey",
+          "columns": [
+            "program",
+            "key"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.program_agents": {
+      "name": "program_agents",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "program": {
+          "name": "program",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "agent_id": {
+          "name": "agent_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'unknown'"
+        },
+        "last_error": {
+          "name": "last_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "program_agents_program_agent_id_key": {
+          "name": "program_agents_program_agent_id_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "program",
+            "agent_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "program_agents_program_check": {
+          "name": "program_agents_program_check",
+          "value": "program = ANY (ARRAY['seekers'::text, 'providers'::text])"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.program_export_targets": {
+      "name": "program_export_targets",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "program": {
+          "name": "program",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sheet_id": {
+          "name": "sheet_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "tab_name": {
+          "name": "tab_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "last_exported_at": {
+          "name": "last_exported_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_error": {
+          "name": "last_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "program_export_targets_program_key": {
+          "name": "program_export_targets_program_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "program"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.program_sync_state": {
+      "name": "program_sync_state",
+      "schema": "",
+      "columns": {
+        "program": {
+          "name": "program",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "last_synced_at": {
+          "name": "last_synced_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "row_count": {
+          "name": "row_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'idle'"
+        },
+        "last_error": {
+          "name": "last_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.purple_dots_calls": {
+      "name": "purple_dots_calls",
+      "schema": "",
+      "columns": {
+        "call_id": {
+          "name": "call_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "call_uuid": {
+          "name": "call_uuid",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "batch_id": {
+          "name": "batch_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "campaign_name": {
+          "name": "campaign_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "agent_id": {
+          "name": "agent_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "agent_name": {
+          "name": "agent_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "persona": {
+          "name": "persona",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "channel": {
+          "name": "channel",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contact_reference_type": {
+          "name": "contact_reference_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contact_reference": {
+          "name": "contact_reference",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "call_date_ist": {
+          "name": "call_date_ist",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "call_datetime_ist": {
+          "name": "call_datetime_ist",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "call_duration_seconds": {
+          "name": "call_duration_seconds",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contact_attempts": {
+          "name": "contact_attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "call_status": {
+          "name": "call_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "call_answered": {
+          "name": "call_answered",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "call_engaged": {
+          "name": "call_engaged",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "call_dropped_abruptly": {
+          "name": "call_dropped_abruptly",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "full_journey_completed": {
+          "name": "full_journey_completed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "abandoned_at_stage": {
+          "name": "abandoned_at_stage",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "callback_requested": {
+          "name": "callback_requested",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "on_behalf_of": {
+          "name": "on_behalf_of",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "demographic_info_shared": {
+          "name": "demographic_info_shared",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "profile_item_id": {
+          "name": "profile_item_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "profile_user_id": {
+          "name": "profile_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "disability_category_mapped": {
+          "name": "disability_category_mapped",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_unsure_disability": {
+          "name": "user_unsure_disability",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_unsure_needs": {
+          "name": "user_unsure_needs",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "solution_option_mapped_categories": {
+          "name": "solution_option_mapped_categories",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "missing_solution_enabler_mapped_categories": {
+          "name": "missing_solution_enabler_mapped_categories",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "solution_option_relevance": {
+          "name": "solution_option_relevance",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "solution_enablers_discussed": {
+          "name": "solution_enablers_discussed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_unsure_solution_options": {
+          "name": "user_unsure_solution_options",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "update_profile_api_triggered": {
+          "name": "update_profile_api_triggered",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "update_profile_api_successful": {
+          "name": "update_profile_api_successful",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "matching_providers_found": {
+          "name": "matching_providers_found",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "connect_provider_api_triggered": {
+          "name": "connect_provider_api_triggered",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "connect_provider_api_successful": {
+          "name": "connect_provider_api_successful",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "providers_connected": {
+          "name": "providers_connected",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "call_value_score": {
+          "name": "call_value_score",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "drop_reason": {
+          "name": "drop_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tools_used": {
+          "name": "tools_used",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "test_flag": {
+          "name": "test_flag",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "loaded_at": {
+          "name": "loaded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "contact_id": {
+          "name": "contact_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "sheet_call_id": {
+          "name": "sheet_call_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "purple_dots_calls_agent_idx": {
+          "name": "purple_dots_calls_agent_idx",
+          "columns": [
+            {
+              "expression": "agent_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "purple_dots_calls_contact_idx": {
+          "name": "purple_dots_calls_contact_idx",
+          "columns": [
+            {
+              "expression": "contact_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "purple_dots_calls_date_idx": {
+          "name": "purple_dots_calls_date_idx",
+          "columns": [
+            {
+              "expression": "call_date_ist",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "date_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "purple_dots_calls_profile_idx": {
+          "name": "purple_dots_calls_profile_idx",
+          "columns": [
+            {
+              "expression": "profile_item_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "purple_dots_calls_sheet_idx": {
+          "name": "purple_dots_calls_sheet_idx",
+          "columns": [
+            {
+              "expression": "sheet_call_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.purple_dots_connections": {
+      "name": "purple_dots_connections",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "call_id": {
+          "name": "call_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "seeker_item_id": {
+          "name": "seeker_item_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "provider_item_id": {
+          "name": "provider_item_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "acting_as_user_id": {
+          "name": "acting_as_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "provider_instance_url": {
+          "name": "provider_instance_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "consent_acknowledged": {
+          "name": "consent_acknowledged",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "consent_version": {
+          "name": "consent_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "loaded_at": {
+          "name": "loaded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "purple_dots_connections_provider_idx": {
+          "name": "purple_dots_connections_provider_idx",
+          "columns": [
+            {
+              "expression": "provider_item_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "purple_dots_connections_seeker_idx": {
+          "name": "purple_dots_connections_seeker_idx",
+          "columns": [
+            {
+              "expression": "seeker_item_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last",
+              "opclass": "text_ops"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "purple_dots_connections_call_id_fkey": {
+          "name": "purple_dots_connections_call_id_fkey",
+          "tableFrom": "purple_dots_connections",
+          "tableTo": "purple_dots_calls",
+          "columnsFrom": [
+            "call_id"
+          ],
+          "columnsTo": [
+            "call_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "purple_dots_connections_call_id_provider_item_id_key": {
+          "name": "purple_dots_connections_call_id_provider_item_id_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "call_id",
+            "provider_item_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.reviewers": {
+      "name": "reviewers",
+      "schema": "",
+      "columns": {
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "added_at": {
+          "name": "added_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.sheet_connections": {
+      "name": "sheet_connections",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "program": {
+          "name": "program",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sheet_id": {
+          "name": "sheet_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tab_name": {
+          "name": "tab_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'unknown'"
+        },
+        "row_count": {
+          "name": "row_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_synced_at": {
+          "name": "last_synced_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "last_error": {
+          "name": "last_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "channel": {
+          "name": "channel",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'outbound'"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "sheet_connections_program_check": {
+          "name": "sheet_connections_program_check",
+          "value": "program = ANY (ARRAY['seekers'::text, 'providers'::text])"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.transcript_reviews": {
+      "name": "transcript_reviews",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "job_id": {
+          "name": "job_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "call_id": {
+          "name": "call_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reviewer_name": {
+          "name": "reviewer_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reviewer_email": {
+          "name": "reviewer_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "company_name": {
+          "name": "company_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "campaign_day": {
+          "name": "campaign_day",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "campaign_type": {
+          "name": "campaign_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "language": {
+          "name": "language",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "city_campaign": {
+          "name": "city_campaign",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contact_phone": {
+          "name": "contact_phone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "call_outcome": {
+          "name": "call_outcome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "job_status_in_master": {
+          "name": "job_status_in_master",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "review_type": {
+          "name": "review_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "quantitative_issues": {
+          "name": "quantitative_issues",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "turn_flags": {
+          "name": "turn_flags",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "overall_rating": {
+          "name": "overall_rating",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reviewer_notes": {
+          "name": "reviewer_notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "summary_match": {
+          "name": "summary_match",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "job_status_correct": {
+          "name": "job_status_correct",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "output_fields_accurate": {
+          "name": "output_fields_accurate",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dataset": {
+          "name": "dataset",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.up_seekers_upload": {
+      "name": "up_seekers_upload",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "smallint",
+          "primaryKey": true,
+          "notNull": true,
+          "default": 1
+        },
+        "csv": {
+          "name": "csv",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "file_name": {
+          "name": "file_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "row_count": {
+          "name": "row_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "uploaded_at": {
+          "name": "uploaded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "up_seekers_upload_single_row": {
+          "name": "up_seekers_upload_single_row",
+          "value": "id = 1"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {
+    "public.call_rows": {
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "program": {
+          "name": "program",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "connection_id": {
+          "name": "connection_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "call_id": {
+          "name": "call_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "campaign_day": {
+          "name": "campaign_day",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "intent_score": {
+          "name": "intent_score",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "data": {
+          "name": "data",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "synced_at": {
+          "name": "synced_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "call_answered": {
+          "name": "call_answered",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "call_engaged": {
+          "name": "call_engaged",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "applied_to_job": {
+          "name": "applied_to_job",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "call_status": {
+          "name": "call_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "job_status": {
+          "name": "job_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "new_job_posted": {
+          "name": "new_job_posted",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "talent_insights_shown": {
+          "name": "talent_insights_shown",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "phases_reached": {
+          "name": "phases_reached",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "drop_reason": {
+          "name": "drop_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "call_outcome": {
+          "name": "call_outcome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "city_campaign": {
+          "name": "city_campaign",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "campaign_date": {
+          "name": "campaign_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "campaign_type": {
+          "name": "campaign_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "language": {
+          "name": "language",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "phone": {
+          "name": "phone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "call_duration_seconds": {
+          "name": "call_duration_seconds",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "applications_count": {
+          "name": "applications_count",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tried_to_apply": {
+          "name": "tried_to_apply",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "channel": {
+          "name": "channel",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "row_hash": {
+          "name": "row_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "definition": "SELECT md5(COALESCE(NULLIF(call_id, ''::text), NULLIF(call_uuid, ''::text), call_datetime_ist::text))::uuid AS id, CASE WHEN lower(COALESCE(persona, ''::text)) = ANY (ARRAY['provider'::text, 'providers'::text]) THEN 'providers'::text ELSE 'seekers'::text END AS program, NULL::uuid AS connection_id, COALESCE(NULLIF(call_id, ''::text), NULLIF(call_uuid, ''::text), ''::text) AS call_id, COALESCE(call_date_ist::text, ''::text) AS campaign_day, call_value_score AS intent_score, jsonb_build_object('call_id', call_id, 'phone', COALESCE(NULLIF(contact_id, ''::text), call_id), 'campaign_day', call_date_ist::text, 'campaign_date', call_date_ist::text, 'campaign_type', campaign_name, 'city_campaign', NULL::text, 'language', NULL::text, 'call_language', NULL::text, 'call_datetime_ist', call_datetime_ist, 'call_duration_seconds', call_duration_seconds, 'call_answered', call_answered, 'call_engaged', call_engaged, 'call_outcome', call_status, 'drop_reason', NULLIF(btrim(drop_reason), ''::text), 'counselled', solution_enablers_discussed, 'applied_to_job', COALESCE(providers_connected, 0) > 0, 'applications_count', providers_connected, 'tried_to_apply', connect_provider_api_triggered, 'jobs_recommended', matching_providers_found, 'jobs_shown', matching_providers_found, 'jobs_applied', providers_connected, 'jobs_failed_to_apply', NULL::text, 'interview_scheduled', NULL::text, 'Intent Score', call_value_score, 'Intent Score Reasoning', NULL::text, 'primary_topic', NULL::text, 'seeker_name', NULL::text, 'user_intent', NULL::text, 'final_summary', NULL::text, 'call_transcript', NULL::text, 'call_recording_url', NULL::text, 'raw', to_jsonb(c.*)) AS data, COALESCE(loaded_at, now()) AS synced_at, call_answered, call_engaged, COALESCE(providers_connected, 0) > 0 AS applied_to_job, call_status, NULL::text AS job_status, NULL::text AS new_job_posted, NULL::text AS talent_insights_shown, pd_norm_stage(abandoned_at_stage) AS phases_reached, NULLIF(btrim(drop_reason), ''::text) AS drop_reason, call_status AS call_outcome, NULL::text AS city_campaign, call_date_ist::text AS campaign_date, COALESCE(NULLIF(campaign_name, ''::text), 'Unattributed'::text) AS campaign_type, NULL::text AS language, COALESCE(NULLIF(contact_id, ''::text), call_id) AS phone, call_duration_seconds, providers_connected::numeric AS applications_count, connect_provider_api_triggered AS tried_to_apply, lower(COALESCE(NULLIF(channel, ''::text), 'outbound'::text)) AS channel, md5(to_jsonb(c.*)::text) AS row_hash FROM purple_dots_calls c WHERE COALESCE(test_flag, false) = false",
+      "name": "call_rows",
+      "schema": "public",
+      "isExisting": false,
+      "materialized": false
+    }
+  },
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

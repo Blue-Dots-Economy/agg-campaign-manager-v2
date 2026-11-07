@@ -38,18 +38,20 @@ RUN --mount=type=cache,target=/root/.bun/install/cache \
 
 COPY . .
 
-# VITE_SUPABASE_* are inlined into the client bundle at build time, and come from
-# the tracked .env (see .dockerignore, which deliberately does not exclude it).
-# They are publishable-key values meant to ship to browsers, but the key role is
-# not verified here. Per-environment values would need build args; not added yet.
 ENV NITRO_PRESET=node-server
 RUN bun run build
+
+# The migrator, bundled to one plain-Node file (drizzle-orm and pg inlined) so the
+# runtime image can run migrations without bun or the TypeScript source. It finds
+# its SQL at ./migrations relative to itself, so the folder is copied next to it.
+RUN bun build src/server/db/migrate.ts --target=node --outfile=/app/migrate/migrate.mjs \
+ && cp -R src/server/db/migrations /app/migrate/migrations
 
 
 FROM ${RUNTIME_IMAGE} AS runtime
 WORKDIR /app
 
-# Server-side secrets (SUPABASE_SERVICE_ROLE_KEY, PURPLE_SUPABASE_SERVICE_ROLE_KEY, RAYA_API_KEY, ...) are read from
+# Server-side secrets (DATABASE_URL, SESSION_SECRET, CRON_SECRET, RAYA_API_KEY, ...) are read from
 # the environment at RUNTIME and are never baked into the image.
 ENV NODE_ENV=production \
     PORT=3000 \
@@ -58,6 +60,10 @@ ENV NODE_ENV=production \
 # Only the build output: Nitro traces its own runtime dependencies into
 # .output/server/node_modules, so no node_modules, source or toolchain ships.
 COPY --from=build --chown=node:node /app/.output ./.output
+
+# Migrations (SQL + meta/_journal.json) and the bundled migrator, for the
+# deployment's migrate Job: `node migrate/migrate.mjs` with DATABASE_URL.
+COPY --from=build --chown=node:node /app/migrate ./migrate
 
 # The Node images ship a non-root `node` user (uid 1000).
 USER node

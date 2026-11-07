@@ -12,7 +12,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ScheduleEditor, type ScheduleState } from "@/components/ScheduleEditor";
-import { useAuth } from "@/auth/context";
 import { useConcurrencyUsage, useRefreshConcurrency } from "@/hooks/useConcurrencyUsage";
 import {
   listCampaignRequests,
@@ -173,7 +172,6 @@ function CampaignRequestsPage() {
 }
 
 function RequestCard({ req, onChanged }: { req: RequestRow; onChanged: () => void }) {
-  const { session } = useAuth();
   const [open, setOpen] = useState(false);
   const [schedule, setSchedule] = useState<ScheduleState>(() => toScheduleState(req.schedule));
   const [concurrency, setConcurrency] = useState<number>(req.concurrency ?? 5);
@@ -249,7 +247,7 @@ function RequestCard({ req, onChanged }: { req: RequestRow; onChanged: () => voi
       },
     });
     await setStatusFn({
-      data: { id: req.id, status: "approved", reviewer_email: session?.email ?? "", batch_id: id },
+      data: { id: req.id, status: "approved", batch_id: id },
     });
     onChanged();
     refreshUsage();
@@ -337,7 +335,6 @@ function RequestCard({ req, onChanged }: { req: RequestRow; onChanged: () => voi
         data: {
           id: req.id,
           status: "declined",
-          reviewer_email: session?.email ?? "",
           decline_reason: reason,
         },
       });

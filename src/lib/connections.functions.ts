@@ -1,6 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
+import { and, asc, eq } from "drizzle-orm";
 import type { CallRow } from "@/programs/data";
 import { type ProgramId } from "@/programs/registry";
+import { requireRole } from "@/auth/middleware";
+import { FN_ROLES } from "@/auth/roles";
+import { getDb } from "@/server/db/client.server";
+import { fromSqlNames, sqlNamed } from "@/server/db/columns";
+import { sheetConnections } from "@/server/db/schema";
 
 export interface SheetConnection {
   id: string;
@@ -16,72 +22,75 @@ export interface SheetConnection {
   created_at: string;
 }
 
-async function getServerSupabase() {
-  const { sbFor } = await import("@/lib/db.server");
-  return sbFor();
+const asConnections = (rows: unknown[]) => rows as SheetConnection[];
+
+function enabledConnections(program: ProgramId) {
+  return getDb()
+    .select(sqlNamed(sheetConnections))
+    .from(sheetConnections)
+    .where(and(eq(sheetConnections.program, program), eq(sheetConnections.enabled, true)))
+    .then(asConnections);
+}
+
+async function patchConnection(id: string, patch: Record<string, unknown>) {
+  await getDb().update(sheetConnections).set(fromSqlNames(sheetConnections, patch)).where(eq(sheetConnections.id, id));
 }
 
 export const listConnections = createServerFn({ method: "GET" })
+  .middleware([requireRole(FN_ROLES.dashboard)])
   .inputValidator((d: { program: ProgramId }) => d)
   .handler(async ({ data }) => {
-    const sb = await getServerSupabase();
-    const { data: rows, error } = await sb
-      .from("sheet_connections")
-      .select("*")
-      .eq("program", data.program)
-      .order("created_at", { ascending: true });
-    if (error) throw new Error(error.message);
-    return (rows ?? []) as SheetConnection[];
+    const rows = await getDb()
+      .select(sqlNamed(sheetConnections))
+      .from(sheetConnections)
+      .where(eq(sheetConnections.program, data.program))
+      .orderBy(asc(sheetConnections.createdAt));
+    return asConnections(rows);
   });
 
 export const createConnection = createServerFn({ method: "POST" })
+  .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator((d: { program: ProgramId; name: string; sheet_id: string; tab_name?: string }) => d)
   .handler(async ({ data }) => {
-    const sb = await getServerSupabase();
-    const { data: row, error } = await sb
-      .from("sheet_connections")
-      .insert({
+    const [row] = await getDb()
+      .insert(sheetConnections)
+      .values({
         program: data.program,
         name: data.name,
-        sheet_id: data.sheet_id,
-        tab_name: data.tab_name || null,
+        sheetId: data.sheet_id,
+        tabName: data.tab_name || null,
         enabled: true,
         status: "unknown",
       })
-      .select()
-      .single();
-    if (error) throw new Error(error.message);
-    return row as SheetConnection;
+      .returning(sqlNamed(sheetConnections));
+    return row as unknown as SheetConnection;
   });
 
 export const updateConnection = createServerFn({ method: "POST" })
+  .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator((d: { id: string; enabled?: boolean; name?: string; tab_name?: string | null }) => d)
   .handler(async ({ data }) => {
-    const sb = await getServerSupabase();
     const patch: Record<string, unknown> = {};
     if (data.enabled !== undefined) patch.enabled = data.enabled;
     if (data.name !== undefined) patch.name = data.name;
     if (data.tab_name !== undefined) patch.tab_name = data.tab_name;
-    const { data: row, error } = await sb
-      .from("sheet_connections")
-      .update(patch)
-      .eq("id", data.id)
-      .select()
-      .single();
-    if (error) throw new Error(error.message);
-    return row as SheetConnection;
+    const db = getDb();
+    if (Object.keys(patch).length > 0) await patchConnection(data.id, patch);
+    const [row] = await db.select(sqlNamed(sheetConnections)).from(sheetConnections).where(eq(sheetConnections.id, data.id));
+    if (!row) throw new Error("Connection not found");
+    return row as unknown as SheetConnection;
   });
 
 export const deleteConnection = createServerFn({ method: "POST" })
+  .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator((d: { id: string }) => d)
   .handler(async ({ data }) => {
-    const sb = await getServerSupabase();
-    const { error } = await sb.from("sheet_connections").delete().eq("id", data.id);
-    if (error) throw new Error(error.message);
+    await getDb().delete(sheetConnections).where(eq(sheetConnections.id, data.id));
     return { ok: true };
   });
 
 export const listSheetTabsFn = createServerFn({ method: "POST" })
+  .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator((d: { sheet_id: string }) => d)
   .handler(async ({ data }) => {
     const { listSheetTabs } = await import("./sheets.server");
@@ -94,13 +103,13 @@ export const listSheetTabsFn = createServerFn({ method: "POST" })
   });
 
 export const testConnection = createServerFn({ method: "POST" })
+  .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator((d: { id?: string; sheet_id: string; tab_name?: string }) => d)
   .handler(async ({ data }) => {
     const { readSheet } = await import("./sheets.server");
     try {
       const result = await readSheet(data.sheet_id, data.tab_name);
       if (data.id) {
-        const sb = await getServerSupabase();
         const patch: Record<string, unknown> = {
           status: "connected",
           row_count: result.rowCount,
@@ -110,7 +119,7 @@ export const testConnection = createServerFn({ method: "POST" })
         if (result.effectiveTab && result.effectiveTab !== (data.tab_name ?? "")) {
           patch.tab_name = result.effectiveTab;
         }
-        await sb.from("sheet_connections").update(patch).eq("id", data.id);
+        await patchConnection(data.id, patch);
       }
       return {
         ok: true as const,
@@ -121,11 +130,7 @@ export const testConnection = createServerFn({ method: "POST" })
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (data.id) {
-        const sb = await getServerSupabase();
-        await sb
-          .from("sheet_connections")
-          .update({ status: "error", last_error: msg, last_synced_at: new Date().toISOString() })
-          .eq("id", data.id);
+        await patchConnection(data.id, { status: "error", last_error: msg, last_synced_at: new Date().toISOString() });
       }
       return { ok: false as const, error: msg };
     }
@@ -133,15 +138,10 @@ export const testConnection = createServerFn({ method: "POST" })
 
 /** Re-validate every enabled connection for a program and refresh stored status. */
 export const revalidateConnections = createServerFn({ method: "POST" })
+  .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator((d: { program: ProgramId }) => d)
   .handler(async ({ data }) => {
-    const sb = await getServerSupabase();
-    const { data: rows } = await sb
-      .from("sheet_connections")
-      .select("*")
-      .eq("program", data.program)
-      .eq("enabled", true);
-    const list = (rows ?? []) as SheetConnection[];
+    const list = await enabledConnections(data.program);
     if (list.length === 0 || !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
       return { checked: 0 };
     }
@@ -158,13 +158,10 @@ export const revalidateConnections = createServerFn({ method: "POST" })
         if (result.effectiveTab && result.effectiveTab !== (c.tab_name ?? "")) {
           patch.tab_name = result.effectiveTab;
         }
-        await sb.from("sheet_connections").update(patch).eq("id", c.id);
+        await patchConnection(c.id, patch);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        await sb
-          .from("sheet_connections")
-          .update({ status: "error", last_error: msg, last_synced_at: new Date().toISOString() })
-          .eq("id", c.id);
+        await patchConnection(c.id, { status: "error", last_error: msg, last_synced_at: new Date().toISOString() });
       }
     }
     return { checked: list.length };
@@ -260,15 +257,10 @@ function mapRow(headers: string[], values: string[]): CallRow {
 }
 
 export const getCallDetailFn = createServerFn({ method: "POST" })
+  .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator((d: { program: ProgramId; call_id: string }) => d)
   .handler(async ({ data }) => {
-    const sb = await getServerSupabase();
-    const { data: conns } = await sb
-      .from("sheet_connections")
-      .select("*")
-      .eq("program", data.program)
-      .eq("enabled", true);
-    const list = (conns ?? []) as SheetConnection[];
+    const list = await enabledConnections(data.program);
     if (!process.env.GOOGLE_SERVICE_ACCOUNT_JSON || list.length === 0) {
       return { ok: false as const, error: "No connection" };
     }
@@ -285,16 +277,10 @@ export const getCallDetailFn = createServerFn({ method: "POST" })
   });
 
 export const fetchProgramRows = createServerFn({ method: "GET" })
+  .middleware([requireRole(FN_ROLES.dashboard)])
   .inputValidator((d: { program: ProgramId }) => d)
   .handler(async ({ data }) => {
-    const sb = await getServerSupabase();
-    const { data: conns, error } = await sb
-      .from("sheet_connections")
-      .select("*")
-      .eq("program", data.program)
-      .eq("enabled", true);
-    if (error) throw new Error(error.message);
-    const list = (conns ?? []) as SheetConnection[];
+    const list = await enabledConnections(data.program);
 
     if (!process.env.GOOGLE_SERVICE_ACCOUNT_JSON || list.length === 0) {
       return {
@@ -328,14 +314,11 @@ export const fetchProgramRows = createServerFn({ method: "GET" })
         if (effectiveTab && effectiveTab !== (c.tab_name ?? "")) {
           patch.tab_name = effectiveTab;
         }
-        await sb.from("sheet_connections").update(patch).eq("id", c.id);
+        await patchConnection(c.id, patch);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         errors.push({ id: c.id, name: c.name, message: msg });
-        await sb
-          .from("sheet_connections")
-          .update({ status: "error", last_error: msg, last_synced_at: new Date().toISOString() })
-          .eq("id", c.id);
+        await patchConnection(c.id, { status: "error", last_error: msg, last_synced_at: new Date().toISOString() });
       }
     }
 

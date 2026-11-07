@@ -1,5 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
+import { asc, eq } from "drizzle-orm";
 import { type ProgramId } from "@/programs/registry";
+import { requireRole } from "@/auth/middleware";
+import { FN_ROLES } from "@/auth/roles";
+import { getDb } from "@/server/db/client.server";
+import { programAgents } from "@/server/db/schema";
 import { rayaFetch, RayaApiError } from "./raya-api";
 
 export interface ProgramAgent {
@@ -12,10 +17,15 @@ export interface ProgramAgent {
   created_at: string;
 }
 
-async function sb() {
-  const { sbFor } = await import("@/lib/db.server");
-  return sbFor();
-}
+const columns = {
+  id: programAgents.id,
+  program: programAgents.program,
+  agent_id: programAgents.agentId,
+  name: programAgents.name,
+  status: programAgents.status,
+  last_error: programAgents.lastError,
+  created_at: programAgents.createdAt,
+};
 
 async function rayaGetAgent(agentId: string): Promise<{ ok: true; name: string; raw: any } | { ok: false; error: string }> {
   try {
@@ -30,6 +40,7 @@ async function rayaGetAgent(agentId: string): Promise<{ ok: true; name: string; 
 }
 
 export const loadAgent = createServerFn({ method: "POST" })
+  .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator((d: { agentId: string }) => {
     if (!d.agentId?.trim()) throw new Error("agentId required");
     return d;
@@ -37,17 +48,19 @@ export const loadAgent = createServerFn({ method: "POST" })
   .handler(async ({ data }) => rayaGetAgent(data.agentId.trim()));
 
 export const listProgramAgents = createServerFn({ method: "GET" })
+  .middleware([requireRole(FN_ROLES.requestCampaign)])
   .inputValidator((d: { program?: ProgramId }) => d)
   .handler(async ({ data }) => {
-    const c = await sb();
-    let q = c.from("program_agents").select("*").order("created_at", { ascending: true });
-    if (data.program) q = q.eq("program", data.program);
-    const { data: rows, error } = await q;
-    if (error) throw new Error(error.message);
-    return (rows ?? []) as ProgramAgent[];
+    const rows = await getDb()
+      .select(columns)
+      .from(programAgents)
+      .where(data.program ? eq(programAgents.program, data.program) : undefined)
+      .orderBy(asc(programAgents.createdAt));
+    return rows as ProgramAgent[];
   });
 
 export const createProgramAgent = createServerFn({ method: "POST" })
+  .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator((d: { program: ProgramId; agentId: string; name?: string }) => {
     if (!d.program) throw new Error("program required");
     if (!d.agentId?.trim()) throw new Error("agentId required");
@@ -59,55 +72,38 @@ export const createProgramAgent = createServerFn({ method: "POST" })
     const last_error = fetched.ok ? null : fetched.error;
     const name = (data.name?.trim()) || (fetched.ok ? fetched.name : data.agentId.trim());
 
-    const c = await sb();
-    const { data: row, error } = await c
-      .from("program_agents")
-      .upsert(
-        {
-          program: data.program,
-          agent_id: data.agentId.trim(),
-          name,
-          status,
-          last_error,
-        },
-        { onConflict: "program,agent_id" },
-      )
-      .select()
-      .single();
-    if (error) throw new Error(error.message);
+    const values = { program: data.program, agentId: data.agentId.trim(), name, status, lastError: last_error };
+    const [row] = await getDb()
+      .insert(programAgents)
+      .values(values)
+      .onConflictDoUpdate({ target: [programAgents.program, programAgents.agentId], set: values })
+      .returning(columns);
     return { ok: fetched.ok, row: row as ProgramAgent, error: fetched.ok ? null : fetched.error };
   });
 
 export const refreshProgramAgent = createServerFn({ method: "POST" })
+  .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator((d: { id: string }) => d)
   .handler(async ({ data }) => {
-    const c = await sb();
-    const { data: existing, error: e1 } = await c
-      .from("program_agents")
-      .select("*")
-      .eq("id", data.id)
-      .single();
-    if (e1) throw new Error(e1.message);
-    const row = existing as ProgramAgent;
+    const db = getDb();
+    const [row] = await db.select(columns).from(programAgents).where(eq(programAgents.id, data.id));
+    if (!row) throw new Error("Agent not found");
     const fetched = await rayaGetAgent(row.agent_id);
     const patch = fetched.ok
-      ? { status: "loaded", last_error: null, name: row.name || fetched.name }
-      : { status: "error", last_error: fetched.error };
-    const { data: updated, error } = await c
-      .from("program_agents")
-      .update(patch)
-      .eq("id", data.id)
-      .select()
-      .single();
-    if (error) throw new Error(error.message);
+      ? { status: "loaded", lastError: null, name: row.name || fetched.name }
+      : { status: "error", lastError: fetched.error };
+    const [updated] = await db
+      .update(programAgents)
+      .set(patch)
+      .where(eq(programAgents.id, data.id))
+      .returning(columns);
     return { ok: fetched.ok, row: updated as ProgramAgent, error: fetched.ok ? null : fetched.error };
   });
 
 export const deleteProgramAgent = createServerFn({ method: "POST" })
+  .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator((d: { id: string }) => d)
   .handler(async ({ data }) => {
-    const c = await sb();
-    const { error } = await c.from("program_agents").delete().eq("id", data.id);
-    if (error) throw new Error(error.message);
+    await getDb().delete(programAgents).where(eq(programAgents.id, data.id));
     return { ok: true };
   });

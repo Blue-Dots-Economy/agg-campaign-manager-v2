@@ -3,7 +3,12 @@
 // sheet configured in program_export_targets.
 
 import { createServerFn } from "@tanstack/react-start";
-import { sbFor } from "./db.server";
+import { desc, eq } from "drizzle-orm";
+import { requireRole } from "@/auth/middleware";
+import { FN_ROLES } from "@/auth/roles";
+import { getDb } from "@/server/db/client.server";
+import { sqlNamed } from "@/server/db/columns";
+import { launchedBatchInputs, launchedBatches, programExportTargets, sheetConnections } from "@/server/db/schema";
 import { delay, rayaFetch } from "./raya-api";
 import {
   appendStagingRows,
@@ -14,9 +19,19 @@ import {
 } from "./sheets.server";
 import { registry, type ProgramId } from "@/programs/registry";
 
-// Per-request client: sbFor() picks the database for the current actor.
-function sb() {
-  return sbFor();
+async function exportTarget(program: string): Promise<ExportTarget | null> {
+  const [row] = await getDb()
+    .select(sqlNamed(programExportTargets))
+    .from(programExportTargets)
+    .where(eq(programExportTargets.program, program))
+    .limit(1);
+  return (row ?? null) as ExportTarget | null;
+}
+
+async function masterSheets() {
+  return getDb()
+    .select({ sheet_id: sheetConnections.sheetId, name: sheetConnections.name, program: sheetConnections.program })
+    .from(sheetConnections);
 }
 
 export interface ExportTarget {
@@ -41,22 +56,16 @@ function parseSheetId(input: string): string {
 
 // ---------- target read ----------
 export const getExportTarget = createServerFn({ method: "GET" })
+  .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator((d: { program: ProgramId }) => {
     if (!d.program) throw new Error("program required");
     return d;
   })
-  .handler(async ({ data }) => {
-    const c = sb();
-    const { data: row } = await c
-      .from("program_export_targets")
-      .select("*")
-      .eq("program", data.program)
-      .maybeSingle();
-    return (row ?? null) as ExportTarget | null;
-  });
+  .handler(async ({ data }) => exportTarget(data.program));
 
 // ---------- target write ----------
 export const setExportTarget = createServerFn({ method: "POST" })
+  .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator(
     (d: { program: ProgramId; sheetUrlOrId: string; tabName?: string; label?: string }) => {
       if (!d.program) throw new Error("program required");
@@ -67,12 +76,8 @@ export const setExportTarget = createServerFn({ method: "POST" })
     const sheetId = parseSheetId(data.sheetUrlOrId);
     if (!sheetId) throw new Error("Provide a valid Google Sheet URL or ID.");
 
-    const c = sb();
-    const { data: masters, error: e1 } = await c
-      .from("sheet_connections")
-      .select("sheet_id,name,program");
-    if (e1) throw new Error(e1.message);
-    const clash = (masters ?? []).find((m) => String(m.sheet_id).trim() === sheetId);
+    const masters = await masterSheets();
+    const clash = masters.find((m) => String(m.sheet_id).trim() === sheetId);
     if (clash) {
       throw new Error(
         `Refusing to use sheet ${sheetId} — it is configured as a master sheet (${clash.name ?? clash.program}) in Connections. Staging must be a separate sheet.`,
@@ -81,19 +86,18 @@ export const setExportTarget = createServerFn({ method: "POST" })
 
     const payload = {
       program: data.program,
-      sheet_id: sheetId,
-      tab_name: "Sheet1",
+      sheetId,
+      tabName: "Sheet1",
       label: data.label?.trim() || null,
       enabled: true,
-      last_error: null,
+      lastError: null,
     };
-    const { data: row, error } = await c
-      .from("program_export_targets")
-      .upsert(payload, { onConflict: "program" })
-      .select()
-      .single();
-    if (error) throw new Error(error.message);
-    return row as ExportTarget;
+    const [row] = await getDb()
+      .insert(programExportTargets)
+      .values(payload)
+      .onConflictDoUpdate({ target: programExportTargets.program, set: { ...payload, updatedAt: new Date().toISOString() } })
+      .returning(sqlNamed(programExportTargets));
+    return row as unknown as ExportTarget;
   });
 
 // ---------- helpers ----------
@@ -665,16 +669,16 @@ function mergeCallDetail(call: any, detail: any | null): any {
   };
 }
 
-async function nextCampaignDay(c: ReturnType<typeof sb>, program: ProgramId): Promise<string> {
-  const { data: rows } = await c
-    .from("launched_batches")
-    .select("campaign_day")
-    .eq("program", program)
-    .order("created_at", { ascending: false })
+async function nextCampaignDay(program: ProgramId): Promise<string> {
+  const rows = await getDb()
+    .select({ campaign_day: launchedBatches.campaignDay })
+    .from(launchedBatches)
+    .where(eq(launchedBatches.program, program))
+    .orderBy(desc(launchedBatches.createdAt))
     .limit(100);
   let maxN = 0;
-  for (const r of rows ?? []) {
-    const m = String((r as any).campaign_day ?? "").match(/(\d+)/);
+  for (const r of rows) {
+    const m = String(r.campaign_day ?? "").match(/(\d+)/);
     if (m) maxN = Math.max(maxN, Number(m[1]));
   }
   return `Day ${maxN + 1}`;
@@ -687,6 +691,7 @@ function campaignTypeFor(program: ProgramId, language: string, campaignDay: stri
 
 // ---------- main export ----------
 export const exportBatchToStaging = createServerFn({ method: "POST" })
+  .middleware([requireRole(FN_ROLES.campaigns)])
   .inputValidator(
     (d: { program: ProgramId; batchId: string; batchName?: string; agentName?: string }) => {
       if (!d.program) throw new Error("program required");
@@ -697,13 +702,8 @@ export const exportBatchToStaging = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     if (!process.env.RAYA_API_KEY) throw new Error("RAYA_API_KEY not set");
 
-    const c = sb();
-    const { data: target, error: te } = await c
-      .from("program_export_targets")
-      .select("*")
-      .eq("program", data.program)
-      .maybeSingle();
-    if (te) throw new Error(te.message);
+    const db = getDb();
+    const target = await exportTarget(data.program);
     if (!target || !target.sheet_id) {
       throw new Error(
         "No staging sheet configured for this program. Add one in Settings → Results export sheet (staging).",
@@ -712,11 +712,8 @@ export const exportBatchToStaging = createServerFn({ method: "POST" })
     if (!target.enabled) throw new Error("Staging export is disabled for this program.");
 
     // SAFETY: never write to a master.
-    const { data: masters, error: me } = await c
-      .from("sheet_connections")
-      .select("sheet_id,name,program");
-    if (me) throw new Error(me.message);
-    const clash = (masters ?? []).find(
+    const masters = await masterSheets();
+    const clash = masters.find(
       (m) => String(m.sheet_id).trim() === String(target.sheet_id).trim(),
     );
     if (clash) {
@@ -748,9 +745,7 @@ export const exportBatchToStaging = createServerFn({ method: "POST" })
       try { await deleteSheetTab(sheetId, "Staging"); } catch { /* ignore */ }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      await c.from("program_export_targets")
-        .update({ last_error: msg })
-        .eq("program", data.program);
+      await db.update(programExportTargets).set({ lastError: msg }).where(eq(programExportTargets.program, data.program));
       throw new Error(`Staging sheet not accessible: ${msg}. Share it with the service account as Editor.`);
     }
     if (!hasHeaders) {
@@ -758,11 +753,11 @@ export const exportBatchToStaging = createServerFn({ method: "POST" })
     }
 
     // Look up launch-time metadata for this batch.
-    const { data: lb } = await c
-      .from("launched_batches")
-      .select("*")
-      .eq("batch_id", data.batchId)
-      .maybeSingle();
+    const [lb] = await db
+      .select(sqlNamed(launchedBatches))
+      .from(launchedBatches)
+      .where(eq(launchedBatches.batchId, data.batchId))
+      .limit(1);
     const contacts = await fetchAllBatchContacts(data.batchId);
     const sampleContact = contacts.find((contact) => pickLastCall(contact)) ?? contacts[0] ?? {};
     const detected = detectRegionForContact(sampleContact, {
@@ -770,7 +765,7 @@ export const exportBatchToStaging = createServerFn({ method: "POST" })
       agentName: data.agentName ?? (lb as any)?.agent_name ?? "",
       program: data.program,
     });
-    const campaignDay = (lb as any)?.campaign_day ?? await nextCampaignDay(c, data.program);
+    const campaignDay = (lb as any)?.campaign_day ?? await nextCampaignDay(data.program);
     const language = (lb as any)?.language ?? detected.language;
     const launchMeta: LaunchMeta = {
       campaignDay,
@@ -783,29 +778,35 @@ export const exportBatchToStaging = createServerFn({ method: "POST" })
       agentName: (lb as any)?.agent_name ?? data.agentName ?? null,
     };
     if (!(lb as any)?.batch_id || !(lb as any)?.campaign_day || !(lb as any)?.campaign_type) {
-      const { error: metaError } = await c.from("launched_batches").upsert({
-        batch_id: data.batchId,
+      const meta = {
+        batchId: data.batchId,
         program: data.program,
-        agent_name: launchMeta.agentName,
-        batch_name: launchMeta.batchName,
-        campaign_day: launchMeta.campaignDay,
-        campaign_date: launchMeta.campaignDate,
-        campaign_type: launchMeta.campaignType,
+        agentName: launchMeta.agentName,
+        batchName: launchMeta.batchName,
+        campaignDay: launchMeta.campaignDay,
+        campaignDate: launchMeta.campaignDate,
+        campaignType: launchMeta.campaignType,
         language: launchMeta.language,
-        city_campaign: launchMeta.cityCampaign,
+        cityCampaign: launchMeta.cityCampaign,
         region: launchMeta.region,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: "batch_id" });
-      if (metaError) throw new Error(metaError.message);
+        updatedAt: new Date().toISOString(),
+      };
+      await db.insert(launchedBatches).values(meta).onConflictDoUpdate({ target: launchedBatches.batchId, set: meta });
     }
 
     const inputByPhone = new Map<string, InputRow>();
     try {
-      const { data: inputRows } = await c
-        .from("launched_batch_inputs")
-        .select("normalized_phone,contact_name,recommendations,user_intent,raw")
-        .eq("batch_id", data.batchId);
-      for (const r of inputRows ?? []) {
+      const inputRows = await db
+        .select({
+          normalized_phone: launchedBatchInputs.normalizedPhone,
+          contact_name: launchedBatchInputs.contactName,
+          recommendations: launchedBatchInputs.recommendations,
+          user_intent: launchedBatchInputs.userIntent,
+          raw: launchedBatchInputs.raw,
+        })
+        .from(launchedBatchInputs)
+        .where(eq(launchedBatchInputs.batchId, data.batchId));
+      for (const r of inputRows) {
         inputByPhone.set(String((r as any).normalized_phone), r as InputRow);
       }
     } catch (e) {
@@ -859,9 +860,10 @@ export const exportBatchToStaging = createServerFn({ method: "POST" })
       updated = await updateStagingRows(sheetId, tab, updates);
     }
 
-    await c.from("program_export_targets")
-      .update({ last_exported_at: new Date().toISOString(), last_error: null })
-      .eq("program", data.program);
+    await db
+      .update(programExportTargets)
+      .set({ lastExportedAt: new Date().toISOString(), lastError: null })
+      .where(eq(programExportTargets.program, data.program));
 
     return {
       appended,
