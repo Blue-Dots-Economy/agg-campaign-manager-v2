@@ -2,7 +2,6 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { format } from "date-fns";
 import {
   Search,
   ArrowRight,
@@ -48,6 +47,14 @@ import { exportBatchToStaging } from "@/lib/raya-export.functions";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
+  CAMPAIGNS_PAGE_SIZE,
+  campaignKey,
+  filterCampaigns,
+  formatCampaignDate,
+  paginate,
+  pct,
+} from "@/lib/campaigns/list";
+import {
   formatSchedule,
   maskPhone,
   RUNNING_STATUSES,
@@ -58,9 +65,6 @@ import {
 
 export const Route = createFileRoute("/campaigns")({ component: CampaignsPage });
 
-const RECENT_WINDOW_DAYS = 2;
-const PAGE_SIZE = 12;
-
 function useTabVisible() {
   const [visible, setVisible] = useState(typeof document !== "undefined" ? !document.hidden : true);
   useEffect(() => {
@@ -70,21 +74,6 @@ function useTabVisible() {
   }, []);
   return visible;
 }
-function parseDate(s: string | null): Date | null {
-  if (!s) return null;
-  const [y, m, d] = s.split("-").map(Number);
-  if (!y || !m || !d) return null;
-  return new Date(y, m - 1, d);
-}
-function formatDate(d: string | null): string {
-  const dt = parseDate(d);
-  return dt ? format(dt, "MMM d, yyyy") : "—";
-}
-function pct(n: number, d: number): string {
-  if (!d) return "—";
-  return `${Math.round((n / d) * 1000) / 10}%`;
-}
-
 function CampaignsPage() {
   const { config } = useProgram();
   const [openLiveBatch, setOpenLiveBatch] = useState<LiveBatch | null>(null);
@@ -139,29 +128,11 @@ function CompletedCampaigns() {
     setPage(1);
   }, [search]);
 
-  const { recent, all } = useMemo(() => {
-    const items = (data ?? []).slice();
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const cutoff = today.getTime() - RECENT_WINDOW_DAYS * 86400000;
-    items.sort((a, b) => (b.campaignDate ?? "").localeCompare(a.campaignDate ?? ""));
-    const q = search.trim().toLowerCase();
-    const filtered = q
-      ? items.filter(
-          (c) =>
-            humanizeCampaignType(c.campaignType).toLowerCase().includes(q) ||
-            c.campaignType.toLowerCase().includes(q),
-        )
-      : items;
-    const recent = filtered.filter((c) => {
-      const dt = parseDate(c.campaignDate);
-      return dt ? dt.getTime() >= cutoff : false;
-    });
-    return { recent, all: filtered };
-  }, [data, search]);
-  const pageCount = Math.max(1, Math.ceil(all.length / PAGE_SIZE));
-  const clampedPage = Math.min(page, pageCount);
-  const pageRows = all.slice((clampedPage - 1) * PAGE_SIZE, clampedPage * PAGE_SIZE);
+  const { recent, all } = useMemo(
+    () => filterCampaigns(data ?? [], search, new Date()),
+    [data, search],
+  );
+  const { pageRows, page: clampedPage, pageCount } = paginate(all, page, CAMPAIGNS_PAGE_SIZE);
   return (
     <section className="space-y-4">
       <div className="flex items-end justify-between gap-3 flex-wrap">
@@ -242,7 +213,7 @@ function CompletedCampaigns() {
               <div className="grid gap-3 md:grid-cols-2">
                 {recent.map((c) => (
                   <CampaignCard
-                    key={`${c.campaignType}__${c.campaignDate ?? "nd"}`}
+                    key={campaignKey(c)}
                     campaign={c}
                     successLabel={successLabel}
                     channel={channel}
@@ -258,7 +229,7 @@ function CompletedCampaigns() {
               <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 All campaigns
               </h3>
-              {all.length > PAGE_SIZE && (
+              {all.length > CAMPAIGNS_PAGE_SIZE && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <button
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
@@ -289,7 +260,7 @@ function CompletedCampaigns() {
                 ) : (
                   pageRows.map((c) => (
                     <CampaignRow
-                      key={`${c.campaignType}__${c.campaignDate ?? "nd"}`}
+                      key={campaignKey(c)}
                       campaign={c}
                       successLabel={successLabel}
                       channel={channel}
@@ -347,7 +318,7 @@ function CampaignCard({
             )}
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
-            {formatDate(campaign.campaignDate)}
+            {formatCampaignDate(campaign.campaignDate)}
             {campaign.region ? ` · ${campaign.region}` : ""}
           </div>
         </div>
@@ -390,7 +361,7 @@ function CampaignRow({
         <div className="min-w-0 flex-1">
           <div className="font-medium truncate">{humanizeCampaignType(campaign.campaignType)}</div>
           <div className="text-xs text-muted-foreground mt-0.5">
-            {formatDate(campaign.campaignDate)}
+            {formatCampaignDate(campaign.campaignDate)}
             {campaign.region ? ` · ${campaign.region}` : ""}
           </div>
         </div>
