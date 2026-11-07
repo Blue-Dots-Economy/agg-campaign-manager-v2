@@ -23,6 +23,7 @@ import {
   nextCampaignDayLabel,
   normalize,
   parseSheetId,
+  sortedKeys,
 } from "./raya-export-format";
 import {
   buildRow,
@@ -406,9 +407,9 @@ export async function exportBatch(data: ExportBatchInput) {
     header: columns,
     ...columnCoverage(columns, allRows),
     rayaFields: {
-      contact: Object.keys(sampleContact).sort(),
-      call: Object.keys(sampleCall ?? {}).sort(),
-      call_output: Object.keys(asRecord(sampleCall?.call_output) ?? {}).sort(),
+      contact: sortedKeys(sampleContact),
+      call: sortedKeys(sampleCall ?? {}),
+      call_output: sortedKeys(asRecord(sampleCall?.call_output) ?? {}),
     },
     sheetUrl: `https://docs.google.com/spreadsheets/d/${sheetId}/edit`,
   };

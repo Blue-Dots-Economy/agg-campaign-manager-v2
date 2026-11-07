@@ -256,3 +256,14 @@ export function nextCampaignDayLabel(days: ReadonlyArray<string | null>): string
   }
   return `Day ${maxN + 1}`;
 }
+
+/** Orders two strings by UTF-16 code units, the same order `Array.prototype.sort` uses by default. */
+function compareCodeUnits(a: string, b: string): number {
+  if (a < b) return -1;
+  return a > b ? 1 : 0;
+}
+
+/** Returns an object's keys in code-unit order, for listing the fields Raya sent. */
+export function sortedKeys(obj: object): string[] {
+  return Object.keys(obj).sort(compareCodeUnits);
+}
