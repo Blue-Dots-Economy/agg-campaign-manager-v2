@@ -53,6 +53,13 @@ import {
 import { appendLaunchLog } from "@/lib/launch-log";
 import { cn } from "@/lib/utils";
 import { loadSeekersAsync, type Seeker } from "@/lib/upSeekersCsv";
+import {
+  CSV_PREVIEW_ROW_LIMIT,
+  detectRegion,
+  parseLaunchCsv,
+  regionInfo as getRegionInfo,
+  type ParsedCsv,
+} from "@/lib/launch/csv";
 import { buildCohort, type CohortIntent, type ConfidenceBand } from "@/lib/cohort";
 
 export const Route = createFileRoute("/launch")({
@@ -82,27 +89,6 @@ interface ValidationReport {
     extras: Record<string, string>;
     rowIndex: number;
   }[];
-}
-
-interface ParsedCsv {
-  headers: string[];
-  rows: string[][];
-}
-
-function parseCsv(text: string): ParsedCsv {
-  const lines = text.trim().split(/\r?\n/);
-  if (!lines.length) return { headers: [], rows: [] };
-  const headers = lines[0].split(",").map((h) => h.trim());
-  const rows = lines.slice(1).map((l) => l.split(",").map((c) => c.trim()));
-  return { headers, rows };
-}
-
-function detectRegion(filename: string): { region: string; language: string; city: string } {
-  const f = filename.toLowerCase();
-  if (f.includes("ka") || f.includes("kannada") || f.includes("hubli")) {
-    return { region: "KA", language: "Kannada", city: "Hubli-Dharwad" };
-  }
-  return { region: "GZB", language: "Hindi", city: "Ghaziabad" };
 }
 
 function LaunchWizard() {
@@ -163,11 +149,7 @@ function LaunchWizard() {
   const cap = usage.data?.cap ?? 20;
 
   // Derive language + city_campaign from region.
-  const regionInfo = useMemo(() => {
-    if (region === "KA") return { language: "Kannada", city: "Hubli-Dharwad" };
-    if (region === "GZB") return { language: "Hindi", city: "Ghaziabad" };
-    return { language: "", city: "" };
-  }, [region]);
+  const regionInfo = useMemo(() => getRegionInfo(region), [region]);
   const campaignType = useMemo(() => {
     const lang = regionInfo.language || region || "";
     const dayNum = (campaignDay.match(/\d+/) || ["1"])[0];
@@ -278,7 +260,7 @@ function LaunchWizard() {
       setRegion(detectRegion(f.name).region);
       // batchName auto-derives from campaignType (program + language + Day N).
       const text = await f.text();
-      const p = parseCsv(text);
+      const p = parseLaunchCsv(text);
       setParsed(p);
       setValidating(true);
       try {
@@ -1184,7 +1166,7 @@ function UploadStep({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {parsed.rows.slice(0, 20).map((r, i) => (
+                {parsed.rows.slice(0, CSV_PREVIEW_ROW_LIMIT).map((r, i) => (
                   <TableRow key={i}>
                     {r.map((c, j) => (
                       <TableCell key={j} className="text-xs whitespace-nowrap">
