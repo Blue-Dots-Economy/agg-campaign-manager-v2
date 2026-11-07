@@ -127,11 +127,12 @@ export function NorthStarMetrics({ program, m }: { program: string; m: Record<st
                 {edit ? (
                   <input
                     type="number"
+                    aria-label={`${it.label} target`}
                     defaultValue={it.threshold ?? ""}
                     onChange={(e) => setDrafts((d) => ({ ...d, [it.key]: e.target.value }))}
                     onBlur={() => commit(it.key)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                      if (e.key === "Enter") e.currentTarget.blur();
                     }}
                     placeholder="—"
                     className="w-14 rounded border border-input bg-background px-1.5 py-0.5 text-right text-xs"
