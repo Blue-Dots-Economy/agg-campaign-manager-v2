@@ -171,6 +171,13 @@ describe("react", () => {
     expect(await severities(code, "src/components/probe.tsx", "jsx-a11y/alt-text")).toEqual([WARN]);
   });
 
+  test("accessibility rules the plugin leaves off stay off", async () => {
+    const code = "export const C = () => <button><span /></button>;\n";
+    expect(
+      await severities(code, "src/components/probe.tsx", "jsx-a11y/control-has-associated-label"),
+    ).toEqual([]);
+  });
+
   test("formatting is not an ESLint finding", async () => {
     const code = "export const x   =  1\n";
     expect(await severities(code, "src/lib/probe.ts", "prettier/prettier")).toEqual([]);

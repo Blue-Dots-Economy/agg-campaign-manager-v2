@@ -22,6 +22,18 @@ const SERVER_ONLY = {
     "TanStack Start does not use the Next.js `server-only` package. Rename the module to `*.server.ts` or mark it with `@tanstack/react-start/server-only`.",
 };
 
+/**
+ * The plugin's recommended accessibility rules, as warnings. Rules the recommended set turns off stay
+ * off, and the deprecated label-has-for is dropped (label-has-associated-control covers it).
+ */
+const A11Y_AS_WARNINGS = Object.fromEntries(
+  Object.entries(jsxA11y.configs.recommended.rules).map(([rule, setting]) => {
+    const level = Array.isArray(setting) ? setting[0] : setting;
+    const off = level === "off" || level === 0 || rule === "jsx-a11y/label-has-for";
+    return [rule, off ? "off" : "warn"];
+  }),
+);
+
 /** Vendored shadcn/ui components. They follow upstream and are left as they are. */
 const VENDORED = ["src/components/ui/**"];
 
@@ -66,9 +78,7 @@ export default tseslint.config(
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
       "react-hooks/set-state-in-effect": "warn",
-      ...Object.fromEntries(Object.keys(jsxA11y.configs.recommended.rules).map((r) => [r, "warn"])),
-      // Deprecated by the plugin; label-has-associated-control covers it.
-      "jsx-a11y/label-has-for": "off",
+      ...A11Y_AS_WARNINGS,
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
     },
   },
