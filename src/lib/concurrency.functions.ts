@@ -10,7 +10,6 @@ import { programAgents } from "@/server/db/schema";
 import { parseInput } from "@/server/validation";
 import { isRecord } from "@/lib/input-schemas";
 import { CONCURRENCY_CAP_DEFAULT } from "./concurrency-cap";
-import { errorMessage } from "./errors";
 import type { JsonObject } from "./json";
 import { delay, rayaFetch } from "./raya-api.server";
 import { BatchListReplySchema, batchItems } from "./raya-live-batches";
@@ -42,6 +41,19 @@ interface ActiveBatch {
   batchName: string;
   concurrency: number;
   status: string;
+}
+
+/** Shown when the agent list cannot be read; the cause goes to the server log only. */
+export const AGENTS_UNAVAILABLE = "Could not read the agent list. Try again later.";
+
+/**
+ * Usage with no active batches, for when it cannot be measured.
+ *
+ * @param error - Short reason shown on the page; never a raw error message.
+ */
+export function emptyUsage(cap: number, error: string) {
+  const batches: ActiveBatch[] = [];
+  return { cap, used: 0, available: cap, batches, error };
 }
 
 async function rayaListAgentBatches(agentId: string): Promise<JsonObject[]> {
@@ -79,15 +91,7 @@ export const getConcurrencyUsage = createServerFn({ method: "GET" })
         ? requested
         : CONCURRENCY_CAP_DEFAULT;
 
-    if (!process.env.RAYA_API_KEY) {
-      return {
-        cap,
-        used: 0,
-        available: cap,
-        batches: [] satisfies ActiveBatch[],
-        error: "RAYA_API_KEY not set",
-      };
-    }
+    if (!process.env.RAYA_API_KEY) return emptyUsage(cap, "RAYA_API_KEY not set");
 
     let agents: Array<{ program: string; agent_id: string; name: string }>;
     try {
@@ -99,13 +103,9 @@ export const getConcurrencyUsage = createServerFn({ method: "GET" })
         })
         .from(programAgents);
     } catch (e) {
-      return {
-        cap,
-        used: 0,
-        available: cap,
-        batches: [] satisfies ActiveBatch[],
-        error: errorMessage(e),
-      };
+      const { logEvent } = await import("@/server/log.server");
+      logEvent("error", { operation: "concurrency.listAgents", status: "failure", error: e });
+      return emptyUsage(cap, AGENTS_UNAVAILABLE);
     }
 
     const active: ActiveBatch[] = [];
