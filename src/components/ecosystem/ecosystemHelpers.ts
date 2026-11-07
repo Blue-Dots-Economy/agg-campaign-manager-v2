@@ -1,5 +1,8 @@
 import { format } from "date-fns";
 
+/** Formats a known count in Indian digit grouping. */
+export const fmtCount = (n: number): string => n.toLocaleString("en-IN");
+
 /** Formats a count in Indian digit grouping, or "—" when missing. */
 export const fmtInt = (n: number | null | undefined): string =>
   typeof n === "number" && Number.isFinite(n) ? n.toLocaleString("en-IN") : "—";
@@ -245,4 +248,12 @@ export function roleCategory(title: string, sector?: string): RoleCategory {
   const hay = `${title ?? ""} ${sector ?? ""}`.toLowerCase();
   for (const r of CATEGORY_RULES) if (r.kw.test(hay)) return r.cat;
   return "Other";
+}
+
+/** Short "time since" label for a sync time: "just now", minutes, or hours. */
+export function syncedAgo(iso: string, now: number = Date.now()): string {
+  const mins = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60000));
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  return `${Math.round(mins / 60)}h ago`;
 }

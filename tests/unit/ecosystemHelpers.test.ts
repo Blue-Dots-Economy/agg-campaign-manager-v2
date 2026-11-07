@@ -17,6 +17,7 @@ import {
   nz,
   relativeAge,
   roleCategory,
+  syncedAgo,
 } from "../../src/components/ecosystem/ecosystemHelpers";
 
 describe("formatters", () => {
@@ -165,5 +166,21 @@ describe("mock trend", () => {
     expect(mockTrend(100, 80)).toEqual(a);
     expect(mockTrend(10, 5, 3)).toHaveLength(3);
     expect(mockTrend(0, 0)).toEqual([]);
+  });
+});
+
+describe("syncedAgo", () => {
+  const now = Date.parse("2026-06-30T12:00:00Z");
+  const ago = (ms: number) => new Date(now - ms).toISOString();
+
+  test("shows just now, minutes or hours", () => {
+    expect(syncedAgo(ago(20_000), now)).toBe("just now");
+    expect(syncedAgo(ago(5 * 60_000), now)).toBe("5m ago");
+    expect(syncedAgo(ago(59 * 60_000), now)).toBe("59m ago");
+    expect(syncedAgo(ago(90 * 60_000), now)).toBe("2h ago");
+  });
+
+  test("treats future times as just now", () => {
+    expect(syncedAgo(ago(-60_000), now)).toBe("just now");
   });
 });
