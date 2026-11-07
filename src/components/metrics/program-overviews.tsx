@@ -7,6 +7,14 @@ import {
   type VerticalFunnelStage,
   type FunnelColor,
 } from "@/components/metrics/VerticalFunnel";
+import { CallOutcomeBreakdown } from "@/components/metrics/CallOutcomeBreakdown";
+import {
+  isNotDialled,
+  previousValue,
+  safeDiv,
+  series,
+  type CallOutcomeCount,
+} from "@/components/metrics/overview-helpers";
 
 export interface DailyPoint {
   day: string;
@@ -17,10 +25,6 @@ export interface DailyPoint {
   new_jobs: number;
   high_intent: number;
 }
-
-const safeDiv = (n: number, d: number) => (d > 0 ? n / d : 0);
-const series = <T,>(arr: T[] | undefined, fn: (p: T) => number): number[] =>
-  (arr ?? []).map(fn).filter((v) => Number.isFinite(v));
 
 export interface KkbMetrics {
   totalCalls: number;
@@ -83,99 +87,6 @@ export interface DkbMetrics {
   newJobsDiscussed: number;
   newJobsPosted: number;
   providerFunnel?: DkbProviderFunnelStage[];
-}
-
-// Helper: pull a numeric metric from a previous-period metrics object (may be undefined).
-function prev<T extends object>(prev: T | undefined, key: keyof T): number | null {
-  if (!prev) return null;
-  const v = prev[key];
-  return typeof v === "number" && Number.isFinite(v) ? v : null;
-}
-
-export interface CallOutcomeCount {
-  outcome: string;
-  n: number;
-}
-
-const isNotDialled = (outcome: string) => {
-  const o = outcome.trim().toLowerCase();
-  return o === "pending" || o.startsWith("not dialled");
-};
-
-const nfIN = new Intl.NumberFormat("en-IN");
-
-function OutcomeCard({
-  outcome,
-  n,
-  pct,
-  muted,
-}: {
-  outcome: string;
-  n: number;
-  pct: number;
-  muted?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-lg border bg-card p-3",
-        muted ? "border-amber-500/40 bg-amber-500/5" : "border-border",
-      )}
-    >
-      <p className="truncate text-[11px] font-medium text-muted-foreground" title={outcome}>
-        {outcome}
-      </p>
-      <p
-        className={cn(
-          "mt-1 text-lg font-semibold tabular-nums",
-          muted ? "text-amber-600 dark:text-amber-400" : "text-foreground",
-        )}
-      >
-        {nfIN.format(n)}
-      </p>
-      <p className="text-[11px] text-muted-foreground tabular-nums">
-        {pct.toFixed(1)}% of all rows
-      </p>
-    </div>
-  );
-}
-
-function CallOutcomeBreakdown({ outcomes }: { outcomes: CallOutcomeCount[] }) {
-  if (!outcomes.length) return null;
-  const total = outcomes.reduce((s, o) => s + o.n, 0);
-  const pctOf = (n: number) => (total > 0 ? (n / total) * 100 : 0);
-  const sorted = [...outcomes].sort((a, b) => b.n - a.n);
-  const dialled = sorted.filter((o) => !isNotDialled(o.outcome));
-  const skipped = sorted.filter((o) => isNotDialled(o.outcome));
-
-  return (
-    <div className="mt-6 space-y-4">
-      <div>
-        <h3 className="text-sm font-semibold text-foreground">Call outcomes</h3>
-        <p className="text-[11px] text-muted-foreground">
-          {nfIN.format(total)} rows in the batch · grouped by outcome
-        </p>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {dialled.map((o) => (
-          <OutcomeCard key={o.outcome} outcome={o.outcome} n={o.n} pct={pctOf(o.n)} />
-        ))}
-      </div>
-      {skipped.length > 0 && (
-        <div className="space-y-2 border-t border-border pt-4">
-          <div>
-            <h4 className="text-xs font-semibold text-muted-foreground">Not dialled</h4>
-            <p className="text-[11px] text-muted-foreground">Excluded from Calls made</p>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {skipped.map((o) => (
-              <OutcomeCard key={o.outcome} outcome={o.outcome} n={o.n} pct={pctOf(o.n)} muted />
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
 }
 
 export function KkbOverviewMetrics({
@@ -246,10 +157,7 @@ export function KkbOverviewMetrics({
   };
   const uploaded = (callOutcomes ?? []).reduce((s, o) => s + o.n, 0);
   const notDialled = (callOutcomes ?? [])
-    .filter((o) => {
-      const x = o.outcome.trim().toLowerCase();
-      return x === "pending" || x.startsWith("not dialled");
-    })
+    .filter((o) => isNotDialled(o.outcome))
     .reduce((s, o) => s + o.n, 0);
   const topExtraSub =
     uploaded > 0 && notDialled > 0
@@ -374,7 +282,7 @@ export function KkbOverviewMetrics({
                 label="High value"
                 value={m.highIntentSeekers}
                 sub={previous ? undefined : "Value score ≥ 5"}
-                previous={prev(previous, "highIntentSeekers")}
+                previous={previousValue(previous, "highIntentSeekers")}
                 comparisonLabel={comparisonLabel}
                 trend={series(perDay, (p) => p.high_intent)}
               />
@@ -536,28 +444,28 @@ export function DkbOverviewMetrics({
             label="Active Openings"
             value={m.activeOpenings}
             sub="Vacancies currently hiring (post-campaign)"
-            previous={prev(previous, "activeOpenings")}
+            previous={previousValue(previous, "activeOpenings")}
             comparisonLabel={comparisonLabel}
           />
           <MetricCard
             label="Active Providers"
             value={m.jobsActive}
             sub="Companies actively hiring"
-            previous={prev(previous, "jobsActive")}
+            previous={previousValue(previous, "jobsActive")}
             comparisonLabel={comparisonLabel}
           />
           <MetricCard
             label="New jobs posted"
             value={m.newJobsPosted}
             sub="Companies that posted new roles"
-            previous={prev(previous, "newJobsPosted")}
+            previous={previousValue(previous, "newJobsPosted")}
             comparisonLabel={comparisonLabel}
           />
           <MetricCard
             label="New job openings"
             value={m.newOpenings}
             sub="New vacancies posted during calls"
-            previous={prev(previous, "newOpenings")}
+            previous={previousValue(previous, "newOpenings")}
             comparisonLabel={comparisonLabel}
           />
         </div>
@@ -569,7 +477,7 @@ export function DkbOverviewMetrics({
             label="Total calls"
             value={m.totalCalls}
             sub={previous ? undefined : "All dialled attempts"}
-            previous={prev(previous, "totalCalls")}
+            previous={previousValue(previous, "totalCalls")}
             comparisonLabel={comparisonLabel}
             trend={series(perDay, (p) => p.rows)}
           />
@@ -579,7 +487,7 @@ export function DkbOverviewMetrics({
             sub={
               previous ? `${pickupPct.toFixed(1)}% pickup` : `${pickupPct.toFixed(1)}% pickup rate`
             }
-            previous={prev(previous, "answeredCalls")}
+            previous={previousValue(previous, "answeredCalls")}
             comparisonLabel={comparisonLabel}
             trend={series(perDay, (p) => p.answered)}
           />
@@ -587,7 +495,7 @@ export function DkbOverviewMetrics({
             label="Unanswered"
             value={m.unansweredCalls}
             sub={previous ? undefined : "No pickup"}
-            previous={prev(previous, "unansweredCalls")}
+            previous={previousValue(previous, "unansweredCalls")}
             comparisonLabel={comparisonLabel}
           />
           <MetricCard
@@ -607,7 +515,7 @@ export function DkbOverviewMetrics({
             label="Avg call duration"
             value={`${m.avgDuration.toFixed(1)} sec`}
             sub={previous ? undefined : "Answered calls only"}
-            previous={prev(previous, "avgDuration")}
+            previous={previousValue(previous, "avgDuration")}
             comparisonLabel={comparisonLabel}
           />
         </div>
