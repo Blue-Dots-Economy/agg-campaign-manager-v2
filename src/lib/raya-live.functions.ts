@@ -12,6 +12,7 @@ import { getDb } from "@/server/db/client.server";
 import { programAgents } from "@/server/db/schema";
 import { logEvent } from "@/server/log.server";
 import { delay, rayaFetch } from "./raya-api.server";
+import { agentsReadFailed } from "./raya-live.server";
 import {
   BatchContactsPageSchema,
   BatchListReplySchema,
@@ -41,22 +42,6 @@ const LIVE_CONTACTS_MAX_PAGES = 5;
 
 /** Input of `listProgramLiveBatches`. */
 export const ListProgramLiveBatchesInput = z.object({ program: programIdSchema });
-
-/** Message shown when the program's agents cannot be read. */
-export const AGENTS_READ_FAILED_MESSAGE = "Could not read this program's agents. Try again later.";
-
-/**
- * Logs a failed agent read and returns the page's failure result.
- * Database errors hold SQL and parameters, so only the error type is logged and none is returned.
- */
-export function agentsReadFailed(e: unknown) {
-  logEvent("error", {
-    operation: "raya-live.readAgents",
-    status: "failure",
-    error: e instanceof Error ? e.name : "Unknown error",
-  });
-  return { ok: false as const, batches: [], error: AGENTS_READ_FAILED_MESSAGE };
-}
 
 /** Lists the program's Raya batches across its agents, running batches first. */
 export const listProgramLiveBatches = createServerFn({ method: "GET" })
