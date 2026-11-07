@@ -9,7 +9,7 @@ export function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
 }
 
-/** Most rows in a stored seeker CSV, and so most contacts one campaign request or batch may carry. */
+/** Most contacts one campaign request or Raya batch may carry. */
 export const MAX_CONTACTS_PER_BATCH = 200_000;
 
 /** A program id from the program registry. */

@@ -6,7 +6,6 @@ import { FN_ROLES } from "@/auth/roles";
 import { getDb } from "@/server/db/client.server";
 import { upSeekersUpload } from "@/server/db/schema";
 import { parseInput } from "@/server/validation";
-import { MAX_CONTACTS_PER_BATCH } from "@/lib/input-schemas";
 
 /** Id of the only row in `up_seekers_upload`; the table holds one CSV at a time. */
 const UPLOAD_ROW_ID = 1;
@@ -39,12 +38,15 @@ export const fetchStoredCsv = createServerFn({ method: "GET" })
 
 /** Largest CSV the app stores, to keep the single upload row small. */
 const MAX_CSV_BYTES = 20 * 1024 * 1024;
+
+/** Most data rows a stored seeker CSV may hold, which bounds the size of the single upload row. */
+const MAX_CSV_ROWS = 200_000;
 const csvInput = z.object({
   text: z
     .string()
     .refine((t) => new TextEncoder().encode(t).length <= MAX_CSV_BYTES, "CSV is larger than 20 MB"),
   name: z.string().max(255),
-  rows: z.number().int().min(0).max(MAX_CONTACTS_PER_BATCH),
+  rows: z.number().int().min(0).max(MAX_CSV_ROWS),
 });
 
 /** Replaces the stored UP seekers CSV. */
