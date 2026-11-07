@@ -402,3 +402,33 @@ describe("readSheetsConfig", () => {
     expect(() => readSheetsConfig({ SHEETS_RETRIES: "-1" })).toThrow("SHEETS_RETRIES");
   });
 });
+
+describe("error messages", () => {
+  const PHONE = "9876543210";
+
+  test("quote Google's error message and status, not other reply text", async () => {
+    stubFetch(() =>
+      json(
+        {
+          error: {
+            code: 403,
+            message: "The caller does not have permission",
+            status: "PERMISSION_DENIED",
+          },
+          echo: PHONE,
+        },
+        403,
+      ),
+    );
+    const err = await readSheet("s1", "Data").catch((e: unknown) => e);
+    expect(err instanceof Error && err.message).toBe(
+      "Sheets read failed (403): The caller does not have permission (PERMISSION_DENIED)",
+    );
+  });
+
+  test("leave out raw text replies", async () => {
+    stubFetch(() => new Response(`row ${PHONE} broke`, { status: 400 }));
+    const err = await appendStagingRows("s1", "Sheet1", [["a"]]).catch((e: unknown) => e);
+    expect(err instanceof Error && err.message).toBe("Sheets append failed (400)");
+  });
+});
