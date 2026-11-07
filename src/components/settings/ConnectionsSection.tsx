@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -122,19 +122,18 @@ function ProgramConnections({ program }: { program: ProgramId }) {
   };
 
   // Re-checks every connection of the program once per visit and refreshes the list when any were checked.
-  useQuery({
-    queryKey: ["connections-revalidate", program],
-    queryFn: async () => {
-      const res = await revalidateFn({ data: { program } });
-      if (res.checked > 0) invalidate();
-      return res;
+  // A failed re-check shows per row, so the mutation has no error handler.
+  const { mutate: revalidate } = useMutation({
+    mutationFn: (p: ProgramId) => revalidateFn({ data: { program: p } }),
+    onSuccess: (res, p) => {
+      if (res.checked === 0) return;
+      qc.invalidateQueries({ queryKey: ["connections", p] });
+      qc.invalidateQueries({ queryKey: ["program-rows", p] });
     },
-    staleTime: 0,
-    gcTime: 0,
-    retry: false,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
   });
+  useEffect(() => {
+    revalidate(program);
+  }, [program, revalidate]);
 
   const toggle = useMutation({
     mutationFn: (vars: { id: string; enabled: boolean }) => updateFn({ data: vars }),
@@ -287,13 +286,7 @@ function TabPicker({
 
   const tabsQuery = useQuery({
     queryKey: ["sheet-tabs", sheetId],
-    queryFn: async () => {
-      const res = await listTabsFn({ data: { sheet_id: sheetId } });
-      // Pick the first tab when none is chosen yet, as soon as the list arrives.
-      const firstTab = res.ok ? res.tabs[0] : undefined;
-      if (!value && firstTab) onChange(firstTab);
-      return res;
-    },
+    queryFn: () => listTabsFn({ data: { sheet_id: sheetId } }),
     enabled: Boolean(sheetId),
     staleTime: 0,
     gcTime: 0,
@@ -309,6 +302,16 @@ function TabPicker({
       ? result.error
       : null;
   const loading = tabsQuery.isFetching;
+
+  // When the tab list for a sheet arrives and no tab is chosen, choose the first one, once per sheet.
+  // This runs in an effect because the value belongs to the parent form.
+  const firstTab = tabs?.[0];
+  const autoPickedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!firstTab || autoPickedFor.current === sheetId) return;
+    autoPickedFor.current = sheetId;
+    if (!value) onChange(firstTab);
+  }, [sheetId, firstTab, value, onChange]);
 
   if (!sheetId) {
     return (
