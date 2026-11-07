@@ -45,9 +45,12 @@ export function passwordProblem(plain: string): string | null {
 
 // No 0/O/1/l/I.
 const TEMP_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
-export function temporaryPassword(length = 14): string {
+/** Length of a temporary password; with this alphabet it gives about 80 bits of randomness. */
+const TEMP_PASSWORD_LENGTH = 14;
+
+export function temporaryPassword(length = TEMP_PASSWORD_LENGTH): string {
   let out = "";
-  for (let i = 0; i < length; i++) out += TEMP_ALPHABET[randomInt(TEMP_ALPHABET.length)];
+  for (let i = 0; i < length; i++) out += TEMP_ALPHABET.charAt(randomInt(TEMP_ALPHABET.length));
   return out;
 }
 
