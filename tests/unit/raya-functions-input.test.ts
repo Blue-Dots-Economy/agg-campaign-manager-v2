@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   CreateBatchInput,
+  CreateBatchReply,
   GetBatchContactsInput,
   InitiateCallInput,
   ListAgentsInput,
@@ -141,5 +142,19 @@ describe("StopBatchInput and InitiateCallInput", () => {
       "Missing phone number.",
     );
     expect(StopBatchInput.safeParse({}).success).toBe(false);
+  });
+});
+
+describe("CreateBatchReply", () => {
+  test("reads an unexpected field type as missing instead of failing", () => {
+    const r = CreateBatchReply.parse({ batchId: 7, totalRows: "3", data: "x", message: 1 });
+    expect(r.batchId).toBe(7);
+    expect(r.totalRows).toBeNull();
+    expect(r.data).toBeNull();
+    expect(r.message).toBeNull();
+  });
+  test("keeps validation details", () => {
+    const r = CreateBatchReply.parse({ status: "error", invalidRows: 2, errors: [{ row: 2 }] });
+    expect(r).toMatchObject({ status: "error", invalidRows: 2, errors: [{ row: 2 }] });
   });
 });

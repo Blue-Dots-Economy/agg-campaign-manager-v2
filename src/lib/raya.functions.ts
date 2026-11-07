@@ -4,7 +4,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireRole } from "@/auth/middleware";
 import { FN_ROLES } from "@/auth/roles";
-import { JsonObjectSchema } from "@/lib/json";
+import { JsonObjectSchema, JsonValueSchema } from "@/lib/json";
 import { DEFAULT_COUNTRY_CODE, validateContactRows } from "./contact-validation";
 import { delay, rayaFetch, RayaApiError } from "./raya-api.server";
 
@@ -54,25 +54,34 @@ export const RayaScheduleSchema = z
 /** Daily calling window for a batch. */
 export type RayaSchedule = z.infer<typeof RayaScheduleSchema>;
 
-/** A Raya reply passed back to the page as it is. */
-const RayaObject = JsonObjectSchema.nullable();
+/** A Raya reply passed back to the page as it is. Any JSON is accepted, so a write Raya has done is never reported as failed. */
+const RayaReply = JsonValueSchema;
 
 const RayaId = z.union([z.string(), z.number()]);
-const RayaIds = z.object({ batchId: RayaId, batch_id: RayaId, id: RayaId }).partial();
+/** Optional reply field; an unexpected type reads as missing. */
+const lenient = <T extends z.ZodTypeAny>(schema: T) => schema.nullish().catch(null);
+const RayaIds = z.object({
+  batchId: lenient(RayaId),
+  batch_id: lenient(RayaId),
+  id: lenient(RayaId),
+});
 
-/** Fields of Raya's batch-creation reply, for both success and row validation errors. */
-const CreateBatchReply = z.object({
-  status: z.string().nullish(),
-  message: z.string().nullish(),
-  batchId: RayaId.nullish(),
-  batch_id: RayaId.nullish(),
-  id: RayaId.nullish(),
-  data: RayaIds.nullish(),
-  batch: RayaIds.nullish(),
-  totalRows: z.number().nullish(),
-  validRows: z.number().nullish(),
-  invalidRows: z.number().nullish(),
-  contactsInserted: z.number().nullish(),
+/**
+ * Fields of Raya's batch-creation reply, for both success and row validation errors.
+ * Fields are lenient: the batch may already exist, so an odd reply must not fail the launch.
+ */
+export const CreateBatchReply = z.object({
+  status: lenient(z.string()),
+  message: lenient(z.string()),
+  batchId: lenient(RayaId),
+  batch_id: lenient(RayaId),
+  id: lenient(RayaId),
+  data: lenient(RayaIds),
+  batch: lenient(RayaIds),
+  totalRows: lenient(z.number()),
+  validRows: lenient(z.number()),
+  invalidRows: lenient(z.number()),
+  contactsInserted: lenient(z.number()),
   errors: z.unknown(),
 });
 type CreateBatchReply = z.infer<typeof CreateBatchReply>;
@@ -118,8 +127,11 @@ export const rayaCreateBatch = createServerFn({ method: "POST" })
     let r: CreateBatchReply;
     try {
       r =
-        (await rayaFetch("/batch", { method: "POST", json: body }, CreateBatchReply.nullable())) ??
-        {};
+        (await rayaFetch(
+          "/batch",
+          { method: "POST", json: body },
+          CreateBatchReply.nullable().catch(null),
+        )) ?? {};
     } catch (e) {
       // Raya 400 validation: { status: "error", message, errors: [{ row, field, ... }] }
       if (e instanceof RayaApiError) {
@@ -188,7 +200,7 @@ export const rayaStartBatch = createServerFn({ method: "POST" })
     return rayaFetch(
       `/batch/${encodeURIComponent(data.batchId)}/start`,
       { method: "POST", json: body },
-      RayaObject,
+      RayaReply,
     );
   });
 
@@ -293,7 +305,7 @@ export const rayaUpdateBatch = createServerFn({ method: "POST" })
     return rayaFetch(
       `/batch/${encodeURIComponent(data.batchId)}`,
       { method: "PATCH", json: body },
-      RayaObject,
+      RayaReply,
     );
   });
 
@@ -308,7 +320,7 @@ export const rayaStopBatch = createServerFn({ method: "POST" })
     rayaFetch(
       `/batch/${encodeURIComponent(data.batchId)}/stop`,
       { method: "POST", json: {} },
-      RayaObject,
+      RayaReply,
     ),
   );
 
@@ -331,7 +343,7 @@ export const rayaListBatches = createServerFn({ method: "GET" })
     return rayaFetch(
       `/batch${pageQuery(data.page, data.pageSize, agent)}`,
       { method: "GET" },
-      RayaObject,
+      RayaReply,
     );
   });
 
@@ -350,7 +362,7 @@ export const rayaGetBatchContacts = createServerFn({ method: "GET" })
     rayaFetch(
       `/batch/${encodeURIComponent(data.batchId)}/contacts${pageQuery(data.page, data.pageSize)}`,
       { method: "GET" },
-      RayaObject,
+      RayaReply,
     ),
   );
 
@@ -373,7 +385,7 @@ export const rayaInitiateCall = createServerFn({ method: "POST" })
       country_code: data.countryCode ?? DEFAULT_COUNTRY_CODE,
       agent_args: data.agentArgs ?? {},
     };
-    return rayaFetch("/call", { method: "POST", json: body }, RayaObject);
+    return rayaFetch("/call", { method: "POST", json: body }, RayaReply);
   });
 
 // ---------- key status (does not expose the key) ----------
