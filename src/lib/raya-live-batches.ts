@@ -1,5 +1,13 @@
 // Pure mapping of Raya batch and contact data into the live-campaign view.
+import type { JsonObject, JsonValue } from "@/lib/json";
 
+/** A Raya object; Raya uses several names for the same field, so most keys may be missing. */
+export type RayaRecord = Readonly<Record<string, JsonValue | undefined>>;
+
+/** A Raya object that may itself be missing. */
+type Item = RayaRecord | null | undefined;
+
+/** One Raya batch as shown on the campaigns page. */
 export interface LiveBatch {
   batchId: string;
   batchName: string;
@@ -17,19 +25,53 @@ export interface LiveBatch {
   completed: number;
   unanswered: number;
   failed: number;
-  schedule: any;
+  schedule: JsonValue | null;
   createdAt: string | null;
   startedAt: string | null;
-  raw: any;
+  raw: JsonObject;
 }
 
-export function normalizeStatus(s: any): string {
+/** Placeholder for a missing name. */
+const MISSING = "—";
+/** Contacts listed under "recent calls" in the batch detail. */
+const RECENT_CONTACTS = 10;
+/** Sort rank for statuses not in STATUS_PRIORITY: after every known status. */
+const UNKNOWN_STATUS_RANK = 9;
+
+/** Returns the first value among `keys` that is neither null nor missing. */
+function first(item: Item, ...keys: string[]): JsonValue | undefined {
+  for (const k of keys) {
+    const v = item?.[k];
+    if (v !== undefined && v !== null) return v;
+  }
+  return undefined;
+}
+
+/** Returns `v` when it is a JSON object. */
+export function asRecord(v: JsonValue | undefined): JsonObject | undefined {
+  return v !== null && typeof v === "object" && !Array.isArray(v) ? v : undefined;
+}
+
+/** Returns `v` as text, or null when it is missing. */
+function textOrNull(v: JsonValue | undefined): string | null {
+  if (v === undefined || v === null) return null;
+  return typeof v === "string" ? v : String(v);
+}
+
+/** Returns `v` when it is a number, else null. */
+function numberOrNull(v: JsonValue | undefined): number | null {
+  return typeof v === "number" ? v : null;
+}
+
+/** Lowercases and trims a Raya status. */
+export function normalizeStatus(s: JsonValue | undefined): string {
   return String(s ?? "")
     .toLowerCase()
     .trim();
 }
 
-export function pickNum(item: any, ...keys: string[]): number {
+/** Returns the first of `keys` holding a finite number or numeric text, else 0. */
+export function pickNum(item: Item, ...keys: string[]): number {
   for (const k of keys) {
     const v = item?.[k];
     if (typeof v === "number" && Number.isFinite(v)) return v;
@@ -38,10 +80,9 @@ export function pickNum(item: any, ...keys: string[]): number {
   return 0;
 }
 
-export function extractStatusCounts(item: any) {
-  // Raya batch object often includes counts like total_contacts, completed, pending, etc.
-  // Try a variety of keys and fall back to 0.
-  const counts = item?.status_counts ?? item?.statusCounts ?? item?.counts ?? item?.summary ?? {};
+/** Reads per-status contact counts from a Raya batch, trying the key names Raya has used. */
+export function extractStatusCounts(item: Item) {
+  const counts = asRecord(first(item, "status_counts", "statusCounts", "counts", "summary"));
   const total =
     pickNum(item, "total_contacts", "totalContacts", "total", "contacts_count") ||
     pickNum(counts, "total");
@@ -65,27 +106,28 @@ export function extractStatusCounts(item: any) {
   return { total, pending, inProgress, completed, unanswered, failed, pickedUp, dialed };
 }
 
-export function toLiveBatch(item: any, agentId: string, agentName: string): LiveBatch {
+/** Maps a Raya batch to the campaigns page shape. */
+export function toLiveBatch(item: JsonObject, agentId: string, agentName: string): LiveBatch {
   const counts = extractStatusCounts(item);
   return {
-    batchId: String(item?.id ?? item?.batch_id ?? item?.batchId ?? ""),
-    batchName: String(item?.name ?? item?.batch_name ?? "—"),
+    batchId: String(first(item, "id", "batch_id", "batchId") ?? ""),
+    batchName: String(first(item, "name", "batch_name") ?? MISSING),
     agentId,
     agentName,
-    status: normalizeStatus(item?.status),
-    concurrency:
-      pickNum(item, "concurrency", "max_concurrency", "parallel_calls", "parallelCalls") || 0,
-    maxRetries: typeof item?.max_retries === "number" ? item.max_retries : null,
-    retryAfterHrs: typeof item?.retry_after_hrs === "number" ? item.retry_after_hrs : null,
+    status: normalizeStatus(item.status),
+    concurrency: pickNum(item, "concurrency", "max_concurrency", "parallel_calls", "parallelCalls"),
+    maxRetries: numberOrNull(item.max_retries),
+    retryAfterHrs: numberOrNull(item.retry_after_hrs),
     ...counts,
-    schedule: item?.schedule ?? null,
-    createdAt: item?.created_at ?? item?.createdAt ?? null,
-    startedAt: item?.started_at ?? item?.startedAt ?? null,
+    schedule: first(item, "schedule") ?? null,
+    createdAt: textOrNull(first(item, "created_at", "createdAt")),
+    startedAt: textOrNull(first(item, "started_at", "startedAt")),
     raw: item,
   };
 }
 
-export const STATUS_PRIORITY: Record<string, number> = {
+/** Sort rank per batch status: running first, then scheduled, stopping, paused, done, stopped, failed. */
+export const STATUS_PRIORITY: Readonly<Record<string, number>> = {
   running: 0,
   in_progress: 0,
   "in progress": 0,
@@ -104,6 +146,7 @@ export const STATUS_PRIORITY: Record<string, number> = {
   failed: 6,
 };
 
+/** One recent contact in the batch detail. */
 export interface BatchContactLite {
   name: string;
   phone: string;
@@ -112,6 +155,7 @@ export interface BatchContactLite {
   updatedAt: string | null;
 }
 
+/** Live progress of one batch, counted from its contacts. */
 export interface BatchLiveDetail {
   batchId: string;
   batchName: string;
@@ -128,25 +172,29 @@ export interface BatchLiveDetail {
   concurrency: number;
   maxRetries: number | null;
   retryAfterHrs: number | null;
-  schedule: any;
+  schedule: JsonValue | null;
   createdAt: string | null;
   startedAt: string | null;
   recent: BatchContactLite[];
 }
 
-export function contactStatus(c: any): string {
-  return String(c?.status ?? c?.call_status ?? "").trim();
+/** Returns a contact's call status as Raya wrote it. */
+export function contactStatus(c: Item): string {
+  return String(first(c, "status", "call_status") ?? "").trim();
 }
-export function contactDuration(c: any): number {
-  const v = c?.call_duration_seconds ?? c?.duration_seconds ?? c?.duration ?? c?.call_duration ?? 0;
+
+/** Returns a contact's call duration in seconds, or 0. */
+export function contactDuration(c: Item): number {
+  const v = first(c, "call_duration_seconds", "duration_seconds", "duration", "call_duration") ?? 0;
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
 }
 
+/** Orders batches by status rank, then newest first. */
 export function sortLiveBatches(all: LiveBatch[]): LiveBatch[] {
   return [...all].sort((x, y) => {
-    const px = STATUS_PRIORITY[x.status] ?? 9;
-    const py = STATUS_PRIORITY[y.status] ?? 9;
+    const px = STATUS_PRIORITY[x.status] ?? UNKNOWN_STATUS_RANK;
+    const py = STATUS_PRIORITY[y.status] ?? UNKNOWN_STATUS_RANK;
     if (px !== py) return px - py;
     const cx = x.createdAt ? Date.parse(x.createdAt) : 0;
     const cy = y.createdAt ? Date.parse(y.createdAt) : 0;
@@ -154,10 +202,22 @@ export function sortLiveBatches(all: LiveBatch[]): LiveBatch[] {
   });
 }
 
+/** Returns the time a contact last changed, as text, or null. */
+function contactUpdatedAt(c: RayaRecord): string | null {
+  return textOrNull(first(c, "updated_at", "last_call_at", "created_at"));
+}
+
+/**
+ * Counts a batch's contacts by status and lists the most recent ones.
+ *
+ * @param data - Batch id plus names known by the page, used when Raya sends none.
+ * @param batchMeta - Batch object from the contacts reply, when Raya sends one.
+ * @param totalReported - Contact total reported by Raya; 0 when unknown.
+ */
 export function buildLiveDetail(
   data: { batchId: string; batchName?: string; agentName?: string },
-  contacts: any[],
-  batchMeta: any,
+  contacts: RayaRecord[],
+  batchMeta: Item,
   totalReported: number,
 ): BatchLiveDetail {
   let pending = 0,
@@ -179,24 +239,23 @@ export function buildLiveDetail(
   const total = totalReported || contacts.length;
   const dialed = Math.max(0, total - pending);
 
-  // Sort recent by updated/created desc
   const sorted = [...contacts].sort((a, b) => {
-    const ta = Date.parse(a?.updated_at ?? a?.last_call_at ?? a?.created_at ?? "") || 0;
-    const tb = Date.parse(b?.updated_at ?? b?.last_call_at ?? b?.created_at ?? "") || 0;
+    const ta = Date.parse(contactUpdatedAt(a) ?? "") || 0;
+    const tb = Date.parse(contactUpdatedAt(b) ?? "") || 0;
     return tb - ta;
   });
-  const recent: BatchContactLite[] = sorted.slice(0, 10).map((c) => ({
-    name: String(c?.contact_name ?? c?.name ?? "—"),
-    phone: String(c?.contact_phone ?? c?.phone ?? ""),
-    status: contactStatus(c) || "—",
+  const recent: BatchContactLite[] = sorted.slice(0, RECENT_CONTACTS).map((c) => ({
+    name: String(first(c, "contact_name", "name") ?? MISSING),
+    phone: String(first(c, "contact_phone", "phone") ?? ""),
+    status: contactStatus(c) || MISSING,
     duration: contactDuration(c),
-    updatedAt: c?.updated_at ?? c?.last_call_at ?? c?.created_at ?? null,
+    updatedAt: contactUpdatedAt(c),
   }));
 
-  const detail: BatchLiveDetail = {
+  return {
     batchId: data.batchId,
-    batchName: String(batchMeta?.name ?? batchMeta?.batch_name ?? data.batchName ?? "—"),
-    agentName: String(batchMeta?.agent_name ?? data.agentName ?? "—"),
+    batchName: String(first(batchMeta, "name", "batch_name") ?? data.batchName ?? MISSING),
+    agentName: String(first(batchMeta, "agent_name") ?? data.agentName ?? MISSING),
     status: normalizeStatus(batchMeta?.status),
     total,
     pending,
@@ -207,13 +266,11 @@ export function buildLiveDetail(
     pickedUp,
     dialed,
     concurrency: pickNum(batchMeta, "concurrency", "max_concurrency", "parallel_calls"),
-    maxRetries: typeof batchMeta?.max_retries === "number" ? batchMeta.max_retries : null,
-    retryAfterHrs:
-      typeof batchMeta?.retry_after_hrs === "number" ? batchMeta.retry_after_hrs : null,
-    schedule: batchMeta?.schedule ?? null,
-    createdAt: batchMeta?.created_at ?? batchMeta?.createdAt ?? null,
-    startedAt: batchMeta?.started_at ?? batchMeta?.startedAt ?? null,
+    maxRetries: numberOrNull(batchMeta?.max_retries),
+    retryAfterHrs: numberOrNull(batchMeta?.retry_after_hrs),
+    schedule: first(batchMeta, "schedule") ?? null,
+    createdAt: textOrNull(first(batchMeta, "created_at", "createdAt")),
+    startedAt: textOrNull(first(batchMeta, "started_at", "startedAt")),
     recent,
   };
-  return detail;
 }
