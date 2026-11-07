@@ -1,19 +1,16 @@
 // Error screen shown by the router for any route that throws while loading or rendering.
-import { useQueryErrorResetBoundary } from "@tanstack/react-query";
 import { useRouter, type ErrorComponentProps } from "@tanstack/react-router";
 import { useEffect } from "react";
 
-/** Router-level error screen with a retry that reloads route data and clears failed queries. */
+/** Router-level error screen; "Try again" reloads the route data and renders the route again. */
 export function RouteError({ error, reset }: ErrorComponentProps) {
   const router = useRouter();
-  const queryErrorResetBoundary = useQueryErrorResetBoundary();
 
   useEffect(() => {
     console.error(error);
   }, [error]);
 
   const retry = async () => {
-    queryErrorResetBoundary.reset();
     await router.invalidate();
     reset();
   };
