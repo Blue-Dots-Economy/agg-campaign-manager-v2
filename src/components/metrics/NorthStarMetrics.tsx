@@ -8,6 +8,7 @@ import { fetchNorthStar, saveNorthStar } from "@/lib/north-star.functions";
 import { useAuth } from "@/auth/context";
 import { canEditShared } from "@/auth/roles";
 import { cn } from "@/lib/utils";
+import type { MetricValues } from "./metric-values";
 
 type Def = { key: string; label: string; num: string; den: string };
 const KKB_DEFS: Def[] = [
@@ -44,7 +45,7 @@ function statusColor(value: number | null, threshold: number | null): string {
   return "text-rose-600 dark:text-rose-400";
 }
 
-export function NorthStarMetrics({ program, m }: { program: string; m: Record<string, number> }) {
+export function NorthStarMetrics({ program, m }: { program: string; m: MetricValues }) {
   const qc = useQueryClient();
   const fetchFn = useServerFn(fetchNorthStar);
   const saveFn = useServerFn(saveNorthStar);
