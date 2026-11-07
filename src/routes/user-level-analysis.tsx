@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   Users,
   UserPlus,
@@ -68,6 +68,7 @@ import {
 import { useProgram } from "@/programs/context";
 import { Bar, ConnectionCell, MetricTile } from "@/components/participants/ParticipantWidgets";
 import { SEEKERS_QUERY_KEY } from "@/hooks/useSeekers";
+import { useTimeout } from "@/hooks/useTimeout";
 import {
   fieldCompletion,
   filterParticipants,
@@ -175,8 +176,7 @@ function UserLevelAnalysis() {
   const [minCompletion, setMinCompletion] = useState<number>(0);
   const [profileInfoOpen, setProfileInfoOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
-  const fetchingTimer = useRef<number | undefined>(undefined);
-  useEffect(() => () => window.clearTimeout(fetchingTimer.current), []);
+  const later = useTimeout();
 
   /** Shows a new seekers list here and makes the launch and request pages read the CSV again. */
   const showSeekers = (next: { seekers: Seeker[]; meta: CsvMeta }) => {
@@ -187,8 +187,7 @@ function UserLevelAnalysis() {
   const refetch = async () => {
     setIsFetching(true);
     await seekersQuery.refetch();
-    window.clearTimeout(fetchingTimer.current);
-    fetchingTimer.current = window.setTimeout(() => setIsFetching(false), MIN_REFRESH_SPIN_MS);
+    later(() => setIsFetching(false), MIN_REFRESH_SPIN_MS);
   };
 
   const handleUploadClick = () => fileRef.current?.click();
