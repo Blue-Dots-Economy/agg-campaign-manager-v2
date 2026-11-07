@@ -201,6 +201,14 @@ export function emptyPayload(
   };
 }
 
+/** Message the browser gets when the dashboard data could not be read. The cause is logged on the server only. */
+export const AGGREGATES_UNAVAILABLE = "Dashboard data could not be loaded. Try again shortly.";
+
+/** Empty payload for a failed read; never carries the underlying error text to the browser. */
+export function failedPayload(): AggregatePayload {
+  return emptyPayload(0, null, AGGREGATES_UNAVAILABLE);
+}
+
 /** Cleans the raw metrics: keeps numbers, numeric strings, the program and the provider funnel. */
 export function normalizeMetricsRaw(value: unknown): ProgramMetricsRaw {
   if (!isRecord(value)) return {};

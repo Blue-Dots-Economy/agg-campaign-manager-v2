@@ -13,7 +13,7 @@ import {
   dropFiltersSchema,
   funnelArgsSchema,
   dropArgs,
-  emptyPayload,
+  failedPayload,
   funnelArgs,
   normalizeCallOutcomes,
   normalizeCampaignDropCauses,
@@ -125,12 +125,24 @@ export const fetchProgramAggregates = createServerFn({ method: "GET" })
           channel: data.channel ?? "all",
         });
       } catch (e) {
-        return emptyPayload(0, null, e instanceof Error ? e.message : String(e));
+        const { logEvent } = await import("@/server/log.server");
+        logEvent("error", {
+          operation: "snapshot.programAggregatePayload",
+          status: "failure",
+          error: e,
+        });
+        return failedPayload();
       }
       // From the calls themselves; program_sync_state is no longer written.
       return toAggregatePayload(out, await callStats(data.program));
     } catch (e) {
-      return emptyPayload(0, null, e instanceof Error ? e.message : String(e));
+      const { logEvent } = await import("@/server/log.server");
+      logEvent("error", {
+        operation: "snapshot.fetchProgramAggregates",
+        status: "failure",
+        error: e,
+      });
+      return failedPayload();
     }
   });
 

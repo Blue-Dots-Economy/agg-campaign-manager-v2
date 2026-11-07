@@ -5,6 +5,8 @@ import {
   dropArgs,
   emptyAggregates,
   emptyPayload,
+  failedPayload,
+  AGGREGATES_UNAVAILABLE,
   funnelArgs,
   normalizeAggregates,
   normalizeCallOutcomes,
@@ -353,5 +355,15 @@ describe("normalizeFilterOptions", () => {
     expect(
       normalizeFilterOptions({ cities: ["KA", " ", 3, ""], campaignTypes: "x", channels: ["in"] }),
     ).toEqual({ cities: ["KA"], campaignTypes: [], channels: ["in"] });
+  });
+});
+
+describe("failedPayload", () => {
+  test("returns an empty payload with a generic message, never the cause text", () => {
+    const p = failedPayload();
+    expect(p.source).toBe("empty");
+    expect(p.totalRows).toBe(0);
+    expect(p.error).toBe(AGGREGATES_UNAVAILABLE);
+    expect(JSON.stringify(p)).not.toContain("password");
   });
 });
