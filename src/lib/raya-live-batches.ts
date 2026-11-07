@@ -1,12 +1,7 @@
 // Pure mapping of Raya batch and contact data into the live-campaign view.
 import { z } from "zod";
 import { JsonObjectSchema, type JsonObject, type JsonValue } from "@/lib/json";
-
-/** A Raya object; Raya uses several names for the same field, so most keys may be missing. */
-export type RayaRecord = Readonly<Record<string, JsonValue | undefined>>;
-
-/** A Raya object that may itself be missing. */
-type Item = RayaRecord | null | undefined;
+import { asRecord, first, textOrNull, type RayaItem, type RayaRecord } from "./raya-record";
 
 /** One Raya batch as shown on the campaigns page. */
 export interface LiveBatch {
@@ -39,26 +34,6 @@ const RECENT_CONTACTS = 10;
 /** Sort rank for statuses not in STATUS_PRIORITY: after every known status. */
 const UNKNOWN_STATUS_RANK = 9;
 
-/** Returns the first value among `keys` that is neither null nor missing. */
-function first(item: Item, ...keys: string[]): JsonValue | undefined {
-  for (const k of keys) {
-    const v = item?.[k];
-    if (v !== undefined && v !== null) return v;
-  }
-  return undefined;
-}
-
-/** Returns `v` when it is a JSON object. */
-export function asRecord(v: JsonValue | undefined): JsonObject | undefined {
-  return v !== null && typeof v === "object" && !Array.isArray(v) ? v : undefined;
-}
-
-/** Returns `v` as text, or null when it is missing. */
-function textOrNull(v: JsonValue | undefined): string | null {
-  if (v === undefined || v === null) return null;
-  return typeof v === "string" ? v : String(v);
-}
-
 /** Returns `v` when it is a number, else null. */
 function numberOrNull(v: JsonValue | undefined): number | null {
   return typeof v === "number" ? v : null;
@@ -72,7 +47,7 @@ export function normalizeStatus(s: JsonValue | undefined): string {
 }
 
 /** Returns the first of `keys` holding a finite number or numeric text, else 0. */
-export function pickNum(item: Item, ...keys: string[]): number {
+export function pickNum(item: RayaItem, ...keys: string[]): number {
   for (const k of keys) {
     const v = item?.[k];
     if (typeof v === "number" && Number.isFinite(v)) return v;
@@ -82,7 +57,7 @@ export function pickNum(item: Item, ...keys: string[]): number {
 }
 
 /** Reads per-status contact counts from a Raya batch, trying the key names Raya has used. */
-export function extractStatusCounts(item: Item) {
+export function extractStatusCounts(item: RayaItem) {
   const counts = asRecord(first(item, "status_counts", "statusCounts", "counts", "summary"));
   const total =
     pickNum(item, "total_contacts", "totalContacts", "total", "contacts_count") ||
@@ -180,12 +155,12 @@ export interface BatchLiveDetail {
 }
 
 /** Returns a contact's call status as Raya wrote it. */
-export function contactStatus(c: Item): string {
+export function contactStatus(c: RayaItem): string {
   return String(first(c, "status", "call_status") ?? "").trim();
 }
 
 /** Returns a contact's call duration in seconds, or 0. */
-export function contactDuration(c: Item): number {
+export function contactDuration(c: RayaItem): number {
   const v = first(c, "call_duration_seconds", "duration_seconds", "duration", "call_duration") ?? 0;
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
@@ -218,7 +193,7 @@ function contactUpdatedAt(c: RayaRecord): string | null {
 export function buildLiveDetail(
   data: { batchId: string; batchName?: string; agentName?: string },
   contacts: RayaRecord[],
-  batchMeta: Item,
+  batchMeta: RayaItem,
   totalReported: number,
 ): BatchLiveDetail {
   let pending = 0,
