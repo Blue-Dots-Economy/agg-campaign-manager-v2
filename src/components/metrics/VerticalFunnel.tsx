@@ -77,8 +77,10 @@ export function VerticalFunnel({
 }) {
   const baseline = stages[0]?.value ?? 0;
   const pickedUpIdx = pickedUpKey ? stages.findIndex((s) => s.key === pickedUpKey) : -1;
-  const pickedUpValue = pickedUpIdx >= 0 ? stages[pickedUpIdx].value : 0;
-  const pickedUpLabel = pickedUpIdx >= 0 ? stages[pickedUpIdx].label.toLowerCase() : "picked up";
+  const pickedUp = pickedUpIdx >= 0 ? stages[pickedUpIdx] : undefined;
+  const pickedUpValue = pickedUp?.value ?? 0;
+  const pickedUpLabel = pickedUp?.label.toLowerCase() ?? "picked up";
+  const firstLabel = stages[0]?.label.toLowerCase() ?? "";
   const visualWidth = (value: number) => {
     if (baseline <= 0) return 100;
     const share = Math.min(1, Math.max(0, value / baseline));
@@ -146,7 +148,7 @@ export function VerticalFunnel({
                     </p>
                   ) : null}
                   <p className="mt-1 text-[11px] tabular-nums text-muted-foreground">
-                    {s.sub ?? `${fmtPct(pct)} of ${stages[0].label.toLowerCase()}`}
+                    {s.sub ?? `${fmtPct(pct)} of ${firstLabel}`}
                   </p>
                   {s.extraSub ? (
                     <p className="text-[11px] text-muted-foreground tabular-nums">{s.extraSub}</p>
@@ -178,11 +180,11 @@ export function VerticalFunnel({
                       </div>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="center" className="w-48">
-                      <DropdownMenuItem onClick={() => onStageClick!(s.key, "copy")}>
+                      <DropdownMenuItem onClick={() => onStageClick?.(s.key, "copy")}>
                         <Copy className="h-4 w-4" />
                         Copy Call IDs
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => onStageClick!(s.key, "review")}>
+                      <DropdownMenuItem onClick={() => onStageClick?.(s.key, "review")}>
                         <Headphones className="h-4 w-4" />
                         Review Calls
                       </DropdownMenuItem>
@@ -198,6 +200,7 @@ export function VerticalFunnel({
               {i < stages.length - 1
                 ? (() => {
                     const next = stages[i + 1];
+                    if (!next) return null;
                     const dropPct = s.value > 0 ? ((s.value - next.value) / s.value) * 100 : 0;
                     const dropAbs = Math.max(0, s.value - next.value);
                     const annotation =
