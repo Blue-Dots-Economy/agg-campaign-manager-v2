@@ -8,7 +8,12 @@ import { requireRole } from "@/auth/middleware";
 import { FN_ROLES } from "@/auth/roles";
 import { getDb } from "@/server/db/client.server";
 import { sqlNamed } from "@/server/db/columns";
-import { launchedBatchInputs, launchedBatches, programExportTargets, sheetConnections } from "@/server/db/schema";
+import {
+  launchedBatchInputs,
+  launchedBatches,
+  programExportTargets,
+  sheetConnections,
+} from "@/server/db/schema";
 import { delay, rayaFetch } from "./raya-api";
 import {
   appendStagingRows,
@@ -30,7 +35,11 @@ async function exportTarget(program: string): Promise<ExportTarget | null> {
 
 async function masterSheets() {
   return getDb()
-    .select({ sheet_id: sheetConnections.sheetId, name: sheetConnections.name, program: sheetConnections.program })
+    .select({
+      sheet_id: sheetConnections.sheetId,
+      name: sheetConnections.name,
+      program: sheetConnections.program,
+    })
     .from(sheetConnections);
 }
 
@@ -95,20 +104,30 @@ export const setExportTarget = createServerFn({ method: "POST" })
     const [row] = await getDb()
       .insert(programExportTargets)
       .values(payload)
-      .onConflictDoUpdate({ target: programExportTargets.program, set: { ...payload, updatedAt: new Date().toISOString() } })
+      .onConflictDoUpdate({
+        target: programExportTargets.program,
+        set: { ...payload, updatedAt: new Date().toISOString() },
+      })
       .returning(sqlNamed(programExportTargets));
     return row as unknown as ExportTarget;
   });
 
 // ---------- helpers ----------
 function normalize(k: string): string {
-  return String(k ?? "").trim().toLowerCase().replace(/[\s\-]+/g, "_");
+  return String(k ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s\-]+/g, "_");
 }
 
 function asStr(v: any): string {
   if (v == null) return "";
   if (typeof v === "object") {
-    try { return JSON.stringify(v); } catch { return String(v); }
+    try {
+      return JSON.stringify(v);
+    } catch {
+      return String(v);
+    }
   }
   return String(v);
 }
@@ -120,7 +139,9 @@ function asArr(v: any): any[] {
     try {
       const p = JSON.parse(v);
       return Array.isArray(p) ? p : [];
-    } catch { return []; }
+    } catch {
+      return [];
+    }
   }
   return [];
 }
@@ -152,7 +173,11 @@ function jsonArrayStringFromAny(v: any): string {
 function jsonStringOrEmptyArray(v: any): string {
   if (v == null || v === "") return "[]";
   if (typeof v === "string") return v.trim() || "[]";
-  try { return JSON.stringify(v); } catch { return "[]"; }
+  try {
+    return JSON.stringify(v);
+  } catch {
+    return "[]";
+  }
 }
 
 // ---------- transcript-based apply_job parsing ----------
@@ -163,7 +188,9 @@ function parseToolArgs(raw: any): Record<string, any> {
   try {
     const p = JSON.parse(s);
     if (p && typeof p === "object") return p as Record<string, any>;
-  } catch { /* fall through */ }
+  } catch {
+    /* fall through */
+  }
   const out: Record<string, any> = {};
   // regex fallback — job_id values can contain spaces and parens, e.g. "9988683683_ITI (Other)"
   const mj = s.match(/["']?job_id["']?\s*[:=]\s*["']([^"']+)["']/i);
@@ -186,12 +213,20 @@ function isErrorToolResult(result: any): boolean {
     if (typeof r.status_code === "number" && r.status_code >= 400) return true;
     const ok = r.ok ?? r.success;
     if (ok === false) return true;
-    try { return isErrorToolResult(JSON.stringify(r)); } catch { return false; }
+    try {
+      return isErrorToolResult(JSON.stringify(r));
+    } catch {
+      return false;
+    }
   }
   return false;
 }
 
-interface ApplyOutcome { job_id: string; profile_id: string; ok: boolean }
+interface ApplyOutcome {
+  job_id: string;
+  profile_id: string;
+  ok: boolean;
+}
 
 function extractApplyOutcomes(transcript: any): ApplyOutcome[] {
   const out: ApplyOutcome[] = [];
@@ -202,7 +237,9 @@ function extractApplyOutcomes(transcript: any): ApplyOutcome[] {
     try {
       const p = JSON.parse(transcript);
       if (Array.isArray(p)) items = p;
-    } catch { return out; }
+    } catch {
+      return out;
+    }
   } else return out;
 
   const resultsByCallId = new Map<string, any>();
@@ -263,7 +300,11 @@ function recommendationLookup(recs: any[]): Map<string, any> {
   return map;
 }
 
-function enrichJob(jobId: string, profileId: string, recMap: Map<string, any>): Record<string, any> {
+function enrichJob(
+  jobId: string,
+  profileId: string,
+  recMap: Map<string, any>,
+): Record<string, any> {
   const rec = recMap.get(jobId) ?? {};
   const obj: Record<string, any> = { job_id: jobId };
   if (profileId) obj.profile_id = profileId;
@@ -284,7 +325,9 @@ function nonEmpty(v: any): boolean {
 }
 
 function stripIst(s: string): string {
-  return String(s ?? "").replace(/\s*IST\s*$/i, "").trim();
+  return String(s ?? "")
+    .replace(/\s*IST\s*$/i, "")
+    .trim();
 }
 
 function datePart(s: string): string {
@@ -302,17 +345,22 @@ function pickLastCall(contact: any): any | null {
   const completed = arr.filter(isCompletedCall);
   if (completed.length === 0) return null;
   const sorted = [...completed].sort((a, b) => {
-    const ta =
-      Date.parse(stripIst(pickCallTime(a))) || 0;
-    const tb =
-      Date.parse(stripIst(pickCallTime(b))) || 0;
+    const ta = Date.parse(stripIst(pickCallTime(a))) || 0;
+    const tb = Date.parse(stripIst(pickCallTime(b))) || 0;
     return tb - ta;
   });
   return sorted[0] ?? null;
 }
 
 function pickCallTime(call: any): any {
-  return call?.call_start_time ?? call?.start_time ?? call?.call_start_time_ist ?? call?.created_at ?? call?.call_time ?? "";
+  return (
+    call?.call_start_time ??
+    call?.start_time ??
+    call?.call_start_time_ist ??
+    call?.created_at ??
+    call?.call_time ??
+    ""
+  );
 }
 
 function isCompletedCall(call: any): boolean {
@@ -343,8 +391,7 @@ function detectRegionForContact(
   fallbacks: { batchName?: string; agentName?: string; program?: string },
 ): Region {
   const args = contact?.agent_args ?? contact?.metadata ?? contact?.args ?? {};
-  const explicit =
-    args?._region ?? args?.region ?? contact?.region ?? contact?._region ?? "";
+  const explicit = args?._region ?? args?.region ?? contact?.region ?? contact?._region ?? "";
   const fromExplicit = detectRegionFromText(String(explicit));
   if (fromExplicit) return fromExplicit;
   const cityHint = args?.city_campaign ?? args?.city ?? contact?.city_campaign ?? "";
@@ -400,7 +447,9 @@ function fmtDateOnly(v: any): string {
 function yesNo(v: any, fallback = false): string {
   if (typeof v === "boolean") return v ? "Yes" : "No";
   if (typeof v === "number") return v > 0 ? "Yes" : "No";
-  const s = String(v ?? "").trim().toLowerCase();
+  const s = String(v ?? "")
+    .trim()
+    .toLowerCase();
   if (!s) return fallback ? "Yes" : "No";
   if (["yes", "y", "true", "1", "completed", "success"].includes(s)) return "Yes";
   if (["no", "n", "false", "0", "none", "null", "undefined"].includes(s)) return "No";
@@ -411,7 +460,13 @@ function yesNo(v: any, fallback = false): string {
 // normalize obvious aliases. Falls back to derived bucket if Raya omitted it.
 function rayaOutcomeOrDerive(
   rayaOutcome: string,
-  fallback: { contactStatus: string; durationSec: number; applied: boolean; jobsShown: boolean; engaged: boolean },
+  fallback: {
+    contactStatus: string;
+    durationSec: number;
+    applied: boolean;
+    jobsShown: boolean;
+    engaged: boolean;
+  },
 ): string {
   const t = String(rayaOutcome ?? "").trim();
   if (t) return t;
@@ -443,8 +498,7 @@ function computeIntent(opts: {
   if (nonEmpty(opts.userIntent)) eng += 1;
   const score = dur + app + eng;
   // Master format: "Duration {s}s (+{d})|Application (+{a})|Engagement (+{e}) → {total}/10"
-  const reasoning =
-    `Duration ${d}s (+${dur})|Application (+${app})|Engagement (+${eng}) → ${score}/10`;
+  const reasoning = `Duration ${d}s (+${dur})|Application (+${app})|Engagement (+${eng}) → ${score}/10`;
   return { score, reasoning };
 }
 
@@ -508,11 +562,11 @@ function buildRow(contact: any, lastCall: any, ctx: BuildCtx): string[] | null {
   const callDur = Number(lastCall?.call_duration ?? lastCall?.duration ?? 0);
   const callDateIst = pickCallTime(lastCall); // call.call_start_time
   const callRecording = asStr(
-    lastCall?.call_recording_url
-      ?? lastCall?.recording_url
-      ?? lastCall?.enhanced_recording_url
-      ?? lastCall?.recording
-      ?? "",
+    lastCall?.call_recording_url ??
+      lastCall?.recording_url ??
+      lastCall?.enhanced_recording_url ??
+      lastCall?.recording ??
+      "",
   );
   const rayaOutcomeStr = asStr(lastCall?.outcome ?? lastCall?.call_outcome ?? "");
 
@@ -551,9 +605,12 @@ function buildRow(contact: any, lastCall: any, ctx: BuildCtx): string[] | null {
 
   // Campaign metadata (from launched_batches join)
   const campaignDay = String(lm.campaignDay ?? "").trim();
-  const campaignDate = fmtDateOnly(lm.campaignDate) || datePart(callDateIst) || new Date().toISOString().slice(0, 10);
+  const campaignDate =
+    fmtDateOnly(lm.campaignDate) || datePart(callDateIst) || new Date().toISOString().slice(0, 10);
   const dayNum = (campaignDay.match(/\d+/) || ["1"])[0];
-  const campaignType = String(lm.campaignType ?? "").trim() || `${ctx.program.toUpperCase()}_${region.language || ""}_Day${dayNum}`;
+  const campaignType =
+    String(lm.campaignType ?? "").trim() ||
+    `${ctx.program.toUpperCase()}_${region.language || ""}_Day${dayNum}`;
 
   const byCol: Record<string, string> = {
     campaign_day: campaignDay,
@@ -588,7 +645,9 @@ function buildRow(contact: any, lastCall: any, ctx: BuildCtx): string[] | null {
     intent_score_reasoning: intent.reasoning,
     // DKB extras (best-effort passthrough from call_output / contact)
     job_id: asStr(callOutput?.job_id ?? contactArgs?.job_id ?? getInput("job_id")),
-    company_name: asStr(callOutput?.company_name ?? contactArgs?.company_name ?? getInput("company_name")),
+    company_name: asStr(
+      callOutput?.company_name ?? contactArgs?.company_name ?? getInput("company_name"),
+    ),
     job_role_input: asStr(contactArgs?.job_role_input ?? getInput("job_role_input")),
     num_vacancies_input: asStr(contactArgs?.num_vacancies_input ?? getInput("num_vacancies_input")),
     city_input: asStr(contactArgs?.city_input ?? getInput("city_input")),
@@ -622,7 +681,8 @@ function buildRow(contact: any, lastCall: any, ctx: BuildCtx): string[] | null {
     const lower = col.toLowerCase();
     if (Object.prototype.hasOwnProperty.call(byCol, lower)) return byCol[lower];
     // best-effort fall through to contact field or agent_args
-    const fb = (contact as any)?.[col] ?? (contact as any)?.[nk] ?? contactArgs?.[col] ?? contactArgs?.[nk];
+    const fb =
+      (contact as any)?.[col] ?? (contact as any)?.[nk] ?? contactArgs?.[col] ?? contactArgs?.[nk];
     return asStr(fb);
   });
 }
@@ -652,7 +712,11 @@ async function fetchCallDetail(callId: string): Promise<any | null> {
   try {
     return (await rayaFetch(`/call/${encodeURIComponent(callId)}`, { method: "GET" })) as any;
   } catch (e) {
-    console.warn("[raya-export] call detail unavailable", callId, e instanceof Error ? e.message : String(e));
+    console.warn(
+      "[raya-export] call detail unavailable",
+      callId,
+      e instanceof Error ? e.message : String(e),
+    );
     return null;
   }
 }
@@ -713,9 +777,7 @@ export const exportBatchToStaging = createServerFn({ method: "POST" })
 
     // SAFETY: never write to a master.
     const masters = await masterSheets();
-    const clash = masters.find(
-      (m) => String(m.sheet_id).trim() === String(target.sheet_id).trim(),
-    );
+    const clash = masters.find((m) => String(m.sheet_id).trim() === String(target.sheet_id).trim());
     if (clash) {
       throw new Error(
         `Refusing to export — staging sheet matches the master in Connections (${clash.name ?? clash.program}). Update Settings with a different sheet.`,
@@ -729,7 +791,11 @@ export const exportBatchToStaging = createServerFn({ method: "POST" })
     const sheetId = target.sheet_id;
 
     // Cleanup: never keep or write to the stray tab that older builds created.
-    try { await deleteSheetTab(sheetId, "Staging"); } catch { /* ignore */ }
+    try {
+      await deleteSheetTab(sheetId, "Staging");
+    } catch {
+      /* ignore */
+    }
 
     let existing: Set<string> = new Set();
     let rowByCallId: Map<string, number> = new Map();
@@ -742,11 +808,20 @@ export const exportBatchToStaging = createServerFn({ method: "POST" })
       if (r.hasHeaders && r.headers.join("\u001f") !== columns.join("\u001f")) {
         await writeStagingHeaders(sheetId, tab, columns);
       }
-      try { await deleteSheetTab(sheetId, "Staging"); } catch { /* ignore */ }
+      try {
+        await deleteSheetTab(sheetId, "Staging");
+      } catch {
+        /* ignore */
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      await db.update(programExportTargets).set({ lastError: msg }).where(eq(programExportTargets.program, data.program));
-      throw new Error(`Staging sheet not accessible: ${msg}. Share it with the service account as Editor.`);
+      await db
+        .update(programExportTargets)
+        .set({ lastError: msg })
+        .where(eq(programExportTargets.program, data.program));
+      throw new Error(
+        `Staging sheet not accessible: ${msg}. Share it with the service account as Editor.`,
+      );
     }
     if (!hasHeaders) {
       await writeStagingHeaders(sheetId, tab, columns);
@@ -765,12 +840,13 @@ export const exportBatchToStaging = createServerFn({ method: "POST" })
       agentName: data.agentName ?? (lb as any)?.agent_name ?? "",
       program: data.program,
     });
-    const campaignDay = (lb as any)?.campaign_day ?? await nextCampaignDay(data.program);
+    const campaignDay = (lb as any)?.campaign_day ?? (await nextCampaignDay(data.program));
     const language = (lb as any)?.language ?? detected.language;
     const launchMeta: LaunchMeta = {
       campaignDay,
       campaignDate: (lb as any)?.campaign_date ?? null,
-      campaignType: (lb as any)?.campaign_type ?? campaignTypeFor(data.program, language, campaignDay),
+      campaignType:
+        (lb as any)?.campaign_type ?? campaignTypeFor(data.program, language, campaignDay),
       language,
       cityCampaign: (lb as any)?.city_campaign ?? detected.city,
       region: (lb as any)?.region ?? detected.region,
@@ -791,7 +867,10 @@ export const exportBatchToStaging = createServerFn({ method: "POST" })
         region: launchMeta.region,
         updatedAt: new Date().toISOString(),
       };
-      await db.insert(launchedBatches).values(meta).onConflictDoUpdate({ target: launchedBatches.batchId, set: meta });
+      await db
+        .insert(launchedBatches)
+        .values(meta)
+        .onConflictDoUpdate({ target: launchedBatches.batchId, set: meta });
     }
 
     const inputByPhone = new Map<string, InputRow>();
@@ -810,7 +889,10 @@ export const exportBatchToStaging = createServerFn({ method: "POST" })
         inputByPhone.set(String((r as any).normalized_phone), r as InputRow);
       }
     } catch (e) {
-      console.warn("[raya-export] input rows unavailable", e instanceof Error ? e.message : String(e));
+      console.warn(
+        "[raya-export] input rows unavailable",
+        e instanceof Error ? e.message : String(e),
+      );
     }
 
     const ctx: BuildCtx = {
@@ -830,17 +912,26 @@ export const exportBatchToStaging = createServerFn({ method: "POST" })
     let skippedNoId = 0;
     for (const contact of contacts) {
       let lastCall = pickLastCall(contact);
-      if (!lastCall) { skippedNoCall++; continue; }
+      if (!lastCall) {
+        skippedNoCall++;
+        continue;
+      }
       const callIdForDetail = asStr(lastCall?.uuid ?? lastCall?.id ?? lastCall?.execution_id ?? "");
       lastCall = mergeCallDetail(lastCall, await fetchCallDetail(callIdForDetail));
       await delay(350);
       const row = buildRow(contact, lastCall, ctx);
-      if (!row) { skippedNoId++; continue; }
+      if (!row) {
+        skippedNoId++;
+        continue;
+      }
       allRowsForStatus.push(row);
       // call_id position in columns
       const idIdx = columns.findIndex((c) => normalize(c) === "call_id");
       const callId = idIdx >= 0 ? row[idIdx] : "";
-      if (!callId) { skippedNoId++; continue; }
+      if (!callId) {
+        skippedNoId++;
+        continue;
+      }
       if (existing.has(callId)) {
         skippedDup++;
         const rowNumber = rowByCallId.get(callId);
@@ -876,8 +967,12 @@ export const exportBatchToStaging = createServerFn({ method: "POST" })
       sheetId,
       tab,
       header: columns,
-      populatedColumns: columns.filter((_, i) => allRowsForStatus.some((row) => String(row[i] ?? "").trim() !== "")),
-      emptyColumns: columns.filter((_, i) => !allRowsForStatus.some((row) => String(row[i] ?? "").trim() !== "")),
+      populatedColumns: columns.filter((_, i) =>
+        allRowsForStatus.some((row) => String(row[i] ?? "").trim() !== ""),
+      ),
+      emptyColumns: columns.filter(
+        (_, i) => !allRowsForStatus.some((row) => String(row[i] ?? "").trim() !== ""),
+      ),
       rayaFields: {
         contact: Object.keys(sampleContact ?? {}).sort(),
         call: Object.keys(pickLastCall(sampleContact) ?? {}).sort(),

@@ -6,7 +6,12 @@ import { requireRole, sessionMiddleware } from "@/auth/middleware";
 const GENERIC_LOGIN_ERROR = "Email or password is incorrect";
 
 const email = z.string().trim().toLowerCase().email().max(320);
-const optText = z.string().trim().max(200).optional().transform((v) => (v ? v : null));
+const optText = z
+  .string()
+  .trim()
+  .max(200)
+  .optional()
+  .transform((v) => (v ? v : null));
 
 async function db() {
   const [{ getDb }, schema, orm] = await Promise.all([
@@ -47,11 +52,17 @@ export const login = createServerFn({ method: "POST" })
       const next = pw.afterFailedLogin(u.failedLoginCount, now);
       await d
         .update(appUsers)
-        .set({ failedLoginCount: next.failedLoginCount, lockedUntil: next.lockedUntil?.toISOString() ?? null })
+        .set({
+          failedLoginCount: next.failedLoginCount,
+          lockedUntil: next.lockedUntil?.toISOString() ?? null,
+        })
         .where(eq(appUsers.id, u.id));
       return refuse(u.passwordHash);
     }
-    await d.update(appUsers).set({ failedLoginCount: 0, lockedUntil: null }).where(eq(appUsers.id, u.id));
+    await d
+      .update(appUsers)
+      .set({ failedLoginCount: 0, lockedUntil: null })
+      .where(eq(appUsers.id, u.id));
     await startSession(u.id);
     return { role: u.role as Role, mustChangePassword: u.mustChangePassword };
   });
@@ -91,10 +102,15 @@ export const changePassword = createServerFn({ method: "POST" })
     if (!u || !(await pw.verifyPassword(data.currentPassword, u.passwordHash))) {
       throw new Error("Current password is incorrect");
     }
-    if (data.newPassword === data.currentPassword) throw new Error("Choose a password different from the current one.");
+    if (data.newPassword === data.currentPassword)
+      throw new Error("Choose a password different from the current one.");
     await d
       .update(appUsers)
-      .set({ passwordHash: await pw.hashPassword(data.newPassword), mustChangePassword: false, updatedAt: new Date().toISOString() })
+      .set({
+        passwordHash: await pw.hashPassword(data.newPassword),
+        mustChangePassword: false,
+        updatedAt: new Date().toISOString(),
+      })
       .where(eq(appUsers.id, u.id));
     return { ok: true };
   });
@@ -153,7 +169,11 @@ export const createAppUser = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<{ temporaryPassword: string }> => {
     const { db: d, appUsers, eq } = await db();
     const pw = await import("@/server/auth/password.server");
-    const [exists] = await d.select({ id: appUsers.id }).from(appUsers).where(eq(appUsers.email, data.email)).limit(1);
+    const [exists] = await d
+      .select({ id: appUsers.id })
+      .from(appUsers)
+      .where(eq(appUsers.email, data.email))
+      .limit(1);
     if (exists) throw new Error("A user with this email already exists.");
     const temporaryPassword = pw.temporaryPassword();
     await d.insert(appUsers).values({
@@ -172,7 +192,10 @@ export const createAppUser = createServerFn({ method: "POST" })
 
 async function activeAdminCount(): Promise<number> {
   const { db: d, appUsers, and, eq, count } = await db();
-  const [r] = await d.select({ n: count() }).from(appUsers).where(and(eq(appUsers.role, "admin"), eq(appUsers.active, true)));
+  const [r] = await d
+    .select({ n: count() })
+    .from(appUsers)
+    .where(and(eq(appUsers.role, "admin"), eq(appUsers.active, true)));
   return r?.n ?? 0;
 }
 
@@ -183,7 +206,12 @@ export const updateAppUser = createServerFn({ method: "POST" })
     const { db: d, appUsers, eq } = await db();
     const [u] = await d.select().from(appUsers).where(eq(appUsers.email, data.email)).limit(1);
     if (!u) throw new Error("No such user.");
-    if (u.role === "admin" && u.active && data.role !== "admin" && (await activeAdminCount()) <= 1) {
+    if (
+      u.role === "admin" &&
+      u.active &&
+      data.role !== "admin" &&
+      (await activeAdminCount()) <= 1
+    ) {
       throw new Error("Cannot demote the last active admin.");
     }
     await d

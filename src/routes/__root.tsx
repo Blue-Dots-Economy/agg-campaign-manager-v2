@@ -79,7 +79,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:title", content: "Purple Dots" },
       { name: "twitter:title", content: "Purple Dots" },
       { property: "og:description", content: "Master Operations Dashboard for Voice-AI Campaigns" },
-      { name: "twitter:description", content: "Master Operations Dashboard for Voice-AI Campaigns" },
+      {
+        name: "twitter:description",
+        content: "Master Operations Dashboard for Voice-AI Campaigns",
+      },
       { name: "twitter:card", content: "summary_large_image" },
       { property: "og:type", content: "website" },
     ],
@@ -111,7 +114,8 @@ function RootShell({ children }: { children: ReactNode }) {
         <HeadContent />
         <script
           dangerouslySetInnerHTML={{
-            __html: "try{var t=localStorage.getItem('rozgar-theme')||'system';var d=t==='dark'||(t==='system'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}",
+            __html:
+              "try{var t=localStorage.getItem('rozgar-theme')||'system';var d=t==='dark'||(t==='system'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}",
           }}
         />
       </head>
@@ -129,7 +133,6 @@ import { AuthProvider, useAuth } from "../auth/context";
 import { ThemeProvider } from "../lib/theme";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { canAccess, landingFor } from "../auth/permissions";
-
 
 function AuthGate({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -157,7 +160,6 @@ function AuthGate({ children }: { children: ReactNode }) {
   return <AppShell>{children}</AppShell>;
 }
 
-
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
@@ -175,4 +177,3 @@ function RootComponent() {
     </QueryClientProvider>
   );
 }
-

@@ -155,17 +155,19 @@ export const providers: ProgramConfig = {
     { key: "jobs_verified", label: "Jobs verified", icon: "ShieldCheck", format: "number" },
     { key: "new_jobs_posted", label: "New jobs posted", icon: "Plus", format: "number" },
     { key: "high_intent", label: "High-intent (≥5)", icon: "Flame", format: "number" },
-    { key: "talent_insights_shown", label: "Talent insights shown", icon: "Sparkles", format: "number" },
+    {
+      key: "talent_insights_shown",
+      label: "Talent insights shown",
+      icon: "Sparkles",
+      format: "number",
+    },
   ],
-  dropReasons: [
-    "Early Disconnect",
-    "No Answer",
-    "Completed",
-    "Callback Requested",
-    "Failure",
-  ],
+  dropReasons: ["Early Disconnect", "No Answer", "Completed", "Callback Requested", "Failure"],
   launchSteps: [
-    { title: "Upload employer CSV", description: "Drop the source list of employers / job postings" },
+    {
+      title: "Upload employer CSV",
+      description: "Drop the source list of employers / job postings",
+    },
     { title: "Map job & company fields", description: "Match to the DKB verification schema" },
     { title: "Assign verification slot", description: "Pick a window for outbound calls" },
     { title: "Schedule call window", description: "Pick a date and time window" },

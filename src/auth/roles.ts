@@ -10,7 +10,16 @@ export function isRole(v: unknown): v is Role {
 // Route prefixes each role may open. "*" = everything.
 export const ROLE_ROUTES: Record<Role, string[]> = {
   admin: ["*"],
-  jfc: ["/user-level-analysis", "/", "/campaigns", "/review", "/launch", "/ecosystem-view", "/campaign-requests", "/request-campaign"],
+  jfc: [
+    "/user-level-analysis",
+    "/",
+    "/campaigns",
+    "/review",
+    "/launch",
+    "/ecosystem-view",
+    "/campaign-requests",
+    "/request-campaign",
+  ],
   coordinator: ["/user-level-analysis", "/", "/campaigns", "/review", "/request-campaign"],
   owner: ["/user-level-analysis", "/"],
   ecosystem: ["/ecosystem-view", "/user-level-analysis", "/"],
@@ -38,7 +47,9 @@ export function canAccess(role: Role | undefined, pathname: string): boolean {
   if (ACCOUNT_ROUTES.includes(pathname)) return true;
   const allowed = ROLE_ROUTES[role] ?? [];
   if (allowed.includes("*")) return true;
-  return allowed.some((r) => (r === "/" ? pathname === "/" : pathname === r || pathname.startsWith(r + "/")));
+  return allowed.some((r) =>
+    r === "/" ? pathname === "/" : pathname === r || pathname.startsWith(r + "/"),
+  );
 }
 
 // May change shared data: the UP seekers CSV and North Star targets.

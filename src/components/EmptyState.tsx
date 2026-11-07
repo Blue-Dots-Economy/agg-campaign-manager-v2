@@ -20,8 +20,8 @@ export function NoDataState({ reason = "no_connections", onClearFilters }: NoDat
             <FilterX className="h-6 w-6" />
           </div>
           <p className="text-sm text-muted-foreground max-w-md">
-            No calls match the current date or region filters. Try a different date range or
-            clear the filters to see all data.
+            No calls match the current date or region filters. Try a different date range or clear
+            the filters to see all data.
           </p>
           {onClearFilters && (
             <Button variant="outline" size="sm" onClick={onClearFilters}>

@@ -35,7 +35,7 @@ interface ActiveBatch {
 
 async function rayaListAgentBatches(agentId: string): Promise<any[]> {
   const qs = new URLSearchParams({ agent_id: agentId, page_size: "100" });
-  const parsed = await rayaFetch(`/batch?${qs.toString()}`, { method: "GET" }) as any;
+  const parsed = (await rayaFetch(`/batch?${qs.toString()}`, { method: "GET" })) as any;
   const items: any[] =
     parsed?.items ?? parsed?.data ?? parsed?.batches ?? (Array.isArray(parsed) ? parsed : []);
   return items;
@@ -58,21 +58,38 @@ export const getConcurrencyUsage = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.dashboard)])
   .inputValidator((d: { cap?: number }) => d ?? {})
   .handler(async ({ data }) => {
-    const cap = Number.isFinite(data?.cap) && (data!.cap as number) > 0
-      ? (data!.cap as number)
-      : CONCURRENCY_CAP_DEFAULT;
+    const cap =
+      Number.isFinite(data?.cap) && (data!.cap as number) > 0
+        ? (data!.cap as number)
+        : CONCURRENCY_CAP_DEFAULT;
 
     if (!process.env.RAYA_API_KEY) {
-      return { cap, used: 0, available: cap, batches: [] as ActiveBatch[], error: "RAYA_API_KEY not set" };
+      return {
+        cap,
+        used: 0,
+        available: cap,
+        batches: [] as ActiveBatch[],
+        error: "RAYA_API_KEY not set",
+      };
     }
 
     let agents: Array<{ program: string; agent_id: string; name: string }>;
     try {
       agents = await getDb()
-        .select({ program: programAgents.program, agent_id: programAgents.agentId, name: programAgents.name })
+        .select({
+          program: programAgents.program,
+          agent_id: programAgents.agentId,
+          name: programAgents.name,
+        })
         .from(programAgents);
     } catch (e) {
-      return { cap, used: 0, available: cap, batches: [] as ActiveBatch[], error: e instanceof Error ? e.message : String(e) };
+      return {
+        cap,
+        used: 0,
+        available: cap,
+        batches: [] as ActiveBatch[],
+        error: e instanceof Error ? e.message : String(e),
+      };
     }
 
     const active: ActiveBatch[] = [];
@@ -81,7 +98,9 @@ export const getConcurrencyUsage = createServerFn({ method: "GET" })
       try {
         const items = await rayaListAgentBatches(a.agent_id);
         for (const item of items) {
-          const status = String(item?.status ?? "").toLowerCase().trim();
+          const status = String(item?.status ?? "")
+            .toLowerCase()
+            .trim();
           if (!ACTIVE_STATUSES.has(status)) continue;
           const concurrency = pickConcurrency(item);
           if (concurrency <= 0) continue;

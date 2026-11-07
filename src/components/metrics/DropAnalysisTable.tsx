@@ -18,18 +18,10 @@ export function regionsFromRows(rows: DropRow[], onlyRegion?: string): string[] 
   return Array.from(set).sort((a, b) => a.localeCompare(b));
 }
 
-export function DropAnalysisTable({
-  rows,
-  onlyRegion,
-}: {
-  rows: DropRow[];
-  onlyRegion?: string;
-}) {
+export function DropAnalysisTable({ rows, onlyRegion }: { rows: DropRow[]; onlyRegion?: string }) {
   if (!rows || rows.length === 0) {
     return (
-      <div className="text-sm text-muted-foreground py-8 text-center">
-        No drop data available.
-      </div>
+      <div className="text-sm text-muted-foreground py-8 text-center">No drop data available.</div>
     );
   }
 
@@ -88,7 +80,9 @@ export function DropAnalysisTable({
                         {fmt(r.byRegion?.[reg] ?? 0)}
                       </td>
                     ))}
-                    <td className="px-4 py-2 text-right tabular-nums font-medium">{fmt(r.total)}</td>
+                    <td className="px-4 py-2 text-right tabular-nums font-medium">
+                      {fmt(r.total)}
+                    </td>
                   </tr>
                 ))}
                 <tr className="border-t border-border bg-primary/5 font-semibold">

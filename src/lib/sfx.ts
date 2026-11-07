@@ -9,5 +9,7 @@ export function playSwoosh() {
     }
     el.currentTime = 0;
     void el.play();
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }

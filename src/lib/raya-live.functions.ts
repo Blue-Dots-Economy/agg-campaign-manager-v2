@@ -33,7 +33,9 @@ export interface LiveBatch {
 }
 
 function normalizeStatus(s: any): string {
-  return String(s ?? "").toLowerCase().trim();
+  return String(s ?? "")
+    .toLowerCase()
+    .trim();
 }
 
 function pickNum(item: any, ...keys: string[]): number {
@@ -48,18 +50,27 @@ function pickNum(item: any, ...keys: string[]): number {
 function extractStatusCounts(item: any) {
   // Raya batch object often includes counts like total_contacts, completed, pending, etc.
   // Try a variety of keys and fall back to 0.
-  const counts =
-    item?.status_counts ?? item?.statusCounts ?? item?.counts ?? item?.summary ?? {};
+  const counts = item?.status_counts ?? item?.statusCounts ?? item?.counts ?? item?.summary ?? {};
   const total =
     pickNum(item, "total_contacts", "totalContacts", "total", "contacts_count") ||
     pickNum(counts, "total");
   const pending = pickNum(counts, "Pending", "pending");
-  const inProgress = pickNum(counts, "In Progress", "InProgress", "in_progress", "Calling", "calling");
+  const inProgress = pickNum(
+    counts,
+    "In Progress",
+    "InProgress",
+    "in_progress",
+    "Calling",
+    "calling",
+  );
   const completed = pickNum(counts, "Completed", "completed");
   const unanswered = pickNum(counts, "Unanswered", "unanswered");
   const failed = pickNum(counts, "Failed", "failed");
-  const pickedUp = pickNum(counts, "PickedUp", "Picked Up", "picked_up", "Answered", "answered") || completed;
-  const dialed = total ? Math.max(0, total - pending) : (inProgress + completed + unanswered + failed);
+  const pickedUp =
+    pickNum(counts, "PickedUp", "Picked Up", "picked_up", "Answered", "answered") || completed;
+  const dialed = total
+    ? Math.max(0, total - pending)
+    : inProgress + completed + unanswered + failed;
   return { total, pending, inProgress, completed, unanswered, failed, pickedUp, dialed };
 }
 
@@ -119,7 +130,11 @@ export const listProgramLiveBatches = createServerFn({ method: "GET" })
         .from(programAgents)
         .where(eq(programAgents.program, data.program));
     } catch (e) {
-      return { ok: false as const, batches: [] as LiveBatch[], error: e instanceof Error ? e.message : String(e) };
+      return {
+        ok: false as const,
+        batches: [] as LiveBatch[],
+        error: e instanceof Error ? e.message : String(e),
+      };
     }
     const all: LiveBatch[] = [];
     for (const a of agents ?? []) {
@@ -185,8 +200,7 @@ function contactStatus(c: any): string {
   return String(c?.status ?? c?.call_status ?? "").trim();
 }
 function contactDuration(c: any): number {
-  const v =
-    c?.call_duration_seconds ?? c?.duration_seconds ?? c?.duration ?? c?.call_duration ?? 0;
+  const v = c?.call_duration_seconds ?? c?.duration_seconds ?? c?.duration ?? c?.call_duration ?? 0;
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
 }
@@ -225,7 +239,12 @@ export const getBatchLiveDetail = createServerFn({ method: "GET" })
       await delay(400);
     }
 
-    let pending = 0, inProgress = 0, completed = 0, unanswered = 0, failed = 0, pickedUp = 0;
+    let pending = 0,
+      inProgress = 0,
+      completed = 0,
+      unanswered = 0,
+      failed = 0,
+      pickedUp = 0;
     for (const c of contacts) {
       const s = contactStatus(c).toLowerCase();
       if (s === "pending") pending++;
@@ -268,7 +287,8 @@ export const getBatchLiveDetail = createServerFn({ method: "GET" })
       dialed,
       concurrency: pickNum(batchMeta, "concurrency", "max_concurrency", "parallel_calls"),
       maxRetries: typeof batchMeta?.max_retries === "number" ? batchMeta.max_retries : null,
-      retryAfterHrs: typeof batchMeta?.retry_after_hrs === "number" ? batchMeta.retry_after_hrs : null,
+      retryAfterHrs:
+        typeof batchMeta?.retry_after_hrs === "number" ? batchMeta.retry_after_hrs : null,
       schedule: batchMeta?.schedule ?? null,
       createdAt: batchMeta?.created_at ?? batchMeta?.createdAt ?? null,
       startedAt: batchMeta?.started_at ?? batchMeta?.startedAt ?? null,

@@ -139,20 +139,7 @@ const PROVIDER_DESCRIPTIONS: Record<Lifecycle, string> = {
   Inactive: "No activity for 90+ days",
 };
 
-const MONTHS = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function formatJoined(raw: string): string {
   if (!raw) return "—";
@@ -190,7 +177,11 @@ function SegmentedBar({ breakdown, max }: { breakdown: ConnectionBreakdown; max:
             const v = breakdown[s.key];
             if (!v) return null;
             return (
-              <div key={s.key} className={`h-full ${s.color}`} style={{ width: `${(v / total) * 100}%` }} />
+              <div
+                key={s.key}
+                className={`h-full ${s.color}`}
+                style={{ width: `${(v / total) * 100}%` }}
+              />
             );
           })}
         </div>
@@ -199,13 +190,7 @@ function SegmentedBar({ breakdown, max }: { breakdown: ConnectionBreakdown; max:
   );
 }
 
-function ConnectionCell({
-  breakdown,
-  max,
-}: {
-  breakdown: ConnectionBreakdown;
-  max: number;
-}) {
+function ConnectionCell({ breakdown, max }: { breakdown: ConnectionBreakdown; max: number }) {
   const total = sumBreakdown(breakdown);
   return (
     <HoverCard openDelay={150} closeDelay={100}>
@@ -265,9 +250,7 @@ function MetricTile({
         <div className="text-sm font-medium leading-tight">{label}</div>
       </div>
       <div className="mt-4 text-3xl font-semibold tracking-tight">{value}</div>
-      <div className="mt-1 text-xs text-muted-foreground">
-        {description}
-      </div>
+      <div className="mt-1 text-xs text-muted-foreground">{description}</div>
     </div>
   );
 }
@@ -576,7 +559,9 @@ function UserLevelAnalysis() {
               </PopoverTrigger>
               <PopoverContent align="end" className="w-64 space-y-3">
                 <div className="space-y-1.5">
-                  <div className="text-xs font-medium text-muted-foreground">Profile completion</div>
+                  <div className="text-xs font-medium text-muted-foreground">
+                    Profile completion
+                  </div>
                   <Select
                     value={String(minCompletion)}
                     onValueChange={(v) => setMinCompletion(Number(v))}
@@ -689,7 +674,10 @@ function UserLevelAnalysis() {
               ))}
               {filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-10">
+                  <TableCell
+                    colSpan={7}
+                    className="text-center text-sm text-muted-foreground py-10"
+                  >
                     No participants match your filters.
                   </TableCell>
                 </TableRow>
@@ -723,7 +711,10 @@ function UserLevelAnalysis() {
             <ol className="list-decimal pl-5 space-y-1.5 text-sm">
               {[
                 { label: "Name", desc: "not blank and not a placeholder (Unknown, अज्ञात, etc.)" },
-                { label: "Location", desc: "not blank and not just city / state / their combination" },
+                {
+                  label: "Location",
+                  desc: "not blank and not just city / state / their combination",
+                },
                 { label: "Email or Phone", desc: "at least one filled" },
                 { label: "Age", desc: "not blank" },
                 { label: "Role", desc: 'not blank and not "any"' },

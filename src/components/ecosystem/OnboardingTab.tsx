@@ -93,7 +93,9 @@ function HealthCard({
     <div className="rounded-xl border bg-card p-5 flex items-center gap-4">
       <div className={`h-10 w-10 shrink-0 rounded-lg grid place-items-center ${tile}`}>{icon}</div>
       <div className="min-w-0 flex-1">
-        <p className="text-2xl font-semibold tracking-tight tabular-nums text-foreground">{value}</p>
+        <p className="text-2xl font-semibold tracking-tight tabular-nums text-foreground">
+          {value}
+        </p>
         <p className="mt-0.5 text-xs text-muted-foreground">{caption}</p>
       </div>
       {action}
@@ -189,7 +191,9 @@ function AddParticipants() {
       >
         <Upload className="h-6 w-6 mx-auto text-muted-foreground" />
         <p className="mt-3 text-sm text-foreground">Drag your CSV here or click to browse</p>
-        <p className="mt-1 text-xs text-muted-foreground">.csv files only · max 500 rows per upload</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          .csv files only · max 500 rows per upload
+        </p>
         {file ? <p className="mt-3 text-xs text-brand font-medium">{file.name}</p> : null}
         <input
           ref={inputRef}
@@ -413,11 +417,7 @@ function ShareLink({ region }: { region: RegionValue }) {
           <p className="text-center text-xs text-muted-foreground">
             Scan or click to open the registration page
           </p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => toast.success("QR downloaded")}
-          >
+          <Button variant="outline" size="sm" onClick={() => toast.success("QR downloaded")}>
             Download QR
           </Button>
         </div>
@@ -575,7 +575,10 @@ function FlaggedSection({ region }: { region: RegionValue }) {
   };
 
   return (
-    <Panel title="Flagged profiles" description="Profiles that need correction before they go live.">
+    <Panel
+      title="Flagged profiles"
+      description="Profiles that need correction before they go live."
+    >
       <div className="hidden md:block overflow-x-auto">
         <Table>
           <TableHeader>
@@ -598,7 +601,12 @@ function FlaggedSection({ region }: { region: RegionValue }) {
                 <TableCell className="text-right tabular-nums">{p.daysFlagged}</TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-1.5">
-                    <Button variant="ghost" size="sm" className="text-brand" onClick={() => notify(p)}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-brand"
+                      onClick={() => notify(p)}
+                    >
                       Notify
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => openFix(p)}>

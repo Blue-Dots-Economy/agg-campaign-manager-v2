@@ -81,9 +81,7 @@ export function MetricCard({
             {hasTrend && trendPct !== null ? <TrendPill pct={trendPct} /> : null}
             {!hasTrend && trailing ? <span>{trailing}</span> : null}
           </div>
-          {subLine ? (
-            <p className="mt-2 text-[13px] text-muted-foreground">{subLine}</p>
-          ) : null}
+          {subLine ? <p className="mt-2 text-[13px] text-muted-foreground">{subLine}</p> : null}
         </div>
         {showSpark ? (
           <div className="shrink-0 self-center">
@@ -129,8 +127,10 @@ function Sparkline({ data, width = 110, height = 40 }: SparkProps) {
     const y = padY + innerH - ((v - min) / range) * innerH;
     return [x, y] as const;
   });
-  const linePath = points.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
-  const areaPath = `${linePath} L${(points[n - 1][0]).toFixed(1)},${height} L0,${height} Z`;
+  const linePath = points
+    .map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`)
+    .join(" ");
+  const areaPath = `${linePath} L${points[n - 1][0].toFixed(1)},${height} L0,${height} Z`;
 
   // Direction: compare mean of first third vs last third (robust to single-point spikes).
   const seg = Math.max(1, Math.floor(n / 3));
@@ -152,7 +152,14 @@ function Sparkline({ data, width = 110, height = 40 }: SparkProps) {
   return (
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden>
       <path d={areaPath} fill={color.fill} />
-      <path d={linePath} fill="none" stroke={color.stroke} strokeWidth={1.75} strokeLinejoin="round" strokeLinecap="round" />
+      <path
+        d={linePath}
+        fill="none"
+        stroke={color.stroke}
+        strokeWidth={1.75}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }

@@ -17,7 +17,6 @@ interface Props {
   filters?: Pick<OverviewFilters, "dateFrom" | "dateTo" | "channel">;
 }
 
-
 function outcomeRate(m: Partial<DkbMetrics> | undefined | null): number | null {
   if (!m) return null;
   const denom = m.companiesCalled ?? 0;
@@ -42,13 +41,7 @@ function score(m: Partial<DkbMetrics> | undefined | null): number | null {
   );
 }
 
-export function CampaignSuccessDkb({
-  campaign,
-  language,
-  region,
-  campaignDate,
-  filters,
-}: Props) {
+export function CampaignSuccessDkb({ campaign, language, region, campaignDate, filters }: Props) {
   const { config } = useProgram();
   const dateFrom = filters?.dateFrom ?? null;
   const dateTo = filters?.dateTo ?? null;
@@ -94,7 +87,6 @@ export function CampaignSuccessDkb({
     channel,
   });
 
-
   const thisM = thisAgg.data?.metrics as Partial<DkbMetrics> | undefined;
   const regionM = regionAgg.data?.metrics as Partial<DkbMetrics> | undefined;
   const prevM = prevEntry ? (prevAgg.data?.metrics as Partial<DkbMetrics> | undefined) : undefined;
@@ -122,9 +114,7 @@ export function CampaignSuccessDkb({
 
   const yes = c3Pass && (c1Applicable ? c1Pass || c2Pass : c2Pass);
 
-  const tone = yes
-    ? "border-emerald-500/40 bg-emerald-500/5"
-    : "border-rose-500/40 bg-rose-500/5";
+  const tone = yes ? "border-emerald-500/40 bg-emerald-500/5" : "border-rose-500/40 bg-rose-500/5";
   const verdictColor = yes
     ? "text-emerald-700 dark:text-emerald-300"
     : "text-rose-700 dark:text-rose-300";
@@ -145,9 +135,7 @@ export function CampaignSuccessDkb({
         Is this campaign successful?
       </div>
       <div className="mt-1 flex items-baseline gap-2">
-        <span className={`text-3xl font-semibold ${verdictColor}`}>
-          {yes ? "Yes" : "No"}
-        </span>
+        <span className={`text-3xl font-semibold ${verdictColor}`}>{yes ? "Yes" : "No"}</span>
         <span className="text-sm text-muted-foreground">
           · {passCount} of {applicableCount} met
         </span>
@@ -161,13 +149,7 @@ export function CampaignSuccessDkb({
   );
 }
 
-function CriterionRow({
-  status,
-  text,
-}: {
-  status: "pass" | "fail" | "na";
-  text: string;
-}) {
+function CriterionRow({ status, text }: { status: "pass" | "fail" | "na"; text: string }) {
   const Icon = status === "pass" ? Check : status === "fail" ? X : Minus;
   const color =
     status === "pass"

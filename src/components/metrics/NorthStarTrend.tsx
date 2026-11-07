@@ -74,9 +74,13 @@ export function NorthStarTrend({
       const date = p.date || p.day || "";
       const bits = [p.type, p.language].filter(Boolean).join(" · ");
       const key = `${date}|${bits}`;
-      const cur =
-        m.get(key) ??
-        { date, label: bits ? `${date} ${bits}` : date || p.label || "—", answered: 0, high_intent: 0, converted: 0 };
+      const cur = m.get(key) ?? {
+        date,
+        label: bits ? `${date} ${bits}` : date || p.label || "—",
+        answered: 0,
+        high_intent: 0,
+        converted: 0,
+      };
       cur.answered += p.answered ?? 0;
       cur.high_intent += p.high_intent ?? 0;
       cur.converted += p.converted ?? 0;
@@ -99,10 +103,7 @@ export function NorthStarTrend({
 
   // Pooled (weighted) rate: sum(numerators) / sum(denominators) over the window.
   // Runs with a zero denominator contribute nothing instead of entering as a hard 0%.
-  const pooled = (
-    rows: typeof data,
-    key: (typeof SERIES)[number]["key"],
-  ) => {
+  const pooled = (rows: typeof data, key: (typeof SERIES)[number]["key"]) => {
     let num = 0;
     let den = 0;
     for (const r of rows) {
@@ -123,10 +124,8 @@ export function NorthStarTrend({
       den,
       runs: rows.length,
       parts: rows.map((r) => {
-        const n =
-          key === "pickup_to_highintent" ? r.high_intent : r.converted;
-        const d =
-          key === "highintent_to_app" ? r.high_intent : r.answered;
+        const n = key === "pickup_to_highintent" ? r.high_intent : r.converted;
+        const d = key === "highintent_to_app" ? r.high_intent : r.answered;
         return `${r.label}: ${n}/${d}`;
       }),
     };
@@ -145,9 +144,7 @@ export function NorthStarTrend({
       for (const w of WINDOWS) out[s.key][w.label] = pooled(data.slice(-w.count), s.key);
     }
     return out;
-
   }, [data]);
-
 
   if (data.length === 0) return null;
 
@@ -231,7 +228,6 @@ export function NorthStarTrend({
                   );
                 })}
               </div>
-
             </div>
           );
         })}
@@ -239,10 +235,9 @@ export function NorthStarTrend({
       <p className="mt-2 text-[11px] text-muted-foreground">
         Rates are pooled across the {data.length} {data.length === 1 ? "campaign" : "campaigns"} in
         range — total numerator ÷ total denominator — so runs with no calls don't drag the number to
-        0%. Last 1/3/5/10 use the most recent campaign runs (or
-        fewer if the range is shorter). A campaign is one date × type × language run. Dashed lines
-
-        show the shared target for each metric (set them in North Star Metrics).
+        0%. Last 1/3/5/10 use the most recent campaign runs (or fewer if the range is shorter). A
+        campaign is one date × type × language run. Dashed lines show the shared target for each
+        metric (set them in North Star Metrics).
       </p>
     </Panel>
   );

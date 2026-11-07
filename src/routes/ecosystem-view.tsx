@@ -176,9 +176,21 @@ function EcosystemView() {
 function TotalsRow({ totals }: { totals: ReturnType<typeof getEcosystemTotals> }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-      <MetricCard label="Total seekers" value={totals.totalSeekers} sub="registered in this district" />
-      <MetricCard label="Total service providers" value={totals.totalProviders} sub="active organisations" />
-      <MetricCard label="Total connections" value={totals.totalConnections} sub="seeker ↔ provider links made" />
+      <MetricCard
+        label="Total seekers"
+        value={totals.totalSeekers}
+        sub="registered in this district"
+      />
+      <MetricCard
+        label="Total service providers"
+        value={totals.totalProviders}
+        sub="active organisations"
+      />
+      <MetricCard
+        label="Total connections"
+        value={totals.totalConnections}
+        sub="seeker ↔ provider links made"
+      />
     </div>
   );
 }
@@ -334,7 +346,9 @@ function ProvidersGapPanel({ region }: { region: RegionValue }) {
               <TableHead className="text-right">Service providers</TableHead>
               <TableHead className="text-right">
                 Can service upto
-                <span className="block text-[10px] font-normal text-muted-foreground">count of seekers</span>
+                <span className="block text-[10px] font-normal text-muted-foreground">
+                  count of seekers
+                </span>
               </TableHead>
               <TableHead className="text-right">Matching seekers</TableHead>
               <TableHead className="text-right">Connections</TableHead>
@@ -354,11 +368,21 @@ function ProvidersGapPanel({ region }: { region: RegionValue }) {
                 <TableCell className="text-right tabular-nums">{fmt(r.capacity)}</TableCell>
                 <TableCell className="text-right tabular-nums">{fmt(r.matching)}</TableCell>
                 <TableCell className="text-right tabular-nums">{fmt(r.connections)}</TableCell>
-                <TableCell className="text-right"><GapNumber value={r.ag} /></TableCell>
-                <TableCell><LevelBadge level={r.agL} /></TableCell>
-                <TableCell className="text-right"><GapNumber value={r.ds} /></TableCell>
-                <TableCell><LevelBadge level={r.dsL} /></TableCell>
-                <TableCell><Actions items={r.actions} /></TableCell>
+                <TableCell className="text-right">
+                  <GapNumber value={r.ag} />
+                </TableCell>
+                <TableCell>
+                  <LevelBadge level={r.agL} />
+                </TableCell>
+                <TableCell className="text-right">
+                  <GapNumber value={r.ds} />
+                </TableCell>
+                <TableCell>
+                  <LevelBadge level={r.dsL} />
+                </TableCell>
+                <TableCell>
+                  <Actions items={r.actions} />
+                </TableCell>
                 <TableCell>
                   <Button
                     variant="ghost"
@@ -436,7 +460,9 @@ function SeekersGapPanel({ region }: { region: RegionValue }) {
               <TableHead className="text-right">Aggregators</TableHead>
               <TableHead className="text-right">
                 Can reach upto
-                <span className="block text-[10px] font-normal text-muted-foreground">count of seekers</span>
+                <span className="block text-[10px] font-normal text-muted-foreground">
+                  count of seekers
+                </span>
               </TableHead>
               <TableHead className="text-right">Matching providers</TableHead>
               <TableHead className="text-right">Connections</TableHead>
@@ -456,11 +482,21 @@ function SeekersGapPanel({ region }: { region: RegionValue }) {
                 <TableCell className="text-right tabular-nums">{fmt(r.reach)}</TableCell>
                 <TableCell className="text-right tabular-nums">{fmt(r.matching)}</TableCell>
                 <TableCell className="text-right tabular-nums">{fmt(r.connections)}</TableCell>
-                <TableCell className="text-right"><GapNumber value={r.ag} /></TableCell>
-                <TableCell><LevelBadge level={r.agL} /></TableCell>
-                <TableCell className="text-right"><GapNumber value={r.ds} /></TableCell>
-                <TableCell><LevelBadge level={r.dsL} /></TableCell>
-                <TableCell><Actions items={r.actions} /></TableCell>
+                <TableCell className="text-right">
+                  <GapNumber value={r.ag} />
+                </TableCell>
+                <TableCell>
+                  <LevelBadge level={r.agL} />
+                </TableCell>
+                <TableCell className="text-right">
+                  <GapNumber value={r.ds} />
+                </TableCell>
+                <TableCell>
+                  <LevelBadge level={r.dsL} />
+                </TableCell>
+                <TableCell>
+                  <Actions items={r.actions} />
+                </TableCell>
                 <TableCell>
                   <Button
                     variant="ghost"
@@ -542,11 +578,21 @@ function ProviderDrilldown({
                     <TableCell className="text-right tabular-nums">{fmt(o.capacity)}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmt(o.matching)}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmt(o.connections)}</TableCell>
-                    <TableCell className="text-right"><GapNumber value={ag} /></TableCell>
-                    <TableCell><LevelBadge level={agL} /></TableCell>
-                    <TableCell className="text-right"><GapNumber value={ds} /></TableCell>
-                    <TableCell><LevelBadge level={dsL} /></TableCell>
-                    <TableCell><Actions items={recommendedActions("provider", agL, dsL)} /></TableCell>
+                    <TableCell className="text-right">
+                      <GapNumber value={ag} />
+                    </TableCell>
+                    <TableCell>
+                      <LevelBadge level={agL} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <GapNumber value={ds} />
+                    </TableCell>
+                    <TableCell>
+                      <LevelBadge level={dsL} />
+                    </TableCell>
+                    <TableCell>
+                      <Actions items={recommendedActions("provider", agL, dsL)} />
+                    </TableCell>
                   </TableRow>
                 );
               })}
@@ -574,7 +620,8 @@ function SeekerDrilldown({
         <DialogHeader>
           <DialogTitle>{area}</DialogTitle>
           <DialogDescription>
-            {orgs.length} aggregator{orgs.length === 1 ? "" : "s"} reaching seekers in this need area.
+            {orgs.length} aggregator{orgs.length === 1 ? "" : "s"} reaching seekers in this need
+            area.
           </DialogDescription>
         </DialogHeader>
         <div className="max-h-[65vh] overflow-auto">
@@ -608,11 +655,21 @@ function SeekerDrilldown({
                     <TableCell className="text-right tabular-nums">{fmt(o.reach)}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmt(o.matching)}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmt(o.connections)}</TableCell>
-                    <TableCell className="text-right"><GapNumber value={ag} /></TableCell>
-                    <TableCell><LevelBadge level={agL} /></TableCell>
-                    <TableCell className="text-right"><GapNumber value={ds} /></TableCell>
-                    <TableCell><LevelBadge level={dsL} /></TableCell>
-                    <TableCell><Actions items={recommendedActions("seeker", agL, dsL)} /></TableCell>
+                    <TableCell className="text-right">
+                      <GapNumber value={ag} />
+                    </TableCell>
+                    <TableCell>
+                      <LevelBadge level={agL} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <GapNumber value={ds} />
+                    </TableCell>
+                    <TableCell>
+                      <LevelBadge level={dsL} />
+                    </TableCell>
+                    <TableCell>
+                      <Actions items={recommendedActions("seeker", agL, dsL)} />
+                    </TableCell>
                   </TableRow>
                 );
               })}

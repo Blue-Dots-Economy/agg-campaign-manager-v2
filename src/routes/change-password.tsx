@@ -52,17 +52,42 @@ function ChangePasswordPage() {
           {forced ? "Set your own password to continue." : `At least ${MIN_LENGTH} characters.`}
         </p>
         <form onSubmit={onSubmit} className="mt-6 space-y-4">
-          <Field id="current" label={forced ? "Temporary password" : "Current password"} value={current} onChange={edit(setCurrent)} autoComplete="current-password" />
-          <Field id="next" label="New password" value={next} onChange={edit(setNext)} autoComplete="new-password" />
-          <Field id="confirm" label="Confirm new password" value={confirm} onChange={edit(setConfirm)} autoComplete="new-password" />
+          <Field
+            id="current"
+            label={forced ? "Temporary password" : "Current password"}
+            value={current}
+            onChange={edit(setCurrent)}
+            autoComplete="current-password"
+          />
+          <Field
+            id="next"
+            label="New password"
+            value={next}
+            onChange={edit(setNext)}
+            autoComplete="new-password"
+          />
+          <Field
+            id="confirm"
+            label="Confirm new password"
+            value={confirm}
+            onChange={edit(setConfirm)}
+            autoComplete="new-password"
+          />
           {error && (
-            <p role="alert" className="text-xs text-rose-600">{error}</p>
+            <p role="alert" className="text-xs text-rose-600">
+              {error}
+            </p>
           )}
           <Button type="submit" className="w-full" disabled={busy}>
             {busy ? "Saving…" : "Change password"}
           </Button>
           {!forced && (
-            <Button type="button" variant="ghost" className="w-full" onClick={() => navigate({ to: landingFor(session?.role) })}>
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full"
+              onClick={() => navigate({ to: landingFor(session?.role) })}
+            >
               Cancel
             </Button>
           )}
@@ -72,10 +97,18 @@ function ChangePasswordPage() {
   );
 }
 
-function Field(props: { id: string; label: string; value: string; onChange: (v: string) => void; autoComplete: string }) {
+function Field(props: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  autoComplete: string;
+}) {
   return (
     <div className="space-y-1.5">
-      <label className="text-xs font-medium text-foreground" htmlFor={props.id}>{props.label}</label>
+      <label className="text-xs font-medium text-foreground" htmlFor={props.id}>
+        {props.label}
+      </label>
       <Input
         id={props.id}
         type="password"

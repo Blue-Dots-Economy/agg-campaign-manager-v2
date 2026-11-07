@@ -3,13 +3,7 @@ import { reasonColor } from "./reasonColors";
 
 const fmt = (n: number) => n.toLocaleString();
 
-export function DropStackedBars({
-  rows,
-  onlyRegion,
-}: {
-  rows: DropRow[];
-  onlyRegion?: string;
-}) {
+export function DropStackedBars({ rows, onlyRegion }: { rows: DropRow[]; onlyRegion?: string }) {
   if (!rows || rows.length === 0) return null;
 
   const valueOf = (r: DropRow) => (onlyRegion ? (r.byRegion?.[onlyRegion] ?? 0) : r.total);
@@ -39,7 +33,9 @@ export function DropStackedBars({
   const max = Math.max(...stages.map((s) => s.total));
 
   const legendOrder = Array.from(reasonTotals.entries())
-    .sort(([reasonA, valueA], [reasonB, valueB]) => valueB - valueA || reasonA.localeCompare(reasonB))
+    .sort(
+      ([reasonA, valueA], [reasonB, valueB]) => valueB - valueA || reasonA.localeCompare(reasonB),
+    )
     .map(([reason]) => reason);
 
   return (

@@ -76,7 +76,7 @@ function NavLink({
           "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
           active || groupActive
             ? "bg-sidebar-accent text-sidebar-foreground"
-            : "text-sidebar-foreground/85 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground"
+            : "text-sidebar-foreground/85 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground",
         )}
       >
         <Link
@@ -87,9 +87,7 @@ function NavLink({
           <item.icon className="h-4 w-4 shrink-0" />
           <div className="flex flex-col">
             <span>{item.label}</span>
-            {item.sub && (
-              <span className="text-[11px] leading-tight opacity-70">{item.sub}</span>
-            )}
+            {item.sub && <span className="text-[11px] leading-tight opacity-70">{item.sub}</span>}
           </div>
         </Link>
         {hasChildren && (
@@ -99,19 +97,14 @@ function NavLink({
             aria-label={collapsed ? "Expand section" : "Collapse section"}
             className="p-1 rounded-md hover:bg-sidebar-accent/70 text-sidebar-foreground/70"
           >
-            {collapsed ? (
-              <ChevronRight className="h-4 w-4" />
-            ) : (
-              <ChevronDown className="h-4 w-4" />
-            )}
+            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </button>
         )}
       </div>
       {hasChildren && !collapsed && (
         <div className="ml-4 mt-0.5 space-y-0.5 border-l border-sidebar-border pl-3">
           {item.children!.map((child) => {
-            const childActive =
-              child.to === "/" ? pathname === "/" : pathname.startsWith(child.to);
+            const childActive = child.to === "/" ? pathname === "/" : pathname.startsWith(child.to);
             const ChildIcon = child.icon;
             return (
               <Link
@@ -122,7 +115,7 @@ function NavLink({
                   "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
                   childActive
                     ? "bg-sidebar-accent text-sidebar-foreground"
-                    : "text-sidebar-foreground/85 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground"
+                    : "text-sidebar-foreground/85 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground",
                 )}
               >
                 <ChildIcon className="h-4 w-4 shrink-0" />
@@ -149,15 +142,16 @@ export function Sidebar() {
           role === "admin" || role === "jfc"
             ? item
             : { to: "/request-campaign", label: "Request a campaign", icon: Rocket };
-        return [launchItem, { to: "/campaign-requests", label: "Campaign Requests", icon: Inbox } as NavItem];
+        return [
+          launchItem,
+          { to: "/campaign-requests", label: "Campaign Requests", icon: Inbox } as NavItem,
+        ];
       })
       .map((item) => ({
         ...item,
         children: item.children?.filter((c) => canAccess(role, c.to)),
       }))
-      .filter(
-        (item) => canAccess(role, item.to) || (item.children && item.children.length > 0),
-      ),
+      .filter((item) => canAccess(role, item.to) || (item.children && item.children.length > 0)),
   })).filter((g) => g.items.length > 0);
   const showSettings = canAccess(role, SETTINGS.to);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -175,9 +169,7 @@ export function Sidebar() {
     for (const group of GROUPS) {
       for (const item of group.items) {
         if (
-          item.children?.some((c) =>
-            c.to === "/" ? pathname === "/" : pathname.startsWith(c.to)
-          )
+          item.children?.some((c) => (c.to === "/" ? pathname === "/" : pathname.startsWith(c.to)))
         ) {
           initial.add(item.to);
         }
@@ -196,7 +188,10 @@ export function Sidebar() {
   };
 
   return (
-    <aside style={{ backgroundImage: "var(--sidebar-gradient)" }} className="hidden min-h-screen w-64 shrink-0 overflow-hidden rounded-r-2xl bg-sidebar text-sidebar-foreground md:sticky md:top-0 md:flex md:h-screen md:flex-col">
+    <aside
+      style={{ backgroundImage: "var(--sidebar-gradient)" }}
+      className="hidden min-h-screen w-64 shrink-0 overflow-hidden rounded-r-2xl bg-sidebar text-sidebar-foreground md:sticky md:top-0 md:flex md:h-screen md:flex-col"
+    >
       <div className="px-5 pt-6 pb-4">
         <BlueDotsMark />
 
@@ -215,7 +210,7 @@ export function Sidebar() {
                 "flex-1 text-xs font-medium py-1.5 rounded-md uppercase tracking-wide transition-colors",
                 programId === id
                   ? "bg-white text-sidebar"
-                  : "text-sidebar-foreground/80 hover:text-sidebar-foreground"
+                  : "text-sidebar-foreground/80 hover:text-sidebar-foreground",
               )}
             >
               {registry[id].label}
@@ -258,7 +253,7 @@ export function Sidebar() {
                   "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
                   active
                     ? "bg-sidebar-accent text-sidebar-foreground"
-                    : "text-sidebar-foreground/85 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground"
+                    : "text-sidebar-foreground/85 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground",
                 )}
               >
                 <Icon className="h-4 w-4 shrink-0" />
@@ -273,7 +268,10 @@ export function Sidebar() {
         <div>
           {enabled.length === 0 ? (
             <>
-              No sheets connected · <Link to="/settings" className="underline">add one</Link>
+              No sheets connected ·{" "}
+              <Link to="/settings" className="underline">
+                add one
+              </Link>
             </>
           ) : (
             <>
@@ -282,7 +280,7 @@ export function Sidebar() {
                 <span
                   className={cn(
                     "h-1.5 w-1.5 rounded-full",
-                    allConnected ? "bg-emerald-300" : "bg-amber-300"
+                    allConnected ? "bg-emerald-300" : "bg-amber-300",
                   )}
                 />
                 {allConnected ? "connected" : "check status"}

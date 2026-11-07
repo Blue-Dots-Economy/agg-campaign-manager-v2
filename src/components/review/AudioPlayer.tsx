@@ -42,7 +42,11 @@ export function AudioPlayer({ src, companyName, duration, datetime }: AudioPlaye
     const a = audioRef.current;
     if (!a) return;
     a.playbackRate = speed;
-    try { window.localStorage.setItem(SPEED_KEY, String(speed)); } catch { /* ignore */ }
+    try {
+      window.localStorage.setItem(SPEED_KEY, String(speed));
+    } catch {
+      /* ignore */
+    }
   }, [speed]);
 
   useEffect(() => {
@@ -64,7 +68,8 @@ export function AudioPlayer({ src, companyName, duration, datetime }: AudioPlaye
   const toggle = () => {
     const a = audioRef.current;
     if (!a) return;
-    if (a.paused) a.play(); else a.pause();
+    if (a.paused) a.play();
+    else a.pause();
   };
 
   const seek = (v: number) => {
@@ -99,7 +104,10 @@ export function AudioPlayer({ src, companyName, duration, datetime }: AudioPlaye
               return (
                 <div
                   key={i}
-                  className={cn("flex-1 rounded-sm transition-colors", active ? "bg-primary" : "bg-muted-foreground/25")}
+                  className={cn(
+                    "flex-1 rounded-sm transition-colors",
+                    active ? "bg-primary" : "bg-muted-foreground/25",
+                  )}
                   style={{ height: `${h}%` }}
                 />
               );
@@ -136,8 +144,14 @@ export function AudioPlayer({ src, companyName, duration, datetime }: AudioPlaye
                 <button
                   key={s}
                   type="button"
-                  onClick={() => { setSpeed(s); setSpeedOpen(false); }}
-                  className={cn("block w-full px-2 py-1 text-left text-xs hover:bg-muted", s === speed && "bg-muted font-semibold")}
+                  onClick={() => {
+                    setSpeed(s);
+                    setSpeedOpen(false);
+                  }}
+                  className={cn(
+                    "block w-full px-2 py-1 text-left text-xs hover:bg-muted",
+                    s === speed && "bg-muted font-semibold",
+                  )}
                 >
                   {s}x
                 </button>

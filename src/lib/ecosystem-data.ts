@@ -63,10 +63,28 @@ const TOTALS: EcosystemTotals = {
 
 const PROVIDER_CATEGORIES: ProviderCategoryRow[] = [
   { category: "Assistive Devices", providers: 9, capacity: 450, matching: 3889, connections: 47 },
-  { category: "Training & Skill Building", providers: 12, capacity: 1200, matching: 2742, connections: 128 },
+  {
+    category: "Training & Skill Building",
+    providers: 12,
+    capacity: 1200,
+    matching: 2742,
+    connections: 128,
+  },
   { category: "Health & Rehab", providers: 18, capacity: 1800, matching: 2080, connections: 95 },
-  { category: "Government Schemes & Certification", providers: 5, capacity: 600, matching: 1480, connections: 52 },
-  { category: "Employment Opportunities", providers: 3, capacity: 150, matching: 912, connections: 20 },
+  {
+    category: "Government Schemes & Certification",
+    providers: 5,
+    capacity: 600,
+    matching: 1480,
+    connections: 52,
+  },
+  {
+    category: "Employment Opportunities",
+    providers: 3,
+    capacity: 150,
+    matching: 912,
+    connections: 20,
+  },
 ];
 
 const SEEKER_NEEDS: SeekerNeedRow[] = [
@@ -82,7 +100,9 @@ function maskedEmail(name: string, domain: string): string {
   const n = name.toLowerCase().replace(/[^a-z]/g, "");
   const d = domain.toLowerCase().replace(/[^a-z]/g, "");
   const mask = (s: string) =>
-    s.length <= 2 ? s : `${s[0]}${"●".repeat(Math.max(1, Math.min(6, s.length - 2)))}${s[s.length - 1]}`;
+    s.length <= 2
+      ? s
+      : `${s[0]}${"●".repeat(Math.max(1, Math.min(6, s.length - 2)))}${s[s.length - 1]}`;
   return `${mask(n || "org")}@${mask(d || "site")}.org`;
 }
 
@@ -148,11 +168,7 @@ const AGGREGATOR_ORG_NAMES: Record<string, string[]> = {
     "Ekta Care Network",
     "Drishti Support Group",
   ],
-  Employment: [
-    "Kaam Se Jodo Sangh",
-    "Swavlamban Network",
-    "Aajeevika Collective",
-  ],
+  Employment: ["Kaam Se Jodo Sangh", "Swavlamban Network", "Aajeevika Collective"],
   Rehabilitation: [
     "Punarjeevan Support Group",
     "Sneha Care Circle",
@@ -186,10 +202,7 @@ export function getSeekerNeeds(_region: EcosystemRegion): SeekerNeedRow[] {
   return SEEKER_NEEDS.map((r) => ({ ...r }));
 }
 
-export function getProvidersForCategory(
-  _region: EcosystemRegion,
-  category: string,
-): OrgRow[] {
+export function getProvidersForCategory(_region: EcosystemRegion, category: string): OrgRow[] {
   const row = PROVIDER_CATEGORIES.find((r) => r.category === category);
   if (!row) return [];
   const names =
@@ -209,10 +222,7 @@ export function getProvidersForCategory(
   }));
 }
 
-export function getAggregatorsForNeed(
-  _region: EcosystemRegion,
-  area: string,
-): AggregatorRow[] {
+export function getAggregatorsForNeed(_region: EcosystemRegion, area: string): AggregatorRow[] {
   const row = SEEKER_NEEDS.find((r) => r.area === area);
   if (!row) return [];
   const names =
@@ -264,8 +274,7 @@ export function recommendedActions(
 export const actionGap = (matching: number, connections: number) =>
   Math.max(0, matching - connections);
 
-export const demandSupplyGap = (matching: number, supply: number) =>
-  Math.max(0, matching - supply);
+export const demandSupplyGap = (matching: number, supply: number) => Math.max(0, matching - supply);
 
 /* ---------- onboarding ---------- */
 

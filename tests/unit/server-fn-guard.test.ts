@@ -27,11 +27,18 @@ function serverFns(): ServerFn[] {
   for (const path of sources(SRC)) {
     const text = readFileSync(path, "utf8");
     const roleConsts = new Set([...text.matchAll(/const (\w+) = requireRole\(/g)].map((m) => m[1]));
-    for (const m of text.matchAll(/export const (\w+) = createServerFn\([^)]*\)([\s\S]*?)\.handler\(/g)) {
+    for (const m of text.matchAll(
+      /export const (\w+) = createServerFn\([^)]*\)([\s\S]*?)\.handler\(/g,
+    )) {
       const listed = [...m[2].matchAll(/\.middleware\(\[([^\]]*)\]\)/g)].flatMap((x) =>
-        x[1].split(",").map((s) => s.trim()).filter(Boolean),
+        x[1]
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
       );
-      const middleware = listed.map((x) => (roleConsts.has(x) || x.startsWith("requireRole(") ? "requireRole" : x));
+      const middleware = listed.map((x) =>
+        roleConsts.has(x) || x.startsWith("requireRole(") ? "requireRole" : x,
+      );
       out.push({ file: relative(SRC, path), name: m[1], middleware });
     }
   }
@@ -58,7 +65,9 @@ describe("server functions", () => {
   });
 
   test("only the listed functions skip the password-change gate", () => {
-    const sessionOnly = fns.filter((f) => f.middleware.includes("sessionMiddleware")).map((f) => f.name);
+    const sessionOnly = fns
+      .filter((f) => f.middleware.includes("sessionMiddleware"))
+      .map((f) => f.name);
     expect(sessionOnly.sort()).toEqual([...SESSION_ONLY].sort());
   });
 

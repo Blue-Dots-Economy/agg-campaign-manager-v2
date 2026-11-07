@@ -17,7 +17,10 @@ import {
 export type ReviewDataset = "seekers" | "providers";
 
 function normKey(h: string): string {
-  return String(h ?? "").trim().toLowerCase().replace(/[\s\-]+/g, "_");
+  return String(h ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s\-]+/g, "_");
 }
 
 async function resolveSheet(
@@ -25,7 +28,11 @@ async function resolveSheet(
   channel?: string,
 ): Promise<{ sheet_id: string; tab_name: string | null }> {
   const rows = await getDb()
-    .select({ sheet_id: sheetConnections.sheetId, tab_name: sheetConnections.tabName, channel: sheetConnections.channel })
+    .select({
+      sheet_id: sheetConnections.sheetId,
+      tab_name: sheetConnections.tabName,
+      channel: sheetConnections.channel,
+    })
     .from(sheetConnections)
     .where(and(eq(sheetConnections.program, dataset), eq(sheetConnections.enabled, true)));
   if (rows.length === 0) throw new Error(`No enabled sheet connection for dataset '${dataset}'`);
@@ -75,14 +82,15 @@ export const fetchReviewCalls = createServerFn({ method: "GET" })
       return {
         call_id: r.call_id != null ? String(r.call_id) : "",
         job_id: pick("job_id"),
-        
+
         campaign_day: r.campaign_day != null ? String(r.campaign_day) : "",
         campaign_date: r.campaign_date != null ? String(r.campaign_date) : "",
         campaign_type: r.campaign_type != null ? String(r.campaign_type) : "",
         language: r.language != null ? String(r.language) : "",
         city_campaign: r.city_campaign != null ? String(r.city_campaign) : "",
         call_outcome: r.call_outcome != null ? String(r.call_outcome) : "",
-        call_duration_seconds: r.call_duration_seconds != null ? String(r.call_duration_seconds) : "",
+        call_duration_seconds:
+          r.call_duration_seconds != null ? String(r.call_duration_seconds) : "",
         call_datetime_ist: pick("call_datetime_ist"),
         intent_score: r.intent_score != null ? String(r.intent_score) : "",
         drop_reason: r.drop_reason != null ? String(r.drop_reason) : "",
@@ -143,7 +151,9 @@ export const fetchReviewedCallIds = createServerFn({ method: "GET" })
         const { sheet_id } = await resolveSheet(data.program);
         const sheetIds = await readReviewedIdsForEmail(sheet_id, "Feedback Responses", email);
         for (const v of sheetIds) ids.add(v);
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
     return Array.from(ids);
   });
@@ -168,7 +178,9 @@ export const fetchAllReviewedCallIds = createServerFn({ method: "GET" })
       const { sheet_id } = await resolveSheet(data.program);
       const sheetIds = await readAllReviewedIds(sheet_id, "Feedback Responses");
       for (const v of sheetIds) ids.add(v);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     return Array.from(ids);
   });
 
@@ -257,7 +269,12 @@ export const submitReview = createServerFn({ method: "POST" })
       if (review.call_id) {
         await tx
           .delete(transcriptReviews)
-          .where(and(eq(transcriptReviews.callId, review.call_id), eq(transcriptReviews.reviewerEmail, review.reviewer_email)));
+          .where(
+            and(
+              eq(transcriptReviews.callId, review.call_id),
+              eq(transcriptReviews.reviewerEmail, review.reviewer_email),
+            ),
+          );
       }
       await tx.insert(transcriptReviews).values(values);
     });
@@ -271,7 +288,10 @@ export const submitReview = createServerFn({ method: "POST" })
         await writeStagingHeaders(sheet_id, tab, FEEDBACK_COLUMNS);
       }
       const timestamp = new Date().toISOString();
-      const rec: Record<string, unknown> = { ...(review as unknown as Record<string, unknown>), timestamp };
+      const rec: Record<string, unknown> = {
+        ...(review as unknown as Record<string, unknown>),
+        timestamp,
+      };
       const row = FEEDBACK_COLUMNS.map((c) => {
         const v = rec[c];
         return v === null || v === undefined ? "" : String(v);

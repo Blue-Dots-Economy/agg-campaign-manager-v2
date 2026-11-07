@@ -60,7 +60,8 @@ export function TopBar() {
       const { data: fresh } = await query.refetch();
       const after = callsOf(fresh);
       const n = after.toLocaleString();
-      if (after > before) toast.success(`Refreshed · ${(after - before).toLocaleString()} new calls`);
+      if (after > before)
+        toast.success(`Refreshed · ${(after - before).toLocaleString()} new calls`);
       else if (after === before) toast.success(`Up to date · ${n} calls`);
       else toast.success(`Refreshed · ${n} calls`);
     } catch (e) {
@@ -79,9 +80,7 @@ export function TopBar() {
       <MobileNav />
       {!isUserOverview && (
         <div>
-          <p className="text-sm text-muted-foreground">
-            Here's how {config.label} is performing
-          </p>
+          <p className="text-sm text-muted-foreground">Here's how {config.label} is performing</p>
         </div>
       )}
       <div className="flex items-center gap-2 ml-auto">
@@ -123,8 +122,12 @@ export function TopBar() {
               </Link>
             )}
             <Link to={canDirectLaunch ? "/launch" : "/request-campaign"}>
-              <Button size="sm" className="gap-1.5 bg-brand text-brand-foreground hover:bg-brand/90">
-                <Rocket className="h-4 w-4" /> {canDirectLaunch ? "Launch campaign" : "Request campaign"}
+              <Button
+                size="sm"
+                className="gap-1.5 bg-brand text-brand-foreground hover:bg-brand/90"
+              >
+                <Rocket className="h-4 w-4" />{" "}
+                {canDirectLaunch ? "Launch campaign" : "Request campaign"}
               </Button>
             </Link>
           </>

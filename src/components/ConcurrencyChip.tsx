@@ -17,8 +17,7 @@ export function ConcurrencyChip() {
       : available <= 5
         ? "border-amber-500/30 bg-amber-500/15 text-amber-800 dark:text-amber-300"
         : "border-brand/20 bg-brand-soft text-brand";
-  const barTone =
-    available === 0 ? "bg-red-500" : available <= 5 ? "bg-amber-500" : "bg-brand";
+  const barTone = available === 0 ? "bg-red-500" : available <= 5 ? "bg-amber-500" : "bg-brand";
 
   const title = data?.error
     ? `Concurrency check failed: ${data.error}`
@@ -35,9 +34,7 @@ export function ConcurrencyChip() {
       )}
     >
       <Gauge className="h-3.5 w-3.5" />
-      <span className="whitespace-nowrap">
-        Concurrency {isLoading ? "…" : `${used} / ${cap}`}
-      </span>
+      <span className="whitespace-nowrap">Concurrency {isLoading ? "…" : `${used} / ${cap}`}</span>
       <span className="hidden sm:block h-1.5 w-14 rounded-full bg-foreground/10 overflow-hidden">
         <span className={cn("block h-full transition-all", barTone)} style={{ width: `${pct}%` }} />
       </span>

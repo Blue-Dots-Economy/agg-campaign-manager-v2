@@ -23,15 +23,13 @@ export interface RayaSchedule {
 // ---------- createBatch ----------
 export const rayaCreateBatch = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.launch)])
-  .inputValidator(
-    (data: { agentId: string; batchName: string; contacts: RayaContact[] }) => {
-      if (!data.agentId) throw new Error("Missing agent id for this program. Set it in Settings.");
-      if (!data.batchName) throw new Error("Missing batch name.");
-      if (!Array.isArray(data.contacts) || data.contacts.length === 0)
-        throw new Error("No contacts to send.");
-      return data;
-    },
-  )
+  .inputValidator((data: { agentId: string; batchName: string; contacts: RayaContact[] }) => {
+    if (!data.agentId) throw new Error("Missing agent id for this program. Set it in Settings.");
+    if (!data.batchName) throw new Error("Missing batch name.");
+    if (!Array.isArray(data.contacts) || data.contacts.length === 0)
+      throw new Error("No contacts to send.");
+    return data;
+  })
   .handler(async ({ data }) => {
     const body = {
       agent_id: data.agentId,
@@ -74,7 +72,10 @@ export const rayaCreateBatch = createServerFn({ method: "POST" })
       r.batch?.id ??
       r.batch?.batchId;
 
-    if (r.status === "error" || (!rawId && typeof r.invalidRows === "number" && r.invalidRows > 0)) {
+    if (
+      r.status === "error" ||
+      (!rawId && typeof r.invalidRows === "number" && r.invalidRows > 0)
+    ) {
       return {
         ok: false as const,
         batchId: null,
@@ -116,7 +117,8 @@ export const rayaStartBatch = createServerFn({ method: "POST" })
       if (!data.batchId) throw new Error("Missing batch id.");
       if (data.schedule) {
         const s = data.schedule;
-        if (!s.start_time || !s.end_time) throw new Error("Schedule requires start_time and end_time.");
+        if (!s.start_time || !s.end_time)
+          throw new Error("Schedule requires start_time and end_time.");
         if (s.start_time >= s.end_time) throw new Error("end_time must be after start_time.");
         if (!Array.isArray(s.days) || s.days.length === 0)
           throw new Error("Pick at least one day of the week.");
@@ -156,23 +158,23 @@ export const rayaListAgents = createServerFn({ method: "GET" })
     const raw = res as any;
     const list: any[] = Array.isArray(raw)
       ? raw
-      : raw?.agents ?? raw?.data ?? raw?.items ?? raw?.results ?? [];
-    return list.map((a) => ({
-      id: String(a.id ?? a.agent_id ?? a._id ?? ""),
-      name: String(a.name ?? a.agent_name ?? a.title ?? a.id ?? "Unnamed agent"),
-    })).filter((a) => a.id);
+      : (raw?.agents ?? raw?.data ?? raw?.items ?? raw?.results ?? []);
+    return list
+      .map((a) => ({
+        id: String(a.id ?? a.agent_id ?? a._id ?? ""),
+        name: String(a.name ?? a.agent_name ?? a.title ?? a.id ?? "Unnamed agent"),
+      }))
+      .filter((a) => a.id);
   });
 
 // ---------- validateContacts (no Raya call — pure validation) ----------
 export const validateContacts = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.launch)])
-  .inputValidator(
-    (data: { headers: string[]; rows: string[][] }) => {
-      if (!Array.isArray(data.headers)) throw new Error("headers required");
-      if (!Array.isArray(data.rows)) throw new Error("rows required");
-      return data;
-    },
-  )
+  .inputValidator((data: { headers: string[]; rows: string[][] }) => {
+    if (!Array.isArray(data.headers)) throw new Error("headers required");
+    if (!Array.isArray(data.rows)) throw new Error("rows required");
+    return data;
+  })
   .handler(async ({ data }) => {
     const lc = data.headers.map((h) => h.trim().toLowerCase());
     const find = (cands: string[]) => {
@@ -190,9 +192,20 @@ export const validateContacts = createServerFn({ method: "POST" })
     if (nameIdx < 0) missingCols.push("contact_name");
     if (phoneIdx < 0) missingCols.push("contact_phone");
 
-    interface Problem { row: number; reason: string; phone?: string; name?: string }
+    interface Problem {
+      row: number;
+      reason: string;
+      phone?: string;
+      name?: string;
+    }
     const problems: Problem[] = [];
-    const validRows: { name: string; phone: string; cc: string; extras: Record<string, string>; rowIndex: number }[] = [];
+    const validRows: {
+      name: string;
+      phone: string;
+      cc: string;
+      extras: Record<string, string>;
+      rowIndex: number;
+    }[] = [];
     const seen = new Map<string, number>();
 
     if (missingCols.length === 0) {
@@ -201,8 +214,14 @@ export const validateContacts = createServerFn({ method: "POST" })
         const name = (r[nameIdx] ?? "").trim();
         const rawPhone = (r[phoneIdx] ?? "").trim();
         const cc = ccIdx >= 0 ? (r[ccIdx] ?? "").replace(/[^\d]/g, "") || "91" : "91";
-        if (!name) { problems.push({ row: rowNum, reason: "missing contact_name" }); return; }
-        if (!rawPhone) { problems.push({ row: rowNum, reason: "missing contact_phone", name }); return; }
+        if (!name) {
+          problems.push({ row: rowNum, reason: "missing contact_name" });
+          return;
+        }
+        if (!rawPhone) {
+          problems.push({ row: rowNum, reason: "missing contact_phone", name });
+          return;
+        }
         let digits = rawPhone.replace(/[^\d]/g, "");
         // strip country code if present at start
         if (digits.startsWith(cc) && digits.length > 10) digits = digits.slice(cc.length);
@@ -235,7 +254,6 @@ export const validateContacts = createServerFn({ method: "POST" })
       validRows,
     };
   });
-
 
 // ---------- updateBatch ----------
 export const rayaUpdateBatch = createServerFn({ method: "POST" })

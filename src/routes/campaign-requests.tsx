@@ -26,9 +26,15 @@ export const Route = createFileRoute("/campaign-requests")({
   head: () => ({
     meta: [
       { title: "Campaign Requests · Review & Launch" },
-      { name: "description", content: "Review, edit and launch campaign requests submitted from the launch wizard." },
+      {
+        name: "description",
+        content: "Review, edit and launch campaign requests submitted from the launch wizard.",
+      },
       { property: "og:title", content: "Campaign Requests · Review & Launch" },
-      { property: "og:description", content: "Review, edit and launch campaign requests submitted from the launch wizard." },
+      {
+        property: "og:description",
+        content: "Review, edit and launch campaign requests submitted from the launch wizard.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -105,7 +111,8 @@ function sourceLine(r: RequestRow) {
 function filtersLine(r: RequestRow): string | null {
   const f = r.cohort_filters as { profileStatuses?: string[]; confidenceBand?: string } | null;
   if (!f) return null;
-  if (Array.isArray(f.profileStatuses) && f.profileStatuses.length) return f.profileStatuses.join(", ");
+  if (Array.isArray(f.profileStatuses) && f.profileStatuses.length)
+    return f.profileStatuses.join(", ");
   if (f.confidenceBand) return `Confidence: ${f.confidenceBand}`;
   return null;
 }
@@ -141,7 +148,9 @@ function CampaignRequestsPage() {
               onClick={() => setFilter(f)}
               className={cn(
                 "px-3 py-1.5 text-xs font-medium rounded-md capitalize transition-colors",
-                filter === f ? "bg-brand text-brand-foreground" : "text-muted-foreground hover:bg-muted",
+                filter === f
+                  ? "bg-brand text-brand-foreground"
+                  : "text-muted-foreground hover:bg-muted",
               )}
             >
               {f}
@@ -362,8 +371,13 @@ function RequestCard({ req, onChanged }: { req: RequestRow; onChanged: () => voi
             {req.campaign_type && (
               <span className="text-xs text-muted-foreground">· {req.campaign_type}</span>
             )}
-            <Badge variant="outline" className="uppercase text-[10px]">{req.program}</Badge>
-            <Badge variant="outline" className={cn("capitalize text-[10px]", statusBadgeClass(req.status))}>
+            <Badge variant="outline" className="uppercase text-[10px]">
+              {req.program}
+            </Badge>
+            <Badge
+              variant="outline"
+              className={cn("capitalize text-[10px]", statusBadgeClass(req.status))}
+            >
               {req.status}
             </Badge>
           </div>
@@ -388,20 +402,34 @@ function RequestCard({ req, onChanged }: { req: RequestRow; onChanged: () => voi
       {isPending && open && (
         <div className="mt-5 space-y-5 border-t pt-5">
           <div className="grid gap-2 sm:grid-cols-2 text-xs text-muted-foreground">
-            <div>Program: <span className="text-foreground">{req.program.toUpperCase()}</span></div>
-            <div>Agent: <span className="text-foreground">{req.agent_name || req.agent_id}</span></div>
             <div>
-              Campaign: <span className="text-foreground">
-                {[req.campaign_day, req.campaign_date, req.campaign_type].filter(Boolean).join(" · ") || "—"}
+              Program: <span className="text-foreground">{req.program.toUpperCase()}</span>
+            </div>
+            <div>
+              Agent: <span className="text-foreground">{req.agent_name || req.agent_id}</span>
+            </div>
+            <div>
+              Campaign:{" "}
+              <span className="text-foreground">
+                {[req.campaign_day, req.campaign_date, req.campaign_type]
+                  .filter(Boolean)
+                  .join(" · ") || "—"}
               </span>
             </div>
             <div>
-              Region: <span className="text-foreground">
+              Region:{" "}
+              <span className="text-foreground">
                 {[req.region, req.language].filter(Boolean).join(" · ") || "—"}
               </span>
             </div>
-            <div>Contacts: <span className="text-foreground">{req.contact_count}</span></div>
-            {cf && <div>Filters: <span className="text-foreground">{cf}</span></div>}
+            <div>
+              Contacts: <span className="text-foreground">{req.contact_count}</span>
+            </div>
+            {cf && (
+              <div>
+                Filters: <span className="text-foreground">{cf}</span>
+              </div>
+            )}
           </div>
 
           <ScheduleEditor value={schedule} onChange={setSchedule} />
@@ -480,8 +508,16 @@ function RequestCard({ req, onChanged }: { req: RequestRow; onChanged: () => voi
 
           <div className="flex flex-wrap items-center gap-2">
             {createdBatchId ? (
-              <Button onClick={retryStart} disabled={busy} className="bg-brand text-brand-foreground hover:bg-brand/90 gap-1.5">
-                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
+              <Button
+                onClick={retryStart}
+                disabled={busy}
+                className="bg-brand text-brand-foreground hover:bg-brand/90 gap-1.5"
+              >
+                {busy ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Rocket className="h-4 w-4" />
+                )}
                 Retry start · {createdBatchId}
               </Button>
             ) : (
@@ -490,7 +526,11 @@ function RequestCard({ req, onChanged }: { req: RequestRow; onChanged: () => voi
                 disabled={busy || overCap}
                 className="bg-brand text-brand-foreground hover:bg-brand/90 gap-1.5"
               >
-                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
+                {busy ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Rocket className="h-4 w-4" />
+                )}
                 Approve &amp; launch
               </Button>
             )}

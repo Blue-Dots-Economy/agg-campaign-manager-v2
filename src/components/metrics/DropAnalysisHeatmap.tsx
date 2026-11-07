@@ -12,7 +12,7 @@ const STAGE_LABEL_DISPLAY: Record<string, string> = {
   "jobs shown": "Update Profile",
   "extra job shown": "Providers Identified",
   "job deliberation": "Consent to Share Info",
-  "apply": "Connection Request Sent",
+  apply: "Connection Request Sent",
 };
 
 const stageLabel = (label: string) =>
@@ -103,7 +103,14 @@ export function DropAnalysisHeatmap({ data }: { data?: KkbDropAnalysisPayload })
                     className="shrink-0 text-muted-foreground transition-transform"
                     style={{ transform: isOpen ? "rotate(90deg)" : "rotate(0deg)" }}
                   >
-                    <path d="M3 1 L7 5 L3 9" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <path
+                      d="M3 1 L7 5 L3 9"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
                   </svg>
                   <span className="truncate">{b.bucket}</span>
                 </div>
@@ -172,7 +179,13 @@ export function DropAnalysisHeatmap({ data }: { data?: KkbDropAnalysisPayload })
           <span>fewer</span>
           <div className="flex h-3 w-32 overflow-hidden rounded">
             {[0.1, 0.25, 0.4, 0.55, 0.7, 0.85, 1].map((t) => (
-              <div key={t} className="flex-1" style={{ background: `color-mix(in srgb, var(--brand) ${Math.round(t * 100)}%, transparent)` }} />
+              <div
+                key={t}
+                className="flex-1"
+                style={{
+                  background: `color-mix(in srgb, var(--brand) ${Math.round(t * 100)}%, transparent)`,
+                }}
+              />
             ))}
           </div>
           <span>more drops</span>

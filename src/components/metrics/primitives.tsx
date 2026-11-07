@@ -67,7 +67,9 @@ export function StatTile({
     <div className="relative overflow-hidden rounded-xl border bg-card p-5">
       <div className={`absolute inset-y-0 left-0 w-1 ${ACCENT_BAR[accent]}`} aria-hidden />
       <div className="flex items-center gap-3">
-        <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${ACCENT_SOFT[accent]}`}>
+        <div
+          className={`flex h-9 w-9 items-center justify-center rounded-lg ${ACCENT_SOFT[accent]}`}
+        >
           <Icon className={`h-4 w-4 ${ACCENT_TEXT[accent]}`} stroke={2} />
         </div>
         <p className="text-xs font-medium text-muted-foreground">{label}</p>
@@ -110,7 +112,13 @@ export function RateDial({
     <div className="flex items-center gap-5 rounded-xl border bg-card p-5">
       <div className="relative shrink-0" style={{ width: size, height: size }}>
         <svg width={size} height={size} className="-rotate-90">
-          <circle cx={size / 2} cy={size / 2} r={radius} className="fill-none stroke-muted" strokeWidth={stroke} />
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            className="fill-none stroke-muted"
+            strokeWidth={stroke}
+          />
           <circle
             cx={size / 2}
             cy={size / 2}
@@ -124,7 +132,9 @@ export function RateDial({
           />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className={`text-2xl font-semibold tracking-tight ${ACCENT_TEXT[accent]}`}>{fmtPct(pct)}</span>
+          <span className={`text-2xl font-semibold tracking-tight ${ACCENT_TEXT[accent]}`}>
+            {fmtPct(pct)}
+          </span>
         </div>
       </div>
       <div className="min-w-0">
@@ -239,14 +249,18 @@ export function SplitBar({
                 <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
                 Answered
               </span>
-              <span className="font-medium tabular-nums text-emerald-600 dark:text-emerald-400">{fmtNum(answered)}</span>
+              <span className="font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
+                {fmtNum(answered)}
+              </span>
             </div>
             <div className="flex items-center justify-between rounded-md bg-rose-500/10 px-3 py-2 text-xs">
               <span className="flex items-center gap-2 text-muted-foreground">
                 <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />
                 Unanswered
               </span>
-              <span className="font-medium tabular-nums text-rose-600 dark:text-rose-400">{fmtNum(unanswered)}</span>
+              <span className="font-medium tabular-nums text-rose-600 dark:text-rose-400">
+                {fmtNum(unanswered)}
+              </span>
             </div>
           </div>
         </div>
@@ -302,13 +316,7 @@ export interface FunnelStage {
   color: Accent;
 }
 
-export function ConversionFunnel({
-  title,
-  stages,
-}: {
-  title?: string;
-  stages: FunnelStage[];
-}) {
+export function ConversionFunnel({ title, stages }: { title?: string; stages: FunnelStage[] }) {
   const max = Math.max(...stages.map((s) => s.value), 1);
   return (
     <div className="rounded-xl border bg-card p-5">
@@ -337,7 +345,9 @@ export function ConversionFunnel({
                     {fmtNum(s.value)}
                   </span>
                 </div>
-                <div className={`absolute left-0 top-0 h-full w-1 rounded-l-lg ${ACCENT_BAR[s.color]}`} />
+                <div
+                  className={`absolute left-0 top-0 h-full w-1 rounded-l-lg ${ACCENT_BAR[s.color]}`}
+                />
               </div>
             </React.Fragment>
           );

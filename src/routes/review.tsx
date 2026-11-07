@@ -11,7 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/u
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/review")({
-  validateSearch: (s: Record<string, unknown>) => ({ prefill: typeof s.prefill === "string" ? s.prefill : undefined }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    prefill: typeof s.prefill === "string" ? s.prefill : undefined,
+  }),
   component: ReviewHub,
 });
 
@@ -24,19 +26,39 @@ const BULK_KEY = "bulk_review_queue";
 
 type Tab = "all" | "pending" | "reviewed";
 interface Filters {
-  day: string; date: string[]; campaign: string; lang: string; city: string;
-  outcome: string; duration: string; intent: string; dropReason: string;
-  channel: string; tab: Tab; search: string;
+  day: string;
+  date: string[];
+  campaign: string;
+  lang: string;
+  city: string;
+  outcome: string;
+  duration: string;
+  intent: string;
+  dropReason: string;
+  channel: string;
+  tab: Tab;
+  search: string;
 }
 const DEFAULT_FILTERS: Filters = {
-  day: "All", date: [], campaign: "All", lang: "All", city: "All",
-  outcome: "All", duration: "All", intent: "All", dropReason: "All",
-  channel: "All", tab: "pending", search: "",
+  day: "All",
+  date: [],
+  campaign: "All",
+  lang: "All",
+  city: "All",
+  outcome: "All",
+  duration: "All",
+  intent: "All",
+  dropReason: "All",
+  channel: "All",
+  tab: "pending",
+  search: "",
 };
 
 function parseIst(s: string): number {
   if (!s) return 0;
-  const m = String(s).replace(/\s*IST\s*$/i, "").trim();
+  const m = String(s)
+    .replace(/\s*IST\s*$/i, "")
+    .trim();
   const d = new Date(m.includes("T") ? m + "+05:30" : m.replace(" ", "T") + "+05:30");
   const t = d.getTime();
   return isFinite(t) ? t : 0;
@@ -90,14 +112,23 @@ function ReviewHub() {
     try {
       const raw = window.sessionStorage.getItem(FILTER_KEY);
       if (raw) return { ...DEFAULT_FILTERS, ...JSON.parse(raw) };
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     return DEFAULT_FILTERS;
   });
   useEffect(() => {
-    try { window.sessionStorage.setItem(FILTER_KEY, JSON.stringify(filters)); } catch { /* ignore */ }
+    try {
+      window.sessionStorage.setItem(FILTER_KEY, JSON.stringify(filters));
+    } catch {
+      /* ignore */
+    }
   }, [filters]);
-  useEffect(() => { setPage(1); }, [filters]);
-  const set = <K extends keyof Filters>(k: K, v: Filters[K]) => setFilters((f) => ({ ...f, [k]: v }));
+  useEffect(() => {
+    setPage(1);
+  }, [filters]);
+  const set = <K extends keyof Filters>(k: K, v: Filters[K]) =>
+    setFilters((f) => ({ ...f, [k]: v }));
 
   useEffect(() => {
     try {
@@ -106,7 +137,9 @@ function ReviewHub() {
         setFilters((f) => ({ ...f, search: ids, tab: "all" }));
         window.sessionStorage.removeItem("review_prefill_ids");
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -122,12 +155,19 @@ function ReviewHub() {
   }, [calls]);
 
   const baseSet = useMemo(() => {
-    return (calls ?? []).filter((c) => c.call_outcome === "Completed" || c.call_outcome === "Early Disconnect");
+    return (calls ?? []).filter(
+      (c) => c.call_outcome === "Completed" || c.call_outcome === "Early Disconnect",
+    );
   }, [calls]);
 
-  const searchTokens = useMemo(() =>
-    filters.search.toLowerCase().split(/[\s,;\n\r\t]+/).filter(Boolean)
-  , [filters.search]);
+  const searchTokens = useMemo(
+    () =>
+      filters.search
+        .toLowerCase()
+        .split(/[\s,;\n\r\t]+/)
+        .filter(Boolean),
+    [filters.search],
+  );
 
   const filtered = useMemo(() => {
     const rows = baseSet.filter((c) => {
@@ -138,7 +178,12 @@ function ReviewHub() {
       if (filters.city !== "All" && c.city_campaign !== filters.city) return false;
       if (filters.outcome !== "All" && c.call_outcome !== filters.outcome) return false;
       if (filters.dropReason !== "All" && c.drop_reason !== filters.dropReason) return false;
-      if (dataset === "seekers" && filters.channel !== "All" && String(c.channel || "outbound").toLowerCase() !== filters.channel.toLowerCase()) return false;
+      if (
+        dataset === "seekers" &&
+        filters.channel !== "All" &&
+        String(c.channel || "outbound").toLowerCase() !== filters.channel.toLowerCase()
+      )
+        return false;
       const sec = Number(c.call_duration_seconds) || 0;
       if (!durationBucket(sec, filters.duration)) return false;
       if (filters.intent !== "All") {
@@ -193,7 +238,11 @@ function ReviewHub() {
       });
     const ids = pending.map((c) => String(c.call_id || c.job_id || "")).filter(Boolean);
     if (ids.length === 0) return;
-    try { window.sessionStorage.setItem(BULK_KEY, JSON.stringify(ids)); } catch { /* ignore */ }
+    try {
+      window.sessionStorage.setItem(BULK_KEY, JSON.stringify(ids));
+    } catch {
+      /* ignore */
+    }
     navigate({ to: "/review/$callId", params: { callId: ids[0] }, search: { bulk: "1" } });
   };
 
@@ -205,7 +254,17 @@ function ReviewHub() {
     );
   }
 
-  const SelectFilter = ({ value, onChange, options, placeholder }: { value: string; onChange: (v: string) => void; options: string[]; placeholder: string }) => (
+  const SelectFilter = ({
+    value,
+    onChange,
+    options,
+    placeholder,
+  }: {
+    value: string;
+    onChange: (v: string) => void;
+    options: string[];
+    placeholder: string;
+  }) => (
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger className="h-9 w-full">
         <span className="truncate text-sm">
@@ -214,7 +273,11 @@ function ReviewHub() {
         </span>
       </SelectTrigger>
       <SelectContent>
-        {options.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+        {options.map((o) => (
+          <SelectItem key={o} value={o}>
+            {o}
+          </SelectItem>
+        ))}
       </SelectContent>
     </Select>
   );
@@ -225,8 +288,15 @@ function ReviewHub() {
         <div>
           <h1 className="text-2xl font-semibold">Review hub</h1>
           <p className="text-xs text-muted-foreground mt-1">
-            {email ? <>Reviewing as <span className="font-medium text-foreground">{email}</span></> : "Not signed in"}
-            {" · "}<span className="uppercase">{dataset}</span>
+            {email ? (
+              <>
+                Reviewing as <span className="font-medium text-foreground">{email}</span>
+              </>
+            ) : (
+              "Not signed in"
+            )}
+            {" · "}
+            <span className="uppercase">{dataset}</span>
           </p>
         </div>
       </div>
@@ -249,15 +319,62 @@ function ReviewHub() {
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
-          {dataset === "seekers" && <SelectFilter value={filters.channel} onChange={(v) => set("channel", v)} options={CHANNEL_OPTIONS} placeholder="Channel" />}
-          <SelectFilter value={filters.day} onChange={(v) => set("day", v)} options={["All", ...options.days]} placeholder="Day" />
-          <SelectFilter value={filters.campaign} onChange={(v) => set("campaign", v)} options={["All", ...options.campaigns]} placeholder="Campaign" />
-          <SelectFilter value={filters.lang} onChange={(v) => set("lang", v)} options={["All", ...options.langs]} placeholder="Language" />
-          <SelectFilter value={filters.city} onChange={(v) => set("city", v)} options={["All", ...options.cities]} placeholder="City" />
-          <SelectFilter value={filters.outcome} onChange={(v) => set("outcome", v)} options={OUTCOME_OPTIONS} placeholder="Outcome" />
-          <SelectFilter value={filters.duration} onChange={(v) => set("duration", v)} options={DURATION_OPTIONS} placeholder="Duration" />
-          <SelectFilter value={filters.intent} onChange={(v) => set("intent", v)} options={INTENT_OPTIONS} placeholder="Intent" />
-          <SelectFilter value={filters.dropReason} onChange={(v) => set("dropReason", v)} options={["All", ...options.drops]} placeholder="Drop reason" />
+          {dataset === "seekers" && (
+            <SelectFilter
+              value={filters.channel}
+              onChange={(v) => set("channel", v)}
+              options={CHANNEL_OPTIONS}
+              placeholder="Channel"
+            />
+          )}
+          <SelectFilter
+            value={filters.day}
+            onChange={(v) => set("day", v)}
+            options={["All", ...options.days]}
+            placeholder="Day"
+          />
+          <SelectFilter
+            value={filters.campaign}
+            onChange={(v) => set("campaign", v)}
+            options={["All", ...options.campaigns]}
+            placeholder="Campaign"
+          />
+          <SelectFilter
+            value={filters.lang}
+            onChange={(v) => set("lang", v)}
+            options={["All", ...options.langs]}
+            placeholder="Language"
+          />
+          <SelectFilter
+            value={filters.city}
+            onChange={(v) => set("city", v)}
+            options={["All", ...options.cities]}
+            placeholder="City"
+          />
+          <SelectFilter
+            value={filters.outcome}
+            onChange={(v) => set("outcome", v)}
+            options={OUTCOME_OPTIONS}
+            placeholder="Outcome"
+          />
+          <SelectFilter
+            value={filters.duration}
+            onChange={(v) => set("duration", v)}
+            options={DURATION_OPTIONS}
+            placeholder="Duration"
+          />
+          <SelectFilter
+            value={filters.intent}
+            onChange={(v) => set("intent", v)}
+            options={INTENT_OPTIONS}
+            placeholder="Intent"
+          />
+          <SelectFilter
+            value={filters.dropReason}
+            onChange={(v) => set("dropReason", v)}
+            options={["All", ...options.drops]}
+            placeholder="Drop reason"
+          />
         </div>
 
         <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -269,7 +386,9 @@ function ReviewHub() {
                 onClick={() => set("tab", t)}
                 className={cn(
                   "px-3 py-1.5 text-xs font-medium rounded-md capitalize transition",
-                  filters.tab === t ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                  filters.tab === t
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 {t === "pending" ? "Pending Review" : t}
@@ -301,41 +420,46 @@ function ReviewHub() {
                 reviewStatus={statusMap?.get(getReviewKey(c))}
               />
             ))}
-            {filtered.length > PAGE_SIZE && (() => {
-              const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-              const current = Math.min(page, totalPages);
-              const start = (current - 1) * PAGE_SIZE + 1;
-              const end = Math.min(current * PAGE_SIZE, filtered.length);
-              return (
-                <div className="flex items-center justify-between gap-3 pt-2 flex-wrap">
-                  <div className="text-xs text-muted-foreground">
-                    Showing <span className="font-medium text-foreground">{start}–{end}</span> of{" "}
-                    <span className="font-medium text-foreground">{filtered.length}</span>
+            {filtered.length > PAGE_SIZE &&
+              (() => {
+                const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+                const current = Math.min(page, totalPages);
+                const start = (current - 1) * PAGE_SIZE + 1;
+                const end = Math.min(current * PAGE_SIZE, filtered.length);
+                return (
+                  <div className="flex items-center justify-between gap-3 pt-2 flex-wrap">
+                    <div className="text-xs text-muted-foreground">
+                      Showing{" "}
+                      <span className="font-medium text-foreground">
+                        {start}–{end}
+                      </span>{" "}
+                      of <span className="font-medium text-foreground">{filtered.length}</span>
+                    </div>
+                    <div className="inline-flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        disabled={current <= 1}
+                        className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        Previous
+                      </button>
+                      <span className="px-2 text-xs text-muted-foreground">
+                        Page <span className="font-medium text-foreground">{current}</span> of{" "}
+                        {totalPages}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={current >= totalPages}
+                        className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        Next
+                      </button>
+                    </div>
                   </div>
-                  <div className="inline-flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      disabled={current <= 1}
-                      className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      Previous
-                    </button>
-                    <span className="px-2 text-xs text-muted-foreground">
-                      Page <span className="font-medium text-foreground">{current}</span> of {totalPages}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                      disabled={current >= totalPages}
-                      className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              );
-            })()}
+                );
+              })()}
           </>
         )}
       </div>

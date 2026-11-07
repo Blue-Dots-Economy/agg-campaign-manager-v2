@@ -37,8 +37,6 @@ export type Seeker = {
   recommendedAction: string;
 };
 
-
-
 const DB_NAME = "up-seekers-db";
 const DB_VERSION = 1;
 const STORE = "csv";
@@ -180,7 +178,6 @@ function computeAction(
 }
 
 function norm(s: string | undefined): string {
-
   return (s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
@@ -250,7 +247,14 @@ function isLocationMeaningful(location: string, district: string, state: string)
   const d = norm(district);
   const s = norm(state);
   const combos = new Set(
-    [d, s, d && s ? `${d}, ${s}` : "", d && s ? `${s}, ${d}` : "", d && s ? `${d} ${s}` : "", d && s ? `${d},${s}` : ""].filter(Boolean),
+    [
+      d,
+      s,
+      d && s ? `${d}, ${s}` : "",
+      d && s ? `${s}, ${d}` : "",
+      d && s ? `${d} ${s}` : "",
+      d && s ? `${d},${s}` : "",
+    ].filter(Boolean),
   );
   if (combos.has(loc)) return false;
   if (INVALID_LOCATIONS.has(normLoc(location))) return false;
@@ -362,7 +366,8 @@ export function parseSeekersCsv(text: string): Seeker[] {
       salary: cSalary !== -1 ? (r[cSalary] ?? "") : "",
     });
     const completion = Math.round((checks.passed / checks.total) * 100);
-    const profileStatus: Seeker["profileStatus"] = checks.passed === checks.total ? "Complete" : "Incomplete";
+    const profileStatus: Seeker["profileStatus"] =
+      checks.passed === checks.total ? "Complete" : "Incomplete";
     // Signal: Strong = all 6 pass; Moderate = Location + Role + Salary pass (but not Strong); Weak = otherwise.
     const passedByLabel = new Map(checks.fields.map((f) => [f.label, f.passed] as const));
     const hasCoreSignals =
@@ -403,7 +408,6 @@ export function parseSeekersCsv(text: string): Seeker[] {
   return out;
 }
 
-
 function bundledResult(): { seekers: Seeker[]; meta: CsvMeta } {
   const seekers = parseSeekersCsv(bundledCsv);
   return {
@@ -435,10 +439,14 @@ export async function loadSeekersAsync(): Promise<{ seekers: Seeker[]; meta: Csv
       try {
         await idbSet(CSV_KEY, remote.text);
         await idbSet(META_KEY_IDB, meta);
-      } catch { /* ignore quota */ }
+      } catch {
+        /* ignore quota */
+      }
       return { seekers, meta };
     }
-  } catch { /* fall through to local cache */ }
+  } catch {
+    /* fall through to local cache */
+  }
 
   try {
     // One-time migration from the old localStorage entries.
@@ -458,12 +466,11 @@ export async function loadSeekersAsync(): Promise<{ seekers: Seeker[]; meta: Csv
     const stored = await idbGet<string>(CSV_KEY);
     if (!stored) return bundledResult();
     const seekers = parseSeekersCsv(stored);
-    const meta =
-      (await idbGet<CsvMeta>(META_KEY_IDB)) ?? {
-        name: "Uploaded CSV",
-        uploadedAt: "",
-        rows: seekers.length,
-      };
+    const meta = (await idbGet<CsvMeta>(META_KEY_IDB)) ?? {
+      name: "Uploaded CSV",
+      uploadedAt: "",
+      rows: seekers.length,
+    };
     return { seekers, meta };
   } catch {
     return bundledResult();
@@ -483,7 +490,9 @@ export async function saveUploadedCsv(
     const { uploadStoredCsv } = await import("@/lib/upSeekersStorage.functions");
     const res = await uploadStoredCsv({ data: { text, name, rows: seekers.length } });
     if (res?.ok) persisted = true;
-  } catch { /* ignore, fall back to local */ }
+  } catch {
+    /* ignore, fall back to local */
+  }
 
   if (typeof window !== "undefined" && typeof indexedDB !== "undefined") {
     try {
@@ -514,8 +523,8 @@ export async function resetToBundled(): Promise<{ seekers: Seeker[]; meta: CsvMe
   try {
     const { clearStoredCsv } = await import("@/lib/upSeekersStorage.functions");
     await clearStoredCsv();
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return bundledResult();
 }
-
-

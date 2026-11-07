@@ -39,14 +39,29 @@ export const submitCampaignRequest = createServerFn({ method: "POST" })
     if (!r.agent_id) throw new Error("Missing agent.");
     if (!r.contacts?.length) throw new Error("No contacts to request.");
     const row = {
-      program: r.program, agent_id: r.agent_id, agent_name: r.agent_name ?? null,
-      batch_name: r.batch_name, campaign_day: r.campaign_day ?? null, campaign_date: r.campaign_date ?? null,
-      campaign_type: r.campaign_type ?? null, region: r.region ?? null, language: r.language ?? null,
-      city_campaign: r.city_campaign ?? null, channel: r.channel ?? "outbound",
-      source: r.source ?? null, cohort_intent: r.cohort_intent ?? null, cohort_filters: r.cohort_filters ?? null,
-      contacts: r.contacts, contact_count: r.contacts.length, schedule: r.schedule ?? null,
-      concurrency: r.concurrency ?? null, max_retries: r.max_retries ?? null, retry_after_hrs: r.retry_after_hrs ?? null,
-      selected_statuses: r.selected_statuses ?? null, requested_by: context.user.email, status: "pending",
+      program: r.program,
+      agent_id: r.agent_id,
+      agent_name: r.agent_name ?? null,
+      batch_name: r.batch_name,
+      campaign_day: r.campaign_day ?? null,
+      campaign_date: r.campaign_date ?? null,
+      campaign_type: r.campaign_type ?? null,
+      region: r.region ?? null,
+      language: r.language ?? null,
+      city_campaign: r.city_campaign ?? null,
+      channel: r.channel ?? "outbound",
+      source: r.source ?? null,
+      cohort_intent: r.cohort_intent ?? null,
+      cohort_filters: r.cohort_filters ?? null,
+      contacts: r.contacts,
+      contact_count: r.contacts.length,
+      schedule: r.schedule ?? null,
+      concurrency: r.concurrency ?? null,
+      max_retries: r.max_retries ?? null,
+      retry_after_hrs: r.retry_after_hrs ?? null,
+      selected_statuses: r.selected_statuses ?? null,
+      requested_by: context.user.email,
+      status: "pending",
       note: r.note ?? null,
     };
     const [ins] = await getDb()
@@ -76,9 +91,19 @@ export const updateCampaignRequest = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.launch)])
   .inputValidator((data: { id: string; patch: Record<string, unknown> }) => data)
   .handler(async ({ data }): Promise<{ ok: boolean }> => {
-    const allowed = ["schedule", "concurrency", "max_retries", "retry_after_hrs", "selected_statuses", "batch_name", "campaign_day", "campaign_date"];
+    const allowed = [
+      "schedule",
+      "concurrency",
+      "max_retries",
+      "retry_after_hrs",
+      "selected_statuses",
+      "batch_name",
+      "campaign_day",
+      "campaign_date",
+    ];
     const patch: Record<string, unknown> = {};
-    for (const k of allowed) if (k in data.patch) patch[k] = (data.patch as Record<string, unknown>)[k];
+    for (const k of allowed)
+      if (k in data.patch) patch[k] = (data.patch as Record<string, unknown>)[k];
     patch["updated_at"] = new Date().toISOString();
     await getDb()
       .update(campaignRequests)
@@ -98,10 +123,16 @@ export const setCampaignRequestStatus = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.launch)])
   .inputValidator((data: z.input<typeof statusInput>) => statusInput.parse(data))
   .handler(async ({ data, context }): Promise<{ ok: boolean }> => {
-    const patch: Record<string, unknown> = { status: data.status, updated_at: new Date().toISOString() };
+    const patch: Record<string, unknown> = {
+      status: data.status,
+      updated_at: new Date().toISOString(),
+    };
     patch["reviewer_email"] = context.user.email;
     if (data.batch_id) patch["batch_id"] = data.batch_id;
     if (data.decline_reason) patch["decline_reason"] = data.decline_reason;
-    await getDb().update(campaignRequests).set(fromSqlNames(campaignRequests, patch)).where(eq(campaignRequests.id, data.id));
+    await getDb()
+      .update(campaignRequests)
+      .set(fromSqlNames(campaignRequests, patch))
+      .where(eq(campaignRequests.id, data.id));
     return { ok: true };
   });

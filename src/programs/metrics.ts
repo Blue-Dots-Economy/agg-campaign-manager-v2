@@ -22,8 +22,12 @@ export function computeKpis(config: ProgramConfig, rows: CallRow[]): Record<stri
       const s = dkbField(r, "job_status").toLowerCase();
       return s === "active" || s === "closed";
     }).length;
-    const newJobsPosted = rows.filter((r) => dkbField(r, "new_job_posted").toLowerCase() === "yes").length;
-    const talentInsights = rows.filter((r) => dkbField(r, "talent_insights_shown").toLowerCase() === "yes").length;
+    const newJobsPosted = rows.filter(
+      (r) => dkbField(r, "new_job_posted").toLowerCase() === "yes",
+    ).length;
+    const talentInsights = rows.filter(
+      (r) => dkbField(r, "talent_insights_shown").toLowerCase() === "yes",
+    ).length;
     const highIntent = rows.filter((r) => {
       const n = Number(dkbField(r, "intent_score"));
       return Number.isFinite(n) && n >= 5;

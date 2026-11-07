@@ -26,14 +26,13 @@ import { listReviewers } from "@/lib/reviewers.functions";
 import type { ProgramConfig, ProgramId } from "./registry";
 import { toast } from "sonner";
 
-
 export interface OverviewFilters {
-  state?: string;             // 'all' | 'GZB' | 'KA'
-  dateFrom?: string | null;   // YYYY-MM-DD
-  dateTo?: string | null;     // YYYY-MM-DD
-  campaignType?: string;      // 'all' | 'normal' | 'higher_education'
-  campaign?: string | null;   // exact campaign_type value (Campaign Review scope)
-  channel?: string;           // 'all' | 'outbound' | 'inbound'
+  state?: string; // 'all' | 'GZB' | 'KA'
+  dateFrom?: string | null; // YYYY-MM-DD
+  dateTo?: string | null; // YYYY-MM-DD
+  campaignType?: string; // 'all' | 'normal' | 'higher_education'
+  campaign?: string | null; // exact campaign_type value (Campaign Review scope)
+  channel?: string; // 'all' | 'outbound' | 'inbound'
 }
 
 const STALE_AFTER_MS = 4 * 60 * 60_000; // 4 hours — on-load freshness trigger
@@ -47,8 +46,20 @@ export function useProgramAggregates(config: ProgramConfig, filters?: OverviewFi
   const campaign = filters?.campaign ?? null;
   const channel = filters?.channel ?? "all";
   const query = useQuery<AggregatePayload>({
-    queryKey: ["program-aggregates", config.id, state, dateFrom, dateTo, campaignType, campaign, channel],
-    queryFn: () => fn({ data: { program: config.id, state, dateFrom, dateTo, campaignType, campaign, channel } }),
+    queryKey: [
+      "program-aggregates",
+      config.id,
+      state,
+      dateFrom,
+      dateTo,
+      campaignType,
+      campaign,
+      channel,
+    ],
+    queryFn: () =>
+      fn({
+        data: { program: config.id, state, dateFrom, dateTo, campaignType, campaign, channel },
+      }),
     staleTime: 5 * 60_000,
     gcTime: 30 * 60_000,
     placeholderData: keepPreviousData,
@@ -116,8 +127,20 @@ export function useFunnelDurations(config: ProgramConfig, filters?: OverviewFilt
   const campaign = filters?.campaign ?? null;
   const channel = filters?.channel ?? "all";
   return useQuery<Record<string, number>>({
-    queryKey: ["funnel-durations", config.id, state, dateFrom, dateTo, campaignType, campaign, channel],
-    queryFn: () => fn({ data: { program: config.id, state, dateFrom, dateTo, campaignType, campaign, channel } }),
+    queryKey: [
+      "funnel-durations",
+      config.id,
+      state,
+      dateFrom,
+      dateTo,
+      campaignType,
+      campaign,
+      channel,
+    ],
+    queryFn: () =>
+      fn({
+        data: { program: config.id, state, dateFrom, dateTo, campaignType, campaign, channel },
+      }),
     staleTime: 5 * 60_000,
     gcTime: 30 * 60_000,
     placeholderData: keepPreviousData,
@@ -193,7 +216,6 @@ export function useSyncProgram(programId: ProgramId) {
       if (res.skipped) return; // a sync was already running — nothing to brag about
       if (res.ok) toast.success(`Synced · ${res.rowCount} rows`);
       else if (res.errors.length > 0) toast.error(res.errors[0].message);
-
     },
     onError: (e, vars) => {
       if (vars?.silent) return;
@@ -282,7 +304,6 @@ export function useExistingReviews(callId?: string | null, jobId?: string | null
     retryDelay: 1500,
   });
 }
-
 
 export function useReviewers() {
   const fn = useServerFn(listReviewers);

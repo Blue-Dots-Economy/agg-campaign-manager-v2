@@ -18,7 +18,9 @@ export function maskName(name: string): string {
   if (!name) return "—";
   const parts = name.trim().split(/\s+/);
   return parts
-    .map((p) => (p.length <= 2 ? p[0] + "*" : p[0] + "*".repeat(Math.max(1, p.length - 2)) + p[p.length - 1]))
+    .map((p) =>
+      p.length <= 2 ? p[0] + "*" : p[0] + "*".repeat(Math.max(1, p.length - 2)) + p[p.length - 1],
+    )
     .join(" ");
 }
 
@@ -175,12 +177,30 @@ export const ROLE_CATEGORIES = [
 export type RoleCategory = (typeof ROLE_CATEGORIES)[number];
 
 const CATEGORY_RULES: { cat: RoleCategory; kw: RegExp }[] = [
-  { cat: "Office & Data", kw: /(data entry|data operator|computer op|back ?office|\boffice\b|admin|account|reception|clerk|copa|tally|documentation)/i },
-  { cat: "Sales & Telecalling", kw: /(sales|tele|telecal|bpo|\bcalling\b|call ?cent(er|re)|caller|\bbde\b|business develop|marketing|collection)/i },
-  { cat: "Retail & Promotion", kw: /(retail|in ?store|store|promoter|promotion|cashier|merchandis|counter|shop|fmcg|billing)/i },
-  { cat: "Logistics & Delivery", kw: /(driver|driving|delivery|logistic|warehouse|loader|courier|rider|picker|packer|supply chain|dispatch)/i },
-  { cat: "Services", kw: /(security|guard|housekeep|hospitality|cook|chef|waiter|steward|cleaning|facility|beautician|salon|\bcare\b|nursing|ward boy|tailor|stitch|garment|textile)/i },
-  { cat: "Manufacturing & Trades", kw: /(manufactur|production|factory|machine|operator|welder|weld|fitter|electric|mechanic|technician|\biti\b|turner|assembl|fabricat|\bplant\b|wireman|plumber|cnc|denter|painter|helper|trainee)/i },
+  {
+    cat: "Office & Data",
+    kw: /(data entry|data operator|computer op|back ?office|\boffice\b|admin|account|reception|clerk|copa|tally|documentation)/i,
+  },
+  {
+    cat: "Sales & Telecalling",
+    kw: /(sales|tele|telecal|bpo|\bcalling\b|call ?cent(er|re)|caller|\bbde\b|business develop|marketing|collection)/i,
+  },
+  {
+    cat: "Retail & Promotion",
+    kw: /(retail|in ?store|store|promoter|promotion|cashier|merchandis|counter|shop|fmcg|billing)/i,
+  },
+  {
+    cat: "Logistics & Delivery",
+    kw: /(driver|driving|delivery|logistic|warehouse|loader|courier|rider|picker|packer|supply chain|dispatch)/i,
+  },
+  {
+    cat: "Services",
+    kw: /(security|guard|housekeep|hospitality|cook|chef|waiter|steward|cleaning|facility|beautician|salon|\bcare\b|nursing|ward boy|tailor|stitch|garment|textile)/i,
+  },
+  {
+    cat: "Manufacturing & Trades",
+    kw: /(manufactur|production|factory|machine|operator|welder|weld|fitter|electric|mechanic|technician|\biti\b|turner|assembl|fabricat|\bplant\b|wireman|plumber|cnc|denter|painter|helper|trainee)/i,
+  },
 ];
 
 export function roleCategory(title: string, sector?: string): RoleCategory {

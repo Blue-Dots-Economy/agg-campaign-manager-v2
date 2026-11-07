@@ -35,7 +35,6 @@ function parseServiceAccount(): ServiceAccountJson {
   return json;
 }
 
-
 const tokenCache = new Map<string, { token: string; expiresAt: number }>();
 
 async function getAccessToken(
@@ -79,7 +78,12 @@ const RW_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
 export async function readStagingCallIds(
   sheetId: string,
   tab: string,
-): Promise<{ existing: Set<string>; rowByCallId: Map<string, number>; hasHeaders: boolean; headers: string[] }> {
+): Promise<{
+  existing: Set<string>;
+  rowByCallId: Map<string, number>;
+  hasHeaders: boolean;
+  headers: string[];
+}> {
   const token = await getAccessToken(RW_SCOPE);
 
   // Ensure the tab exists; create if missing.
@@ -111,10 +115,12 @@ export async function readStagingCallIds(
   if (!headerRes.ok) throw new Error(`Sheets header read failed (${headerRes.status})`);
   const headerJson = (await headerRes.json()) as { values?: string[][] };
   const headers = (headerJson.values?.[0] ?? []).map((h) => String(h ?? "").trim());
-  if (headers.length === 0) return { existing: new Set(), rowByCallId: new Map(), hasHeaders: false, headers: [] };
+  if (headers.length === 0)
+    return { existing: new Set(), rowByCallId: new Map(), hasHeaders: false, headers: [] };
   const norm = headers.map(normalizeHeader);
   const callIdCol = norm.indexOf("call_id");
-  if (callIdCol < 0) return { existing: new Set(), rowByCallId: new Map(), hasHeaders: true, headers };
+  if (callIdCol < 0)
+    return { existing: new Set(), rowByCallId: new Map(), hasHeaders: true, headers };
   const letter = colLetter(callIdCol);
   const colUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${tabPrefix}${letter}2:${letter}200000`;
   const colRes = await fetch(colUrl, { headers: { authorization: `Bearer ${token}` } });
@@ -231,7 +237,6 @@ export async function updateStagingRows(
   return rows.length;
 }
 
-
 export interface SheetReadResult {
   headers: string[];
   rows: string[][];
@@ -258,13 +263,12 @@ function quoteTab(tab: string): string {
 // Columns excluded from the bulk read — they balloon Worker memory on 20k+ row sheets.
 // Fetched on demand via getCallDetail when a user opens a specific call.
 function normalizeHeader(h: string): string {
-  return String(h ?? "").trim().toLowerCase().replace(/[\s\-]+/g, "_");
+  return String(h ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s\-]+/g, "_");
 }
-const HEAVY_HEADERS_NORM = new Set([
-  "call_transcript",
-  "final_summary",
-  "call_recording_url",
-]);
+const HEAVY_HEADERS_NORM = new Set(["call_transcript", "final_summary", "call_recording_url"]);
 
 /** Fetch the spreadsheet's tab titles in order. */
 export async function listSheetTabs(sheetId: string): Promise<string[]> {
@@ -285,19 +289,18 @@ export async function deleteSheetTab(sheetId: string, title: string): Promise<bo
   const metaUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?fields=sheets.properties`;
   const metaRes = await fetch(metaUrl, { headers: { authorization: `Bearer ${token}` } });
   if (!metaRes.ok) return false;
-  const meta = (await metaRes.json()) as { sheets?: Array<{ properties?: { sheetId?: number; title?: string } }> };
+  const meta = (await metaRes.json()) as {
+    sheets?: Array<{ properties?: { sheetId?: number; title?: string } }>;
+  };
   const match = (meta.sheets ?? []).find((s) => s.properties?.title === title);
   if (!match?.properties?.sheetId && match?.properties?.sheetId !== 0) return false;
-  const res = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}:batchUpdate`,
-    {
-      method: "POST",
-      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-      body: JSON.stringify({
-        requests: [{ deleteSheet: { sheetId: match.properties!.sheetId } }],
-      }),
-    },
-  );
+  const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}:batchUpdate`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify({
+      requests: [{ deleteSheet: { sheetId: match.properties!.sheetId } }],
+    }),
+  });
   return res.ok;
 }
 
@@ -313,7 +316,6 @@ async function readSheetForTab(
   pageSize: number = 200000,
   excludeSet: Set<string> = HEAVY_HEADERS_NORM,
 ): Promise<SheetReadResult> {
-
   const tabPrefix = quoteTab(tab);
   const headerUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${tabPrefix}A1:ZZ1`;
   const headerRes = await fetch(headerUrl, { headers: { authorization: `Bearer ${token}` } });
@@ -337,7 +339,9 @@ async function readSheetForTab(
     else groups.push([i, i]);
   }
   const endRow = startRow + pageSize - 1;
-  const ranges = groups.map(([s, e]) => `${tabPrefix}${colLetter(s)}${startRow}:${colLetter(e)}${endRow}`);
+  const ranges = groups.map(
+    ([s, e]) => `${tabPrefix}${colLetter(s)}${startRow}:${colLetter(e)}${endRow}`,
+  );
 
   // FORMATTED_VALUE + FORMATTED_STRING so date cells come back as their
   // displayed strings ("2026-06-23") instead of Excel serials ("46196").
@@ -434,7 +438,14 @@ export async function readSheetForReview(
 
   if (trimmed) {
     try {
-      return await readSheetForTab(sheetId, token, trimmed, startRow, pageSize, REVIEW_EXCLUDE_NORM);
+      return await readSheetForTab(
+        sheetId,
+        token,
+        trimmed,
+        startRow,
+        pageSize,
+        REVIEW_EXCLUDE_NORM,
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (!isRangeParseError(msg)) throw err;
@@ -445,8 +456,6 @@ export async function readSheetForReview(
   if (tabs.length === 0) throw new Error("Spreadsheet has no tabs");
   return await readSheetForTab(sheetId, token, tabs[0], startRow, pageSize, REVIEW_EXCLUDE_NORM);
 }
-
-
 
 export interface CallDetail {
   call_transcript: string;
@@ -564,10 +573,18 @@ export async function readReviewedIdsForEmail(
     if (!res.ok) return out;
     const data = (await res.json()) as { values?: unknown[][] };
     for (const row of data.values ?? []) {
-      const em = String((row[emailCol] ?? "")).trim().toLowerCase();
+      const em = String(row[emailCol] ?? "")
+        .trim()
+        .toLowerCase();
       if (em !== target) continue;
-      if (callIdCol >= 0) { const v = String(row[callIdCol] ?? "").trim(); if (v) out.add(v); }
-      if (jobIdCol >= 0) { const v = String(row[jobIdCol] ?? "").trim(); if (v) out.add(v); }
+      if (callIdCol >= 0) {
+        const v = String(row[callIdCol] ?? "").trim();
+        if (v) out.add(v);
+      }
+      if (jobIdCol >= 0) {
+        const v = String(row[jobIdCol] ?? "").trim();
+        if (v) out.add(v);
+      }
     }
   } catch {
     /* never break resume on a sheet hiccup */
@@ -579,10 +596,7 @@ export async function readReviewedIdsForEmail(
  * Read ALL call_id + job_id values from a feedback/responses tab (every
  * reviewer). Returns an empty set on any error — must never throw.
  */
-export async function readAllReviewedIds(
-  sheetId: string,
-  tab: string,
-): Promise<Set<string>> {
+export async function readAllReviewedIds(sheetId: string, tab: string): Promise<Set<string>> {
   const out = new Set<string>();
   try {
     const token = await getAccessToken();
@@ -606,8 +620,14 @@ export async function readAllReviewedIds(
     if (!res.ok) return out;
     const data = (await res.json()) as { values?: unknown[][] };
     for (const row of data.values ?? []) {
-      if (callIdCol >= 0) { const v = String(row[callIdCol] ?? "").trim(); if (v) out.add(v); }
-      if (jobIdCol >= 0) { const v = String(row[jobIdCol] ?? "").trim(); if (v) out.add(v); }
+      if (callIdCol >= 0) {
+        const v = String(row[callIdCol] ?? "").trim();
+        if (v) out.add(v);
+      }
+      if (jobIdCol >= 0) {
+        const v = String(row[jobIdCol] ?? "").trim();
+        if (v) out.add(v);
+      }
     }
   } catch {
     /* never break the queue on a sheet hiccup */
