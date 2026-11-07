@@ -85,8 +85,9 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ```bash
 bun install --frozen-lockfile        # install exactly what is committed
 bun run dev                          # local dev server
-bun x tsc --noEmit                   # type-check (there is no typecheck script)
-bun run lint                         # ESLint (advisory in CI, see below)
+bun run typecheck                    # tsc --noEmit
+bun run lint                         # ESLint; errors fail CI
+bun run lint:report                  # lint findings per rule and block (server, web, vendored, tests, tooling)
 bun run build                        # production build
 bun run test                         # unit tests (tests/unit)
 bun test tests/unit/auth.test.ts     # one test file
@@ -97,6 +98,8 @@ bun run db:migrate                   # apply migrations to DATABASE_URL
 ```
 
 The database login is created by `db/bootstrap.sql` (see the `migrations` job in `.github/workflows/ci.yaml` for the exact steps).
+
+Local end-to-end checks: `scripts/e2e/` (`setup.sh` brings up Postgres in Docker and seeds one user per role plus sample calls; `smoke.ts` checks login, the server-function role matrix and dashboard numbers against a running dev server). The `campaign-manager-e2e` skill walks through it, including the browser checks per role.
 
 ## Architecture
 
@@ -122,9 +125,9 @@ Apply them to every line you write or change. Existing code does not meet all of
 
 ## CI
 
-`.github/workflows/ci.yaml` runs on every PR and every push to `main`. Blocking: `typecheck`, `build`, `migrations` (bootstrap, migrate, schema drift, `bun test tests`) and `smoke-image` (builds and boots the Docker image). Advisory: `lint` (ESLint and Prettier have a large existing baseline) and `sonar`. Images are published by `build-images.yaml` on release tags only.
+`.github/workflows/ci.yaml` runs on every PR and every push to `main`. Blocking: `typecheck`, `build`, `lint` (ESLint errors), `migrations` (bootstrap, migrate, schema drift, `bun test tests`) and `smoke-image` (builds and boots the Docker image). Advisory: the Prettier check inside `lint`, and `sonar`. Images are published by `build-images.yaml` on release tags only.
 
-Do not add new ESLint or Prettier problems in files you change, even though the lint job does not fail the build.
+ESLint rules that still have findings in existing code are warnings (a ratchet); each moves to error once its count reaches 0. Do not add new warnings, and format the files you change with Prettier.
 
 ## Commits and pull requests
 
