@@ -64,6 +64,22 @@ describe("parseInput", () => {
     expect(message).toContain("phone");
   });
 
+  test("passes on the messages a schema sets", async () => {
+    const named = z.object({ agentId: z.string().min(1, "Missing agent id.") });
+    const err = await parseInput(named)({ agentId: "" }).catch((e: unknown) => e);
+    const message = err instanceof Error ? err.message : "";
+    expect(message).toBe(`${INVALID_INPUT_MESSAGE}: agentId: Missing agent id.`);
+  });
+
+  test("does not echo a rejected enum value", async () => {
+    const err = await parseInput(schema)({ program: "secret-value", limit: 1 } as never).catch(
+      (e: unknown) => e,
+    );
+    const message = err instanceof Error ? err.message : "";
+    expect(message).toContain("program");
+    expect(message).not.toContain("secret-value");
+  });
+
   test("refuses a missing body for a schema that needs one", async () => {
     const err = await parseInput(schema)(undefined as never).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(Error);

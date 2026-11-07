@@ -7,15 +7,25 @@ import type { Json } from "@/server/db/schema";
 /** First words of the message sent to the browser when input fails validation. */
 export const INVALID_INPUT_MESSAGE = "Invalid input";
 
-/** Most field paths named in one error message, to keep the message short. */
-const MAX_PATHS_IN_MESSAGE = 5;
+/** Most problems named in one error message, to keep the message short. */
+const MAX_ISSUES_IN_MESSAGE = 5;
 
-/** Placeholder path for an issue on the whole input rather than one field. */
-const ROOT_PATH = "(root)";
+/**
+ * Replaces Zod default messages that repeat the rejected value. Messages a schema sets itself
+ * take precedence over this map and reach the browser as written.
+ */
+const noEchoErrorMap: z.ZodErrorMap = (issue, ctx) =>
+  issue.code === z.ZodIssueCode.invalid_enum_value
+    ? { message: "Invalid value" }
+    : { message: ctx.defaultError };
+
+function describeIssue(issue: z.ZodIssue): string {
+  return issue.path.length ? `${issue.path.join(".")}: ${issue.message}` : issue.message;
+}
 
 /**
  * Builds a server-function input validator that parses with a Zod schema.
- * The message names the bad fields only; it never repeats the rejected values.
+ * The message names each bad field with the schema's message; it never repeats rejected values.
  *
  * @param schema - Schema for the input; unknown keys are dropped (Zod's default `strip`).
  * @returns A validator for `.inputValidator(...)` that resolves to the parsed input.
@@ -25,14 +35,14 @@ export function parseInput<S extends z.ZodTypeAny>(
   schema: S,
 ): (input: z.input<S>) => Promise<z.output<S>> {
   return async (input) => {
-    const result = await schema.safeParseAsync(input);
+    const result = await schema.safeParseAsync(input, { errorMap: noEchoErrorMap });
     if (result.success) return result.data;
-    const paths = [
-      ...new Set(result.error.issues.map((i) => (i.path.length ? i.path.join(".") : ROOT_PATH))),
-    ];
+    const problems = [...new Set(result.error.issues.map(describeIssue))];
     const { setResponseStatus } = await import("@tanstack/react-start/server");
     setResponseStatus(400);
-    throw new Error(`${INVALID_INPUT_MESSAGE}: ${paths.slice(0, MAX_PATHS_IN_MESSAGE).join(", ")}`);
+    throw new Error(
+      `${INVALID_INPUT_MESSAGE}: ${problems.slice(0, MAX_ISSUES_IN_MESSAGE).join("; ")}`,
+    );
   };
 }
 
