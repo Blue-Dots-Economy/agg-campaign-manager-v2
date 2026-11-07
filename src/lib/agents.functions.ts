@@ -5,7 +5,7 @@ import { requireRole } from "@/auth/middleware";
 import { FN_ROLES } from "@/auth/roles";
 import { getDb } from "@/server/db/client.server";
 import { programAgents } from "@/server/db/schema";
-import { rayaFetch, RayaApiError } from "./raya-api";
+import { rayaFetch, RayaApiError } from "./raya-api.server";
 
 export interface ProgramAgent {
   id: string;

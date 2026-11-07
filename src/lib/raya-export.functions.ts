@@ -14,7 +14,7 @@ import {
   programExportTargets,
   sheetConnections,
 } from "@/server/db/schema";
-import { delay, rayaFetch } from "./raya-api";
+import { delay, rayaFetch } from "./raya-api.server";
 import {
   appendStagingRows,
   deleteSheetTab,

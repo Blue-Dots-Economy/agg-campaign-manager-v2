@@ -4,7 +4,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireRole } from "@/auth/middleware";
 import { FN_ROLES } from "@/auth/roles";
-import { delay, rayaFetch, RayaApiError } from "./raya-api";
+import { delay, rayaFetch, RayaApiError } from "./raya-api.server";
 
 export interface RayaContact {
   contact_name: string;

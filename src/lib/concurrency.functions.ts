@@ -6,7 +6,7 @@ import { requireRole } from "@/auth/middleware";
 import { FN_ROLES } from "@/auth/roles";
 import { getDb } from "@/server/db/client.server";
 import { programAgents } from "@/server/db/schema";
-import { delay, rayaFetch } from "./raya-api";
+import { delay, rayaFetch } from "./raya-api.server";
 
 export const CONCURRENCY_CAP_DEFAULT = 20;
 
