@@ -18,7 +18,16 @@ export function useDkbCampaignInsights(
   const dateTo = filters?.dateTo ?? null;
   return useQuery<DkbCampaignCausesPayload>({
     queryKey: ["dkb-campaign-causes", campaign, state, dateFrom, dateTo],
-    queryFn: () => fn({ data: { campaign: campaign as string, state, dateFrom, dateTo } }),
+    queryFn: () =>
+      fn({
+        data: {
+          // `enabled` keeps this from running without a campaign.
+          campaign: campaign ?? "",
+          state,
+          dateFrom,
+          dateTo,
+        },
+      }),
     enabled: !!campaign,
     staleTime: 5 * 60_000,
     gcTime: 30 * 60_000,
