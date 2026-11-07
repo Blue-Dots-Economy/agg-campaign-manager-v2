@@ -2,12 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { CheckCircle2, FileText } from "lucide-react";
 import { StatusChip, OutcomeChip } from "./Chips";
 import { cn } from "@/lib/utils";
-import {
-  getReviewKey,
-  REVIEW_THRESHOLD,
-  type JobReviewStatus,
-  type ReviewCall,
-} from "@/lib/review-ui";
+import { REVIEW_THRESHOLD, type JobReviewStatus, type ReviewCall } from "@/lib/review-ui";
 
 function ReviewerChip({ status }: { status?: JobReviewStatus }) {
   const n = status?.unique_reviewers ?? 0;
