@@ -110,8 +110,9 @@ function discoverServerFns(): ServerFn[] {
     );
     const re =
       /export const (\w+) = createServerFn\(\{\s*method:\s*"(GET|POST)"[^)]*\)([\s\S]*?)\.handler\(/g;
-    for (const m of text.matchAll(re)) {
-      const mw = /\.middleware\(\[([^\]]*)\]\)/.exec(m[3])?.[1] ?? "";
+    for (const [, name, method, chain = ""] of text.matchAll(re)) {
+      if (!name) continue;
+      const mw = /\.middleware\(\[([^\]]*)\]\)/.exec(chain)?.[1] ?? "";
       const inline = /requireRole\(FN_ROLES\.(\w+)\)/.exec(mw)?.[1];
       const viaConst = mw
         .split(",")
@@ -120,8 +121,8 @@ function discoverServerFns(): ServerFn[] {
       const key = inline ?? viaConst ?? null;
       out.push({
         file: relative(SRC, path),
-        name: m[1],
-        method: m[2] === "GET" ? "GET" : "POST",
+        name,
+        method: method === "GET" ? "GET" : "POST",
         group: isFnGroup(key) ? key : null,
       });
     }
