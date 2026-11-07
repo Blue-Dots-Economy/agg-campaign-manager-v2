@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { Application } from "./mockData";
+import type { Application } from "./types";
 import { APP_AGE_LABEL, appAgeBucket, relativeAge } from "./ecosystemHelpers";
 
 export function ApplicationsDrilldown({

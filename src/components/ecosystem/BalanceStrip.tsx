@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ChevronRight } from "lucide-react";
-import type { JobPost } from "./mockData";
+import type { JobPost } from "./types";
 import {
   GAP_LEVEL_BAR_CLASSES,
   GAP_LEVEL_TEXT_CLASSES,
