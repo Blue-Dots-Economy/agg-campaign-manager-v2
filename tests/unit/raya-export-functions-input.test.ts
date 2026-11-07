@@ -16,7 +16,7 @@ describe("GetExportTargetInput", () => {
 describe("SetExportTargetInput", () => {
   test("accepts what the settings page sends", () => {
     const input = {
-      program: "seekers",
+      program: "seekers" as const,
       sheetUrlOrId: "https://x/d/abc",
       tabName: "Sheet1",
       label: "",
@@ -33,7 +33,7 @@ describe("SetExportTargetInput", () => {
 
 describe("ExportBatchToStagingInput", () => {
   test("accepts what the campaigns page sends", () => {
-    const input = { program: "seekers", batchId: "12", batchName: "B", agentName: "A" };
+    const input = { program: "seekers" as const, batchId: "12", batchName: "B", agentName: "A" };
     expect(ExportBatchToStagingInput.parse(input)).toEqual(input);
   });
   test("refuses a missing batch id", () => {
