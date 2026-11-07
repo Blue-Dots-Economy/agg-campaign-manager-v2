@@ -105,12 +105,12 @@ function relativeAge(iso: string): string {
 
 function EcosystemView() {
   const [region, setRegion] = useState<RegionValue>({
-    state: REGION_TREE[0].state,
-    district: REGION_TREE[0].districts[0],
+    state: REGION_TREE[0]?.state ?? "",
+    district: REGION_TREE[0]?.districts[0] ?? "",
   });
   const [syncedAt, setSyncedAt] = useState(() => new Date().toISOString());
 
-  const totals = useMemo(() => getEcosystemTotals(region), [region, syncedAt]);
+  const totals = useMemo(() => getEcosystemTotals(region), [region]);
 
   return (
     <Tabs defaultValue="providers" className="space-y-6">
@@ -345,7 +345,7 @@ function ProvidersGapPanel({ region }: { region: RegionValue }) {
               <TableHead>Service category</TableHead>
               <TableHead className="text-right">Service providers</TableHead>
               <TableHead className="text-right">
-                Can service upto
+                Can service upto{" "}
                 <span className="block text-[10px] font-normal text-muted-foreground">
                   count of seekers
                 </span>
@@ -459,7 +459,7 @@ function SeekersGapPanel({ region }: { region: RegionValue }) {
               <TableHead>Seeker need area</TableHead>
               <TableHead className="text-right">Aggregators</TableHead>
               <TableHead className="text-right">
-                Can reach upto
+                Can reach upto{" "}
                 <span className="block text-[10px] font-normal text-muted-foreground">
                   count of seekers
                 </span>
