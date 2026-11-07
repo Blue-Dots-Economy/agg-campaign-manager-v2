@@ -279,7 +279,7 @@ export const sheetConnections = pgTable(
     lastError: text("last_error"),
     channel: text().default("outbound").notNull(),
   },
-  (table) => [
+  () => [
     check(
       "sheet_connections_program_check",
       sql`program = ANY (ARRAY['seekers'::text, 'providers'::text])`,
@@ -372,7 +372,7 @@ export const upSeekersUpload = pgTable(
       .defaultNow()
       .notNull(),
   },
-  (table) => [check("up_seekers_upload_single_row", sql`id = 1`)],
+  () => [check("up_seekers_upload_single_row", sql`id = 1`)],
 );
 
 export const callRows = pgView("call_rows", {
