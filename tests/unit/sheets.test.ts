@@ -71,6 +71,9 @@ function stubFetch(route: Route): Call[] {
   return calls;
 }
 
+/** Retry-After of 0, so retried reads do not wait in tests. */
+const NO_WAIT = { "retry-after": "0" };
+
 const tabsReply = (titles: string[]) =>
   json({ sheets: titles.map((title, i) => ({ properties: { title, sheetId: i } })) });
 
@@ -181,7 +184,7 @@ describe("getSheetRowCount", () => {
     expect(await getSheetRowCount("s1", "Data")).toBe(3);
   });
   test("returns 0 on an error reply", async () => {
-    stubFetch(() => json({}, 500));
+    stubFetch(() => json({}, 500, NO_WAIT));
     expect(await getSheetRowCount("s1", "Data")).toBe(0);
   });
 });
@@ -258,7 +261,7 @@ describe("reviewed ids", () => {
     ]);
   });
   test("both return empty when the sheet fails", async () => {
-    stubFetch(() => json({}, 500));
+    stubFetch(() => json({}, 500, NO_WAIT));
     expect((await readAllReviewedIds("s1", "Feedback")).size).toBe(0);
     expect((await readReviewedIdsForEmail("s1", "Feedback", "a@x.org")).size).toBe(0);
   });
@@ -346,7 +349,7 @@ describe("staging writes", () => {
   test("deleteSheetTab returns false when the tab is missing or the read fails", async () => {
     stubFetch(() => tabsReply(["Sheet1"]));
     expect(await deleteSheetTab("s1", "Staging")).toBe(false);
-    stubFetch(() => json({}, 500));
+    stubFetch(() => json({}, 500, NO_WAIT));
     expect(await deleteSheetTab("s1", "Staging")).toBe(false);
   });
 });
@@ -369,14 +372,14 @@ describe("timeouts and retries", () => {
     let attempts = 0;
     stubFetch(() => {
       attempts += 1;
-      return attempts === 1 ? json({}, 503, { "retry-after": "0" }) : tabsReply(["A"]);
+      return attempts === 1 ? json({}, 503, NO_WAIT) : tabsReply(["A"]);
     });
     expect(await listSheetTabs("s1")).toEqual(["A"]);
     expect(attempts).toBe(2);
   });
 
   test("a write is sent once", async () => {
-    const calls = stubFetch(() => json({}, 503, { "retry-after": "0" }));
+    const calls = stubFetch(() => json({}, 503, NO_WAIT));
     await expect(appendStagingRows("s1", "Sheet1", [["a"]])).rejects.toThrow(
       "Sheets append failed (503)",
     );
