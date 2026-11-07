@@ -7,7 +7,6 @@ import { requireRole } from "@/auth/middleware";
 import { FN_ROLES } from "@/auth/roles";
 import { parseInput } from "@/server/validation";
 import { programIdSchema } from "@/lib/input-schemas";
-import { errorMessage } from "@/lib/errors";
 import type { JsonObject } from "@/lib/json";
 import { getDb } from "@/server/db/client.server";
 import { programAgents } from "@/server/db/schema";
@@ -42,6 +41,22 @@ const LIVE_CONTACTS_MAX_PAGES = 5;
 /** Input of `listProgramLiveBatches`. */
 export const ListProgramLiveBatchesInput = z.object({ program: programIdSchema });
 
+/** Message shown when the program's agents cannot be read. */
+export const AGENTS_READ_FAILED_MESSAGE = "Could not read this program's agents. Try again later.";
+
+/**
+ * Logs a failed agent read and returns the page's failure result.
+ * Database errors hold SQL and parameters, so only the error type is logged and none is returned.
+ */
+export function agentsReadFailed(e: unknown) {
+  logEvent("error", {
+    operation: "raya-live.readAgents",
+    status: "failure",
+    error: e instanceof Error ? e.name : "Unknown error",
+  });
+  return { ok: false as const, batches: [], error: AGENTS_READ_FAILED_MESSAGE };
+}
+
 export const listProgramLiveBatches = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.campaigns)])
   .inputValidator(parseInput(ListProgramLiveBatchesInput))
@@ -56,7 +71,7 @@ export const listProgramLiveBatches = createServerFn({ method: "GET" })
         .from(programAgents)
         .where(eq(programAgents.program, data.program));
     } catch (e) {
-      return { ok: false as const, batches: [], error: errorMessage(e) };
+      return agentsReadFailed(e);
     }
     const all: LiveBatch[] = [];
     for (const a of agents) {
