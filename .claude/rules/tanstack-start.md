@@ -24,7 +24,7 @@ The app is TanStack Start: file-based routes in `src/routes/` and server functio
 ## Server functions are public HTTP endpoints
 
 - Every server function runs `requireRole(FN_ROLES.<name>)` or `authMiddleware`. Add the role entry to `FN_ROLES` in `src/auth/roles.ts`. `tests/unit/server-fn-guard.test.ts` fails if one is missing; do not add to its allow-lists without the user's approval.
-- Validate input in `.inputValidator(...)` with a Zod schema (`(d: unknown) => Schema.parse(d)`). A TypeScript type on the input is not validation; the browser can send anything.
+- Validate input with `.inputValidator(parseInput(Schema))` (`src/server/validation.ts`): it parses with Zod and answers 400 with the bad field names. Shared schemas (program ids, contacts, JSON) live in `src/lib/input-schemas.ts` and `src/lib/json.ts`. A TypeScript type on the input is not validation; the browser can send anything. `tests/unit/server-fn-guard.test.ts` fails on a validator that does not use `parseInput`.
 - Take the caller's identity and role from `context.user`, never from the input.
 - POST server functions get a same-origin check from the middleware. Do not change state from a GET server function.
 - Return only the fields the page needs. Never return password hashes, secrets, or other users' personal data the role may not see.
