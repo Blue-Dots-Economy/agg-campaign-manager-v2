@@ -1,5 +1,6 @@
 // Server-only helper: read a Google Sheet via service-account JWT.
 import { SignJWT, importPKCS8 } from "jose";
+import { colLetter, isRangeParseError, normalizeHeader, quoteTab } from "./sheet-ranges";
 
 export interface ServiceAccountJson {
   client_email: string;
@@ -244,30 +245,8 @@ export interface SheetReadResult {
   effectiveTab: string;
 }
 
-function colLetter(i: number): string {
-  let s = "";
-  let n = i + 1;
-  while (n > 0) {
-    const r = (n - 1) % 26;
-    s = String.fromCharCode(65 + r) + s;
-    n = Math.floor((n - 1) / 26);
-  }
-  return s;
-}
-
-function quoteTab(tab: string): string {
-  if (/^[A-Za-z0-9_]+$/.test(tab)) return `${tab}!`;
-  return `'${tab.replace(/'/g, "''")}'!`;
-}
-
 // Columns excluded from the bulk read — they balloon Worker memory on 20k+ row sheets.
 // Fetched on demand via getCallDetail when a user opens a specific call.
-function normalizeHeader(h: string): string {
-  return String(h ?? "")
-    .trim()
-    .toLowerCase()
-    .replace(/[\s\-]+/g, "_");
-}
 const HEAVY_HEADERS_NORM = new Set(["call_transcript", "final_summary", "call_recording_url"]);
 
 /** Fetch the spreadsheet's tab titles in order. */
@@ -302,10 +281,6 @@ export async function deleteSheetTab(sheetId: string, title: string): Promise<bo
     }),
   });
   return res.ok;
-}
-
-function isRangeParseError(msg: string): boolean {
-  return /Unable to parse range|INVALID_ARGUMENT/i.test(msg);
 }
 
 async function readSheetForTab(
