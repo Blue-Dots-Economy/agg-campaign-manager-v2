@@ -172,12 +172,12 @@ export function SegmentedBar({
       </div>
       <p className="mt-1 text-3xl font-semibold tracking-tight text-foreground">{fmtNum(total)}</p>
       <div className="mt-4 flex h-3 w-full overflow-hidden rounded-full bg-muted">
-        {segments.map((s, i) => {
+        {segments.map((s) => {
           const w = (s.value / safeTotal) * 100;
           if (w <= 0) return null;
           return (
             <div
-              key={i}
+              key={s.label}
               className={ACCENT_BAR[s.color]}
               style={{ width: `${w}%` }}
               title={`${s.label}: ${fmtNum(s.value)} (${fmtPct(w)})`}
@@ -186,10 +186,10 @@ export function SegmentedBar({
         })}
       </div>
       <ul className="mt-4 space-y-2">
-        {segments.map((s, i) => {
+        {segments.map((s) => {
           const pct = (s.value / safeTotal) * 100;
           return (
-            <li key={i} className="flex items-center justify-between text-xs">
+            <li key={s.label} className="flex items-center justify-between text-xs">
               <span className="flex items-center gap-2 text-muted-foreground">
                 <span className={`h-2 w-2 rounded-full ${ACCENT_BAR[s.color]}`} />
                 {s.label}
