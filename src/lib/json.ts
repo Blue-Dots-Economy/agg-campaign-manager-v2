@@ -1,14 +1,9 @@
-// JSON value type and schema, for upstream data passed through to the page unchanged.
+// Schemas for upstream JSON passed through to the page unchanged.
 import { z } from "zod";
+import type { Json } from "@/server/db/schema";
 
 /** Any value JSON can hold. Server functions can return it; `unknown` they cannot. */
-export type JsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | JsonValue[]
-  | { [key: string]: JsonValue };
+export type JsonValue = Json;
 
 /** Matches any JSON value. */
 export const JsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>

@@ -8,10 +8,10 @@ import { JsonObjectSchema } from "@/lib/json";
 import { DEFAULT_COUNTRY_CODE, validateContactRows } from "./contact-validation";
 import { delay, rayaFetch, RayaApiError } from "./raya-api.server";
 
-/** Most contacts accepted in one batch. */
-export const MAX_CONTACTS_PER_BATCH = 50_000;
+/** Most contacts in one batch: the most rows a stored seeker CSV holds. */
+export const MAX_CONTACTS_PER_BATCH = 200_000;
 /** Most rows accepted by the upload check. */
-export const MAX_UPLOAD_ROWS = 50_000;
+export const MAX_UPLOAD_ROWS = MAX_CONTACTS_PER_BATCH;
 /** Most columns accepted by the upload check. */
 export const MAX_UPLOAD_COLUMNS = 200;
 /** Wait before starting a batch, so Raya has finished creating it. */
