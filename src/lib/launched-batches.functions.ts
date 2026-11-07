@@ -9,7 +9,8 @@ import { FN_ROLES } from "@/auth/roles";
 import { getDb } from "@/server/db/client.server";
 import { sqlNamed, type SqlNamedSelect } from "@/server/db/columns";
 import { launchedBatches, launchedBatchInputs } from "@/server/db/schema";
-import { contactSchema, MAX_CONTACTS_PER_BATCH, parseInput } from "@/server/validation";
+import { parseInput } from "@/server/validation";
+import { contactSchema, MAX_CONTACTS_PER_BATCH } from "@/lib/input-schemas";
 
 /** Digits in an Indian mobile number without the country code. */
 const PHONE_DIGITS = 10;

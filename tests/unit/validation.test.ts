@@ -10,8 +10,7 @@ mock.module("@tanstack/react-start/server", () => ({
   },
 }));
 
-const { parseInput, INVALID_INPUT_MESSAGE, programIdSchema, contactSchema } =
-  await import("../../src/server/validation");
+const { parseInput, INVALID_INPUT_MESSAGE } = await import("../../src/server/validation");
 
 const schema = z.object({ program: z.enum(["seekers", "providers"]), limit: z.number().max(10) });
 
@@ -78,31 +77,5 @@ describe("parseInput", () => {
     const err = await parseInput(schema)(undefined as never).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(Error);
     expect(statuses).toEqual([400]);
-  });
-});
-
-describe("programIdSchema", () => {
-  test("accepts the registry programs", () => {
-    expect(programIdSchema.parse("seekers")).toBe("seekers");
-    expect(programIdSchema.parse("providers")).toBe("providers");
-  });
-
-  test("refuses other strings, inherited keys and non-strings", () => {
-    expect(programIdSchema.safeParse("kkb").success).toBe(false);
-    expect(programIdSchema.safeParse("toString").success).toBe(false);
-    expect(programIdSchema.safeParse(1).success).toBe(false);
-  });
-});
-
-describe("contactSchema", () => {
-  test("accepts flat CSV cells and drops undefined values", () => {
-    expect(
-      contactSchema.parse({ contact_name: "A", age: 3, ok: true, x: null, y: undefined }),
-    ).toEqual({ contact_name: "A", age: 3, ok: true, x: null });
-  });
-
-  test("refuses nested values", () => {
-    expect(contactSchema.safeParse({ a: { b: "c" } }).success).toBe(false);
-    expect(contactSchema.safeParse({ a: ["b"] }).success).toBe(false);
   });
 });

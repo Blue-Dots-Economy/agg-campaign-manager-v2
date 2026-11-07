@@ -1,7 +1,7 @@
 // Input schemas for the campaign-request server functions.
 import { z } from "zod";
 import { JsonObjectSchema } from "@/lib/json";
-import { contactSchema, MAX_CONTACTS_PER_BATCH, programIdSchema } from "@/server/validation";
+import { contactSchema, MAX_CONTACTS_PER_BATCH, programIdSchema } from "@/lib/input-schemas";
 
 const optText = z.string().max(500).nullish();
 const optCount = z.number().int().min(0).nullish();

@@ -1,8 +1,6 @@
-// Input validation for server functions. Loaded by `.functions.ts` modules that the browser
-// also imports, so server-only code is imported inside the failure path.
+// Input validation for server functions. Used only inside `.inputValidator(...)`, which the
+// client build strips; server-only code is still imported inside the failure path.
 import { z } from "zod";
-import { registry, type ProgramId } from "@/programs/registry";
-import { withoutUndefined, type JsonObject } from "@/lib/json";
 
 /** First words of the message sent to the browser when input fails validation. */
 export const INVALID_INPUT_MESSAGE = "Invalid input";
@@ -45,21 +43,3 @@ export function parseInput<S extends z.ZodTypeAny>(
     );
   };
 }
-
-/** Narrows an unknown value, such as parsed JSON, to an object with string keys. */
-export function isRecord(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null;
-}
-
-/** Most rows in a stored seeker CSV, and so most contacts one campaign request or batch may carry. */
-export const MAX_CONTACTS_PER_BATCH = 200_000;
-
-/** A program id from the program registry. */
-export const programIdSchema = z
-  .string()
-  .refine((v): v is ProgramId => Object.hasOwn(registry, v), "Unknown program");
-
-/** One uploaded contact: a flat record of CSV cells. Undefined values are dropped. */
-export const contactSchema: z.ZodType<JsonObject, z.ZodTypeDef, unknown> = z
-  .record(z.union([z.string(), z.number(), z.boolean(), z.null()]).optional())
-  .transform(withoutUndefined);

@@ -1,7 +1,7 @@
 // Pure helpers for the dashboard server functions: filter arguments and the normalisers that turn
 // report SQL results into the payloads the dashboard reads.
 import { z } from "zod";
-import { isRecord, programIdSchema } from "@/server/validation";
+import { isRecord, programIdSchema } from "@/lib/input-schemas";
 
 /** Maps a missing or empty filter value to "all", the report functions' "no filter" value. */
 export const all = (v: string | undefined) => (v && v !== "all" ? v : "all");

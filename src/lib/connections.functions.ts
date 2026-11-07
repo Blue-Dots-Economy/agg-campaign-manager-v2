@@ -13,7 +13,8 @@ import {
   type SqlNamedSelect,
 } from "@/server/db/columns";
 import { sheetConnections } from "@/server/db/schema";
-import { parseInput, programIdSchema } from "@/server/validation";
+import { parseInput } from "@/server/validation";
+import { programIdSchema } from "@/lib/input-schemas";
 import { errorMessage } from "./errors";
 
 /** A Google Sheet connection of a program, keyed by SQL column name. */

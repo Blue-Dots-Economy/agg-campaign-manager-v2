@@ -7,7 +7,8 @@ import { FN_ROLES } from "@/auth/roles";
 import { getDb } from "@/server/db/client.server";
 import { fromSqlNames } from "@/server/db/columns";
 import { callRows, sheetConnections, transcriptReviews } from "@/server/db/schema";
-import { isRecord, parseInput, programIdSchema } from "@/server/validation";
+import { parseInput } from "@/server/validation";
+import { isRecord, programIdSchema } from "@/lib/input-schemas";
 import {
   getCallDetail,
   readStagingCallIds,

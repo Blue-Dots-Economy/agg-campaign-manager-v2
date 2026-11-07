@@ -5,7 +5,7 @@ import {
   campaignRequestSchema,
   campaignRequestStatusSchema,
 } from "../../src/lib/campaign-request-input";
-import { MAX_CONTACTS_PER_BATCH } from "../../src/server/validation";
+import { MAX_CONTACTS_PER_BATCH } from "../../src/lib/input-schemas";
 
 const request = {
   program: "seekers",

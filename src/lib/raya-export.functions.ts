@@ -4,7 +4,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireRole } from "@/auth/middleware";
 import { FN_ROLES } from "@/auth/roles";
-import { parseInput, programIdSchema } from "@/server/validation";
+import { parseInput } from "@/server/validation";
+import { programIdSchema } from "@/lib/input-schemas";
 
 export type { ExportTarget } from "./raya-export.server";
 

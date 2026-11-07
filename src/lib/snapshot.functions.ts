@@ -4,7 +4,8 @@ import type { ProgramId } from "@/programs/registry";
 import { FN_ROLES } from "@/auth/roles";
 import { requireRole } from "@/auth/middleware";
 import type { Json } from "@/server/db/schema";
-import { parseInput, programIdSchema } from "@/server/validation";
+import { parseInput } from "@/server/validation";
+import { programIdSchema } from "@/lib/input-schemas";
 import {
   all,
   campaignArgs,
