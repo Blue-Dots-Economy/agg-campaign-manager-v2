@@ -1,16 +1,15 @@
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { z } from "zod";
+import { createParseInput, INVALID_INPUT_MESSAGE } from "../../src/server/validation";
 
 // Inputs the schema type does not allow are cast with `as never`: the browser can send anything.
 
 const statuses: number[] = [];
-mock.module("@tanstack/react-start/server", () => ({
-  setResponseStatus: (status: number) => {
-    statuses.push(status);
-  },
-}));
-
-const { parseInput, INVALID_INPUT_MESSAGE } = await import("../../src/server/validation");
+// A recording status setter instead of a module mock: Bun's mock.module would replace
+// @tanstack/react-start/server for every other test file in the run.
+const parseInput = createParseInput((status) => {
+  statuses.push(status);
+});
 
 const schema = z.object({ program: z.enum(["seekers", "providers"]), limit: z.number().max(10) });
 
