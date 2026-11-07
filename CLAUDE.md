@@ -127,7 +127,7 @@ Apply them to every line you write or change. Existing code does not meet all of
 
 `.github/workflows/ci.yaml` runs on every PR and every push to `main`. Blocking: `typecheck`, `build`, `lint` (ESLint errors and Prettier), `migrations` (bootstrap, migrate, schema drift, `bun test tests`) and `smoke-image` (builds and boots the Docker image). Advisory: `sonar`. Images are published by `build-images.yaml` on release tags only.
 
-ESLint rules that still have findings in existing code are warnings (a ratchet); each moves to error once its count reaches 0. Do not add new warnings.
+Type-safety rules (no casts, no `any`, no non-null assertions, `import type`, unused variables) and React hook rules are errors. Accessibility and react-refresh rules are warnings; do not add new ones. `tsconfig.json` has `strict` and `noUncheckedIndexedAccess` on.
 
 ## Commits and pull requests
 
