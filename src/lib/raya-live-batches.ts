@@ -95,7 +95,7 @@ export function toLiveBatch(item: JsonObject, agentId: string, agentName: string
     maxRetries: numberOrNull(item.max_retries),
     retryAfterHrs: numberOrNull(item.retry_after_hrs),
     ...counts,
-    schedule: first(item, "schedule") ?? null,
+    schedule: item.schedule ?? null,
     createdAt: textOrNull(first(item, "created_at", "createdAt")),
     startedAt: textOrNull(first(item, "started_at", "startedAt")),
     raw: item,
@@ -193,7 +193,7 @@ function contactUpdatedAt(c: RayaRecord): string | null {
 export function buildLiveDetail(
   data: { batchId: string; batchName?: string; agentName?: string },
   contacts: RayaRecord[],
-  batchMeta: RayaItem,
+  batchMeta: JsonObject | null,
   totalReported: number,
 ): BatchLiveDetail {
   let pending = 0,
@@ -244,7 +244,7 @@ export function buildLiveDetail(
     concurrency: pickNum(batchMeta, "concurrency", "max_concurrency", "parallel_calls"),
     maxRetries: numberOrNull(batchMeta?.max_retries),
     retryAfterHrs: numberOrNull(batchMeta?.retry_after_hrs),
-    schedule: first(batchMeta, "schedule") ?? null,
+    schedule: batchMeta?.schedule ?? null,
     createdAt: textOrNull(first(batchMeta, "created_at", "createdAt")),
     startedAt: textOrNull(first(batchMeta, "started_at", "startedAt")),
     recent,
