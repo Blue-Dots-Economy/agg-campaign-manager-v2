@@ -1,16 +1,20 @@
 import { createServerFn } from "@tanstack/react-start";
 import { and, asc, eq } from "drizzle-orm";
+import { z } from "zod";
 import type { CallRow } from "@/programs/data";
-import { type ProgramId } from "@/programs/registry";
+import type { ProgramId } from "@/programs/registry";
 import { requireRole } from "@/auth/middleware";
 import { FN_ROLES } from "@/auth/roles";
 import { getDb } from "@/server/db/client.server";
-import { fromSqlNames, sqlNamed } from "@/server/db/columns";
+import { fromSqlNames, sqlNamed, type SqlNamedInsert } from "@/server/db/columns";
 import { sheetConnections } from "@/server/db/schema";
+import { parseInput, programIdSchema } from "@/server/validation";
+import { errorMessage } from "./errors";
 
+/** A Google Sheet connection of a program, keyed by SQL column name. */
 export interface SheetConnection {
   id: string;
-  program: ProgramId;
+  program: string;
   name: string;
   sheet_id: string;
   tab_name: string | null;
@@ -22,17 +26,28 @@ export interface SheetConnection {
   created_at: string;
 }
 
-const asConnections = (rows: unknown[]) => rows as SheetConnection[];
+type ConnectionPatch = Partial<SqlNamedInsert<typeof sheetConnections>>;
 
-function enabledConnections(program: ProgramId) {
+/** A failed sheet read, as the browser shows it per connection. */
+interface ConnectionError {
+  id: string;
+  name: string;
+  message: string;
+}
+
+const programInput = z.object({ program: programIdSchema });
+const idInput = z.object({ id: z.string().uuid() });
+const sheetId = z.string().min(1).max(200);
+const tabName = z.string().max(200);
+
+async function enabledConnections(program: ProgramId): Promise<SheetConnection[]> {
   return getDb()
     .select(sqlNamed(sheetConnections))
     .from(sheetConnections)
-    .where(and(eq(sheetConnections.program, program), eq(sheetConnections.enabled, true)))
-    .then(asConnections);
+    .where(and(eq(sheetConnections.program, program), eq(sheetConnections.enabled, true)));
 }
 
-async function patchConnection(id: string, patch: Record<string, unknown>) {
+async function patchConnection(id: string, patch: ConnectionPatch) {
   await getDb()
     .update(sheetConnections)
     .set(fromSqlNames(sheetConnections, patch))
@@ -41,22 +56,28 @@ async function patchConnection(id: string, patch: Record<string, unknown>) {
 
 export const listConnections = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.dashboard)])
-  .inputValidator((d: { program: ProgramId }) => d)
-  .handler(async ({ data }) => {
-    const rows = await getDb()
+  .inputValidator(parseInput(programInput))
+  .handler(async ({ data }): Promise<SheetConnection[]> => {
+    return getDb()
       .select(sqlNamed(sheetConnections))
       .from(sheetConnections)
       .where(eq(sheetConnections.program, data.program))
       .orderBy(asc(sheetConnections.createdAt));
-    return asConnections(rows);
   });
 
 export const createConnection = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator(
-    (d: { program: ProgramId; name: string; sheet_id: string; tab_name?: string }) => d,
+    parseInput(
+      z.object({
+        program: programIdSchema,
+        name: z.string().max(200),
+        sheet_id: sheetId,
+        tab_name: tabName.optional(),
+      }),
+    ),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data }): Promise<SheetConnection> => {
     const [row] = await getDb()
       .insert(sheetConnections)
       .values({
@@ -68,16 +89,24 @@ export const createConnection = createServerFn({ method: "POST" })
         status: "unknown",
       })
       .returning(sqlNamed(sheetConnections));
-    return row as unknown as SheetConnection;
+    if (!row) throw new Error("Connection was not saved");
+    return row;
   });
 
 export const updateConnection = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator(
-    (d: { id: string; enabled?: boolean; name?: string; tab_name?: string | null }) => d,
+    parseInput(
+      z.object({
+        id: z.string().uuid(),
+        enabled: z.boolean().optional(),
+        name: z.string().max(200).optional(),
+        tab_name: tabName.nullish(),
+      }),
+    ),
   )
-  .handler(async ({ data }) => {
-    const patch: Record<string, unknown> = {};
+  .handler(async ({ data }): Promise<SheetConnection> => {
+    const patch: ConnectionPatch = {};
     if (data.enabled !== undefined) patch.enabled = data.enabled;
     if (data.name !== undefined) patch.name = data.name;
     if (data.tab_name !== undefined) patch.tab_name = data.tab_name;
@@ -88,12 +117,12 @@ export const updateConnection = createServerFn({ method: "POST" })
       .from(sheetConnections)
       .where(eq(sheetConnections.id, data.id));
     if (!row) throw new Error("Connection not found");
-    return row as unknown as SheetConnection;
+    return row;
   });
 
 export const deleteConnection = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator((d: { id: string }) => d)
+  .inputValidator(parseInput(idInput))
   .handler(async ({ data }) => {
     await getDb().delete(sheetConnections).where(eq(sheetConnections.id, data.id));
     return { ok: true };
@@ -101,26 +130,34 @@ export const deleteConnection = createServerFn({ method: "POST" })
 
 export const listSheetTabsFn = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator((d: { sheet_id: string }) => d)
+  .inputValidator(parseInput(z.object({ sheet_id: sheetId })))
   .handler(async ({ data }) => {
     const { listSheetTabs } = await import("./sheets.server");
     try {
       const tabs = await listSheetTabs(data.sheet_id);
       return { ok: true as const, tabs };
     } catch (err) {
-      return { ok: false as const, error: err instanceof Error ? err.message : String(err) };
+      return { ok: false as const, error: errorMessage(err) };
     }
   });
 
 export const testConnection = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator((d: { id?: string; sheet_id: string; tab_name?: string }) => d)
+  .inputValidator(
+    parseInput(
+      z.object({
+        id: z.string().uuid().optional(),
+        sheet_id: sheetId,
+        tab_name: tabName.optional(),
+      }),
+    ),
+  )
   .handler(async ({ data }) => {
     const { readSheet } = await import("./sheets.server");
     try {
       const result = await readSheet(data.sheet_id, data.tab_name);
       if (data.id) {
-        const patch: Record<string, unknown> = {
+        const patch: ConnectionPatch = {
           status: "connected",
           row_count: result.rowCount,
           last_error: null,
@@ -138,7 +175,7 @@ export const testConnection = createServerFn({ method: "POST" })
         effectiveTab: result.effectiveTab,
       };
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = errorMessage(err);
       if (data.id) {
         await patchConnection(data.id, {
           status: "error",
@@ -153,7 +190,7 @@ export const testConnection = createServerFn({ method: "POST" })
 /** Re-validate every enabled connection for a program and refresh stored status. */
 export const revalidateConnections = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator((d: { program: ProgramId }) => d)
+  .inputValidator(parseInput(programInput))
   .handler(async ({ data }) => {
     const list = await enabledConnections(data.program);
     if (list.length === 0 || !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
@@ -163,7 +200,7 @@ export const revalidateConnections = createServerFn({ method: "POST" })
     for (const c of list) {
       try {
         const result = await readSheet(c.sheet_id, c.tab_name ?? undefined);
-        const patch: Record<string, unknown> = {
+        const patch: ConnectionPatch = {
           status: "connected",
           row_count: result.rowCount,
           last_error: null,
@@ -174,7 +211,7 @@ export const revalidateConnections = createServerFn({ method: "POST" })
         }
         await patchConnection(c.id, patch);
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
+        const msg = errorMessage(err);
         await patchConnection(c.id, {
           status: "error",
           last_error: msg,
@@ -218,7 +255,7 @@ function normKey(h: string): string {
   return String(h ?? "")
     .trim()
     .toLowerCase()
-    .replace(/[\s\-]+/g, "_");
+    .replace(/[\s-]+/g, "_");
 }
 
 function mapRow(headers: string[], values: string[]): CallRow {
@@ -280,7 +317,7 @@ function mapRow(headers: string[], values: string[]): CallRow {
 
 export const getCallDetailFn = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator((d: { program: ProgramId; call_id: string }) => d)
+  .inputValidator(parseInput(z.object({ program: programIdSchema, call_id: z.string().max(200) })))
   .handler(async ({ data }) => {
     const list = await enabledConnections(data.program);
     if (!process.env.GOOGLE_SERVICE_ACCOUNT_JSON || list.length === 0) {
@@ -300,23 +337,19 @@ export const getCallDetailFn = createServerFn({ method: "POST" })
 
 export const fetchProgramRows = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.dashboard)])
-  .inputValidator((d: { program: ProgramId }) => d)
+  .inputValidator(parseInput(programInput))
   .handler(async ({ data }) => {
     const list = await enabledConnections(data.program);
 
     if (!process.env.GOOGLE_SERVICE_ACCOUNT_JSON || list.length === 0) {
-      return {
-        source: "empty" as const,
-        connectionCount: list.length,
-        rows: [] as CallRow[],
-        errors: [] as { id: string; name: string; message: string }[],
-      };
+      const none: { rows: CallRow[]; errors: ConnectionError[] } = { rows: [], errors: [] };
+      return { source: "empty" as const, connectionCount: list.length, ...none };
     }
 
     const { readSheet } = await import("./sheets.server");
     const out: CallRow[] = [];
     const seen = new Set<string>();
-    const errors: { id: string; name: string; message: string }[] = [];
+    const errors: ConnectionError[] = [];
     for (const c of list) {
       try {
         const { headers, rows, effectiveTab } = await readSheet(
@@ -330,7 +363,7 @@ export const fetchProgramRows = createServerFn({ method: "GET" })
           seen.add(key);
           out.push(mapped);
         }
-        const patch: Record<string, unknown> = {
+        const patch: ConnectionPatch = {
           status: "connected",
           row_count: rows.length,
           last_error: null,
@@ -341,7 +374,7 @@ export const fetchProgramRows = createServerFn({ method: "GET" })
         }
         await patchConnection(c.id, patch);
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
+        const msg = errorMessage(err);
         errors.push({ id: c.id, name: c.name, message: msg });
         await patchConnection(c.id, {
           status: "error",
@@ -352,12 +385,8 @@ export const fetchProgramRows = createServerFn({ method: "GET" })
     }
 
     if (out.length === 0) {
-      return {
-        source: "empty" as const,
-        connectionCount: list.length,
-        rows: [] as CallRow[],
-        errors,
-      };
+      const rows: CallRow[] = [];
+      return { source: "empty" as const, connectionCount: list.length, rows, errors };
     }
     return { source: "sheets" as const, connectionCount: list.length, rows: out, errors };
   });
