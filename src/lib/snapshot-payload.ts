@@ -1,14 +1,10 @@
 // Pure helpers for the dashboard server functions: filter arguments and the normalisers that turn
 // report SQL results into the payloads the dashboard reads.
-import type { ProgramId } from "@/programs/registry";
+import { z } from "zod";
+import { isRecord, programIdSchema } from "@/server/validation";
 
 /** Maps a missing or empty filter value to "all", the report functions' "no filter" value. */
 export const all = (v: string | undefined) => (v && v !== "all" ? v : "all");
-
-/** Narrows a JSON value from the report SQL to an object with string keys. */
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null;
-}
 
 /**
  * Returns `v` when it is an array, otherwise `[]`. The elements are kept as the report SQL
@@ -318,15 +314,26 @@ export interface KkbDropAnalysisPayload {
   safeguardingFlagged?: number;
 }
 
-/** Dashboard filters shared by the drop-analysis and funnel reports. */
-export type DropFilters = {
-  state?: string;
-  dateFrom?: string | null;
-  dateTo?: string | null;
-  campaignType?: string;
-  campaign?: string | null;
-  channel?: string;
+const filterText = z.string().max(500);
+const isoDate = z.string().max(40);
+
+/** Date, region and channel filters shared by every dashboard report. */
+const baseFilters = {
+  state: filterText.optional(),
+  dateFrom: isoDate.nullish(),
+  dateTo: isoDate.nullish(),
+  channel: filterText.optional(),
 };
+
+/** Dashboard filters shared by the drop-analysis and funnel reports. */
+export const dropFiltersSchema = z.object({
+  ...baseFilters,
+  campaignType: filterText.optional(),
+  campaign: filterText.nullish(),
+});
+
+/** Dashboard filters shared by the drop-analysis and funnel reports. */
+export type DropFilters = z.output<typeof dropFiltersSchema>;
 
 /** Turns optional drop-analysis filters into report arguments with defaults. */
 export function dropArgs(d: DropFilters) {
@@ -405,13 +412,13 @@ export interface CampaignDropCausesPayload {
 }
 
 /** Filters for the per-campaign reports. */
-export type CampaignArgs = {
-  campaign: string;
-  state?: string;
-  dateFrom?: string | null;
-  dateTo?: string | null;
-  channel?: string;
-};
+export const campaignArgsSchema = z.object({ campaign: filterText, ...baseFilters });
+
+/** Filters for the per-campaign reports. */
+export type CampaignArgs = z.output<typeof campaignArgsSchema>;
+
+/** Filters for the campaign list of one program. */
+export const campaignListSchema = z.object({ program: programIdSchema, ...baseFilters });
 
 /** Turns optional campaign filters into report arguments with defaults. */
 export function campaignArgs(d: CampaignArgs) {
@@ -465,8 +472,11 @@ export function normalizeDkbCampaignCauses(out: unknown): DkbCampaignCausesPaylo
   };
 }
 
-/** Funnel report filters for one program. */
-export type FunnelArgs = DropFilters & { program: ProgramId };
+/** Funnel and aggregate report filters for one program. */
+export const funnelArgsSchema = dropFiltersSchema.extend({ program: programIdSchema });
+
+/** Funnel and aggregate report filters for one program. */
+export type FunnelArgs = z.output<typeof funnelArgsSchema>;
 
 /** Turns funnel filters into report arguments with defaults. */
 export function funnelArgs(d: FunnelArgs) {

@@ -1,11 +1,17 @@
 import { createServerFn } from "@tanstack/react-start";
-import type { CallRow } from "@/programs/data";
+import { z } from "zod";
 import type { ProgramId } from "@/programs/registry";
 import { FN_ROLES } from "@/auth/roles";
 import { requireRole } from "@/auth/middleware";
+import type { Json } from "@/server/db/schema";
+import { parseInput, programIdSchema } from "@/server/validation";
 import {
   all,
   campaignArgs,
+  campaignArgsSchema,
+  campaignListSchema,
+  dropFiltersSchema,
+  funnelArgsSchema,
   dropArgs,
   emptyPayload,
   funnelArgs,
@@ -20,12 +26,9 @@ import {
   toAggregatePayload,
   type AggregatePayload,
   type CallOutcomeCount,
-  type CampaignArgs,
   type CampaignDropCausesPayload,
   type CampaignListItem,
   type DkbCampaignCausesPayload,
-  type DropFilters,
-  type FunnelArgs,
   type KkbDropAnalysisPayload,
   type ProgramFilterOptions,
 } from "./snapshot-payload";
@@ -49,6 +52,9 @@ export type {
 
 const reports = () => import("@/server/db/reports.server");
 const dashboard = requireRole(FN_ROLES.dashboard);
+
+/** Most call rows one campaign-day request returns. */
+const MAX_CAMPAIGN_DAY_ROWS = 5000;
 
 async function callStats(program: string): Promise<{ calls: number; lastCallAt: string | null }> {
   const [{ getDb }, { callRows }, { count, eq, max }] = await Promise.all([
@@ -94,22 +100,12 @@ export async function performSync(program: ProgramId): Promise<SyncResult> {
 
 export const syncProgramSnapshot = createServerFn({ method: "POST" })
   .middleware([dashboard])
-  .inputValidator((d: { program: ProgramId; force?: boolean }) => d)
+  .inputValidator(parseInput(z.object({ program: programIdSchema, force: z.boolean().optional() })))
   .handler(async ({ data }) => performSync(data.program));
 
 export const fetchProgramAggregates = createServerFn({ method: "GET" })
   .middleware([dashboard])
-  .inputValidator(
-    (d: {
-      program: ProgramId;
-      state?: string;
-      dateFrom?: string | null;
-      dateTo?: string | null;
-      campaignType?: string;
-      campaign?: string | null;
-      channel?: string;
-    }) => d,
-  )
+  .inputValidator(parseInput(funnelArgsSchema))
   .handler(async ({ data }): Promise<AggregatePayload> => {
     try {
       let out: unknown;
@@ -137,8 +133,8 @@ export const fetchProgramAggregates = createServerFn({ method: "GET" })
 
 export const fetchCampaignDayRowsFn = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator((d: { program: ProgramId; day: string }) => d)
-  .handler(async ({ data }): Promise<{ rows: CallRow[] }> => {
+  .inputValidator(parseInput(z.object({ program: programIdSchema, day: z.string().max(40) })))
+  .handler(async ({ data }): Promise<{ rows: Array<Json | null> }> => {
     const [{ getDb }, { callRows }, { and, eq }] = await Promise.all([
       import("@/server/db/client.server"),
       import("@/server/db/schema"),
@@ -148,13 +144,13 @@ export const fetchCampaignDayRowsFn = createServerFn({ method: "GET" })
       .select({ data: callRows.data })
       .from(callRows)
       .where(and(eq(callRows.program, data.program), eq(callRows.campaignDay, data.day)))
-      .limit(5000);
-    return { rows: out.map((r) => r.data as unknown as CallRow) };
+      .limit(MAX_CAMPAIGN_DAY_ROWS);
+    return { rows: out.map((r) => r.data) };
   });
 
 export const fetchKkbDropAnalysis = createServerFn({ method: "GET" })
   .middleware([dashboard])
-  .inputValidator((d: DropFilters) => d)
+  .inputValidator(parseInput(dropFiltersSchema))
   .handler(async ({ data }): Promise<KkbDropAnalysisPayload> => {
     try {
       return normalizeDropAnalysis(await (await reports()).kkbDropAnalysis(dropArgs(data)));
@@ -165,7 +161,7 @@ export const fetchKkbDropAnalysis = createServerFn({ method: "GET" })
 
 export const fetchDkbDropAnalysis = createServerFn({ method: "GET" })
   .middleware([dashboard])
-  .inputValidator((d: DropFilters) => d)
+  .inputValidator(parseInput(dropFiltersSchema))
   .handler(async ({ data }): Promise<KkbDropAnalysisPayload> => {
     try {
       return normalizeDropAnalysis(await (await reports()).dkbDropAnalysis(dropArgs(data)));
@@ -176,15 +172,7 @@ export const fetchDkbDropAnalysis = createServerFn({ method: "GET" })
 
 export const fetchCampaignList = createServerFn({ method: "GET" })
   .middleware([dashboard])
-  .inputValidator(
-    (d: {
-      program: ProgramId;
-      state?: string;
-      dateFrom?: string | null;
-      dateTo?: string | null;
-      channel?: string;
-    }) => d,
-  )
+  .inputValidator(parseInput(campaignListSchema))
   .handler(async ({ data }): Promise<CampaignListItem[]> => {
     try {
       const out = await (
@@ -204,7 +192,7 @@ export const fetchCampaignList = createServerFn({ method: "GET" })
 
 export const fetchCampaignDropCauses = createServerFn({ method: "GET" })
   .middleware([dashboard])
-  .inputValidator((d: CampaignArgs) => d)
+  .inputValidator(parseInput(campaignArgsSchema))
   .handler(async ({ data }): Promise<CampaignDropCausesPayload> => {
     try {
       return normalizeCampaignDropCauses(
@@ -217,7 +205,7 @@ export const fetchCampaignDropCauses = createServerFn({ method: "GET" })
 
 export const fetchDkbCampaignCauses = createServerFn({ method: "GET" })
   .middleware([dashboard])
-  .inputValidator((d: CampaignArgs) => d)
+  .inputValidator(parseInput(campaignArgsSchema))
   .handler(async ({ data }): Promise<DkbCampaignCausesPayload> => {
     try {
       return normalizeDkbCampaignCauses(
@@ -230,7 +218,7 @@ export const fetchDkbCampaignCauses = createServerFn({ method: "GET" })
 
 export const fetchFunnelCallIds = createServerFn({ method: "GET" })
   .middleware([dashboard])
-  .inputValidator((d: FunnelArgs & { stage: string }) => d)
+  .inputValidator(parseInput(funnelArgsSchema.extend({ stage: z.string().max(200) })))
   .handler(async ({ data }): Promise<{ count: number; ids: string[] }> => {
     try {
       return normalizeFunnelCallIds(
@@ -243,7 +231,7 @@ export const fetchFunnelCallIds = createServerFn({ method: "GET" })
 
 export const fetchFunnelDurations = createServerFn({ method: "GET" })
   .middleware([dashboard])
-  .inputValidator((d: FunnelArgs) => d)
+  .inputValidator(parseInput(funnelArgsSchema))
   .handler(async ({ data }): Promise<Record<string, number>> => {
     try {
       return normalizeFunnelDurations(await (await reports()).funnelDurations(funnelArgs(data)));
@@ -255,7 +243,7 @@ export const fetchFunnelDurations = createServerFn({ method: "GET" })
 /** KKB-only: call_outcome breakdown honouring the same filters as the funnel. */
 export const fetchKkbCallOutcomes = createServerFn({ method: "GET" })
   .middleware([dashboard])
-  .inputValidator((d: DropFilters) => d)
+  .inputValidator(parseInput(dropFiltersSchema))
   .handler(async ({ data }): Promise<CallOutcomeCount[]> => {
     try {
       return normalizeCallOutcomes(await (await reports()).kkbCallOutcomes(dropArgs(data)));
@@ -266,7 +254,7 @@ export const fetchKkbCallOutcomes = createServerFn({ method: "GET" })
 
 export const fetchProgramFilterOptions = createServerFn({ method: "GET" })
   .middleware([dashboard])
-  .inputValidator((d: { program: ProgramId }) => d)
+  .inputValidator(parseInput(z.object({ program: programIdSchema })))
   .handler(async ({ data }): Promise<ProgramFilterOptions> => {
     try {
       return normalizeFilterOptions(
