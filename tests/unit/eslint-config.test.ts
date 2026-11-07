@@ -69,6 +69,13 @@ describe("type safety rules", () => {
     ).toEqual([WARN]);
   });
 
+  test("a non-null assertion is reported", async () => {
+    const code = "export const f = (a: string[]) => a[0]!.length;\n";
+    expect(
+      await severities(code, "src/lib/probe.ts", "@typescript-eslint/no-non-null-assertion"),
+    ).toEqual([WARN]);
+  });
+
   test("loose equality is an error", async () => {
     const code = "export const f = (a: number, b: number) => a == b;\n";
     expect(await severities(code, "src/lib/probe.ts", "eqeqeq")).toEqual([ERROR]);
@@ -132,7 +139,7 @@ describe("imports", () => {
       const found = (result?.messages ?? [])
         .filter((m) => m.ruleId === "import-x/no-cycle")
         .map((m) => m.severity);
-      expect(found).toEqual([WARN]);
+      expect(found).toEqual([ERROR]);
     });
 
     test("a cycle closed only by type imports is not reported", async () => {

@@ -51,9 +51,10 @@ export default tseslint.config(
       eqeqeq: ["error", "always", { null: "ignore" }],
       "no-restricted-imports": ["error", { paths: [SERVER_ONLY] }],
       "no-useless-escape": "warn",
-      "import-x/no-cycle": "warn",
+      "import-x/no-cycle": "error",
       "@typescript-eslint/consistent-type-assertions": ["warn", { assertionStyle: "never" }],
       "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-non-null-assertion": "warn",
       "@typescript-eslint/consistent-type-imports": [
         "warn",
         { prefer: "type-imports", fixStyle: "inline-type-imports" },
@@ -90,6 +91,7 @@ export default tseslint.config(
     rules: {
       "@typescript-eslint/consistent-type-assertions": "off",
       "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-non-null-assertion": "off",
     },
   },
   {
@@ -97,6 +99,7 @@ export default tseslint.config(
     rules: {
       "@typescript-eslint/consistent-type-assertions": "off",
       "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-non-null-assertion": "off",
       "@typescript-eslint/consistent-type-imports": "off",
       "react-refresh/only-export-components": "off",
       "react-hooks/set-state-in-effect": "off",

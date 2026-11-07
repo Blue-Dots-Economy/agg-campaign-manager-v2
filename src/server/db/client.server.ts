@@ -5,9 +5,11 @@ import * as schema from "./schema";
 
 const fullSchema = { ...schema, ...relations };
 
-let db: NodePgDatabase<typeof fullSchema> | undefined;
+type Db = NodePgDatabase<typeof fullSchema> & { $client: pg.Pool };
 
-export function getDb(): NodePgDatabase<typeof fullSchema> {
+let db: Db | undefined;
+
+export function getDb(): Db {
   if (!db) {
     const url = process.env.DATABASE_URL;
     if (!url) throw new Error("DATABASE_URL is not set");
