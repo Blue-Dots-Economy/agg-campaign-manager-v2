@@ -10,14 +10,8 @@ mock.module("@tanstack/react-start/server", () => ({
   },
 }));
 
-const {
-  parseInput,
-  INVALID_INPUT_MESSAGE,
-  programIdSchema,
-  jsonSchema,
-  jsonObjectSchema,
-  contactSchema,
-} = await import("../../src/server/validation");
+const { parseInput, INVALID_INPUT_MESSAGE, programIdSchema, contactSchema } =
+  await import("../../src/server/validation");
 
 const schema = z.object({ program: z.enum(["seekers", "providers"]), limit: z.number().max(10) });
 
@@ -97,26 +91,6 @@ describe("programIdSchema", () => {
     expect(programIdSchema.safeParse("kkb").success).toBe(false);
     expect(programIdSchema.safeParse("toString").success).toBe(false);
     expect(programIdSchema.safeParse(1).success).toBe(false);
-  });
-});
-
-describe("jsonSchema", () => {
-  test("accepts nested JSON and drops undefined object values", () => {
-    expect(jsonSchema.parse({ a: [1, "x", null, { b: true, c: undefined }] })).toEqual({
-      a: [1, "x", null, { b: true }],
-    });
-  });
-
-  test("refuses values JSON cannot hold", () => {
-    expect(jsonSchema.safeParse(() => 1).success).toBe(false);
-    expect(jsonSchema.safeParse(NaN).success).toBe(false);
-    expect(jsonSchema.safeParse({ a: Symbol("x") }).success).toBe(false);
-  });
-
-  test("jsonObjectSchema refuses arrays and scalars", () => {
-    expect(jsonObjectSchema.parse({ name: "A", extra: undefined })).toEqual({ name: "A" });
-    expect(jsonObjectSchema.safeParse("x").success).toBe(false);
-    expect(jsonObjectSchema.safeParse(null).success).toBe(false);
   });
 });
 

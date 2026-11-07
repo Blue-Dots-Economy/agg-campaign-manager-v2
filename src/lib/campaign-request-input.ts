@@ -1,11 +1,7 @@
 // Input schemas for the campaign-request server functions.
 import { z } from "zod";
-import {
-  contactSchema,
-  jsonObjectSchema,
-  MAX_CONTACTS_PER_BATCH,
-  programIdSchema,
-} from "@/server/validation";
+import { JsonObjectSchema } from "@/lib/json";
+import { contactSchema, MAX_CONTACTS_PER_BATCH, programIdSchema } from "@/server/validation";
 
 const optText = z.string().max(500).nullish();
 const optCount = z.number().int().min(0).nullish();
@@ -28,9 +24,9 @@ export const campaignRequestSchema = z.object({
   channel: optText,
   source: optText,
   cohort_intent: optText,
-  cohort_filters: jsonObjectSchema.nullish(),
+  cohort_filters: JsonObjectSchema.nullish(),
   contacts: z.array(contactSchema).min(1).max(MAX_CONTACTS_PER_BATCH),
-  schedule: jsonObjectSchema.nullish(),
+  schedule: JsonObjectSchema.nullish(),
   concurrency: optCount,
   max_retries: optCount,
   retry_after_hrs: optCount,
@@ -44,7 +40,7 @@ export type CampaignRequestInput = z.input<typeof campaignRequestSchema>;
 /** The fields a reviewer may change on a pending request; other keys are dropped. */
 export const campaignRequestPatchSchema = z
   .object({
-    schedule: jsonObjectSchema.nullable(),
+    schedule: JsonObjectSchema.nullable(),
     concurrency: optCount,
     max_retries: optCount,
     retry_after_hrs: optCount,
