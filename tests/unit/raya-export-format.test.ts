@@ -112,6 +112,12 @@ describe("stripIst", () => {
     expect(stripIst("IST 10:00")).toBe("IST 10:00");
     expect(stripIst("  plain  ")).toBe("plain");
   });
+  test("handles long whitespace runs in linear time", () => {
+    const input = `x${" ".repeat(50_000)}y`;
+    const start = performance.now();
+    expect(stripIst(input)).toBe(input);
+    expect(performance.now() - start).toBeLessThan(500);
+  });
 });
 
 describe("datePart", () => {

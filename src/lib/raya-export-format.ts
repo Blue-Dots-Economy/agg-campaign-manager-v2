@@ -62,10 +62,10 @@ export function nonEmpty(v: any): boolean {
   return String(v).trim().length > 0;
 }
 
+/** Trims the text and drops one trailing "IST" marker (any case). Runs in linear time. */
 export function stripIst(s: string): string {
-  return String(s ?? "")
-    .replace(/\s*IST\s*$/i, "")
-    .trim();
+  const t = String(s ?? "").trim();
+  return /IST$/i.test(t) ? t.slice(0, -"IST".length).trim() : t;
 }
 
 export function datePart(s: string): string {
