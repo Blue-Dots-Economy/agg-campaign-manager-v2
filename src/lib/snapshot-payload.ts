@@ -2,8 +2,28 @@
 // report SQL results into the payloads the dashboard reads.
 import type { ProgramId } from "@/programs/registry";
 
+/** Maps a missing or empty filter value to "all", the report functions' "no filter" value. */
 export const all = (v: string | undefined) => (v && v !== "all" ? v : "all");
 
+/** Narrows a JSON value from the report SQL to an object with string keys. */
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null;
+}
+
+/**
+ * Returns `v` when it is an array, otherwise `[]`. The elements are kept as the report SQL
+ * function wrote them; their shape is set by that function.
+ */
+function sqlArray<T>(v: unknown): T[] {
+  return Array.isArray(v) ? v : [];
+}
+
+/** Returns `v` as a number, or 0 when it is missing or not numeric. */
+function toCount(v: unknown): number {
+  return Number(v ?? 0) || 0;
+}
+
+/** One campaign day in the aggregate report. */
 export interface CampaignRollup {
   day: string;
   date: string;
@@ -18,6 +38,7 @@ export interface CampaignRollup {
   high_intent: number;
 }
 
+/** KPIs and breakdowns for one program under the current filters. */
 export interface ProgramAggregates {
   kpis: Record<string, number>;
   perDay: CampaignRollup[];
@@ -36,6 +57,7 @@ export interface ProgramAggregates {
   }>;
 }
 
+/** Aggregates with every list empty. */
 export function emptyAggregates(): ProgramAggregates {
   return {
     kpis: {},
@@ -51,32 +73,34 @@ export function emptyAggregates(): ProgramAggregates {
   };
 }
 
+/** Cleans the `aggregates` part of the aggregate report; anything malformed becomes empty. */
 export function normalizeAggregates(value: unknown): ProgramAggregates {
-  if (!value || typeof value !== "object") return emptyAggregates();
-  const raw = value as Partial<ProgramAggregates>;
-  const kpis: Record<string, number> =
-    raw.kpis && typeof raw.kpis === "object" ? { ...(raw.kpis as Record<string, number>) } : {};
+  if (!isRecord(value)) return emptyAggregates();
+  const raw = value;
+  const kpis: Record<string, number> = {};
+  if (isRecord(raw.kpis)) {
+    for (const [k, v] of Object.entries(raw.kpis)) if (typeof v === "number") kpis[k] = v;
+  }
   // RPC historically emits `total_rows`; frontend registry uses `total_calls`.
   // Mirror both so either consumer reads the same filtered count.
   if (kpis.total_calls == null && kpis.total_rows != null) kpis.total_calls = kpis.total_rows;
   if (kpis.total_rows == null && kpis.total_calls != null) kpis.total_rows = kpis.total_calls;
   return {
     kpis,
-    perDay: Array.isArray(raw.perDay) ? raw.perDay : [],
-    drops: Array.isArray(raw.drops) ? raw.drops : [],
-    intents: Array.isArray(raw.intents) ? raw.intents : [],
-    regions: Array.isArray(raw.regions) ? raw.regions : [],
-    phases: Array.isArray(raw.phases) ? raw.phases : [],
-    jobStatus: Array.isArray(raw.jobStatus) ? raw.jobStatus : [],
-    outcomes: Array.isArray(raw.outcomes) ? raw.outcomes : [],
-    dkbIntents: Array.isArray(raw.dkbIntents) ? raw.dkbIntents : [],
+    perDay: sqlArray(raw.perDay),
+    drops: sqlArray(raw.drops),
+    intents: sqlArray(raw.intents),
+    regions: sqlArray(raw.regions),
+    phases: sqlArray(raw.phases),
+    jobStatus: sqlArray(raw.jobStatus),
+    outcomes: sqlArray(raw.outcomes),
+    dkbIntents: sqlArray(raw.dkbIntents),
     dropAnalysis: Array.isArray(raw.dropAnalysis)
-      ? (raw.dropAnalysis as unknown[]).flatMap((entry) => {
-          if (!entry || typeof entry !== "object") return [];
-          const e = entry as Record<string, unknown>;
+      ? raw.dropAnalysis.flatMap((e: unknown) => {
+          if (!isRecord(e)) return [];
           const byRegion: Record<string, number> = {};
-          if (e.byRegion && typeof e.byRegion === "object") {
-            for (const [k, v] of Object.entries(e.byRegion as Record<string, unknown>)) {
+          if (isRecord(e.byRegion)) {
+            for (const [k, v] of Object.entries(e.byRegion)) {
               if (typeof v === "number" && Number.isFinite(v)) byRegion[k] = v;
             }
           }
@@ -94,8 +118,16 @@ export function normalizeAggregates(value: unknown): ProgramAggregates {
   };
 }
 
-export type MetricAccent = "green" | "amber" | "red" | "blue";
+const METRIC_ACCENTS = ["green", "amber", "red", "blue"] as const;
 
+/** Colour of a metric card. */
+export type MetricAccent = (typeof METRIC_ACCENTS)[number];
+
+function isMetricAccent(v: unknown): v is MetricAccent {
+  return METRIC_ACCENTS.some((a) => a === v);
+}
+
+/** One metric card on the dashboard. */
 export interface MetricCardDef {
   key: string;
   label: string;
@@ -104,6 +136,7 @@ export interface MetricCardDef {
   accent: MetricAccent;
 }
 
+/** A titled group of metric cards. */
 export interface MetricGroup {
   key: string;
   title: string;
@@ -111,6 +144,7 @@ export interface MetricGroup {
   cards: MetricCardDef[];
 }
 
+/** One stage of the provider funnel. */
 export interface ProviderFunnelStage {
   key: string;
   label: string;
@@ -118,12 +152,14 @@ export interface ProviderFunnelStage {
   openings: number;
   calls: number;
 }
+/** Raw program metrics keyed by metric name. */
 export interface ProgramMetricsRaw {
   program?: string;
   providerFunnel?: ProviderFunnelStage[];
   [k: string]: number | string | ProviderFunnelStage[] | undefined;
 }
 
+/** Everything the program dashboard reads in one request. */
 export interface AggregatePayload {
   source: "snapshot" | "empty";
   hasSnapshot: boolean;
@@ -143,6 +179,7 @@ export interface AggregatePayload {
   error?: string;
 }
 
+/** Builds a payload with no data, with the reason the dashboard shows for it. */
 export function emptyPayload(
   connectionCount: number,
   state: { last_synced_at: string | null; status: string } | null,
@@ -168,32 +205,22 @@ export function emptyPayload(
   };
 }
 
-export interface AggregateRpcPayload {
-  connectionCount?: number;
-  lastSyncedAt?: string | null;
-  syncStatus?: string;
-  stateRowCount?: number;
-  aggregates?: unknown;
-  metricGroups?: unknown;
-  metrics?: unknown;
-}
-
+/** Cleans the raw metrics: keeps numbers, numeric strings, the program and the provider funnel. */
 export function normalizeMetricsRaw(value: unknown): ProgramMetricsRaw {
-  if (!value || typeof value !== "object") return {};
+  if (!isRecord(value)) return {};
   const out: ProgramMetricsRaw = {};
-  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+  for (const [k, v] of Object.entries(value)) {
     if (k === "program") out.program = String(v);
     else if (k === "providerFunnel" && Array.isArray(v)) {
-      out.providerFunnel = v.flatMap((it) => {
-        if (!it || typeof it !== "object") return [];
-        const o = it as Record<string, unknown>;
+      out.providerFunnel = v.flatMap((o: unknown) => {
+        if (!isRecord(o)) return [];
         return [
           {
             key: String(o.key ?? ""),
             label: String(o.label ?? ""),
-            providers: Number(o.providers ?? 0) || 0,
-            openings: Number(o.openings ?? 0) || 0,
-            calls: Number(o.calls ?? 0) || 0,
+            providers: toCount(o.providers),
+            openings: toCount(o.openings),
+            calls: toCount(o.calls),
           },
         ];
       });
@@ -203,19 +230,15 @@ export function normalizeMetricsRaw(value: unknown): ProgramMetricsRaw {
   return out;
 }
 
+/** Cleans the metric card groups; an unknown accent becomes blue. */
 export function normalizeMetricGroups(value: unknown): MetricGroup[] {
   if (!Array.isArray(value)) return [];
-  const allowed: MetricAccent[] = ["green", "amber", "red", "blue"];
-  return value.flatMap((g): MetricGroup[] => {
-    if (!g || typeof g !== "object") return [];
-    const o = g as Record<string, unknown>;
+  return value.flatMap((o: unknown): MetricGroup[] => {
+    if (!isRecord(o)) return [];
     const cards = Array.isArray(o.cards)
-      ? o.cards.flatMap((c): MetricCardDef[] => {
-          if (!c || typeof c !== "object") return [];
-          const x = c as Record<string, unknown>;
-          const accent = allowed.includes(x.accent as MetricAccent)
-            ? (x.accent as MetricAccent)
-            : "blue";
+      ? o.cards.flatMap((x: unknown): MetricCardDef[] => {
+          if (!isRecord(x)) return [];
+          const accent = isMetricAccent(x.accent) ? x.accent : "blue";
           return [
             {
               key: String(x.key ?? ""),
@@ -243,12 +266,12 @@ export function toAggregatePayload(
   out: unknown,
   calls: { calls: number; lastCallAt: string | null },
 ): AggregatePayload {
-  const payload = (out && typeof out === "object" ? out : {}) as AggregateRpcPayload;
-  const connectionCount = payload.connectionCount ?? 0;
+  const payload = isRecord(out) ? out : {};
+  const connectionCount = typeof payload.connectionCount === "number" ? payload.connectionCount : 0;
   const { calls: snapshotRowCount, lastCallAt } = calls;
   const stateMeta = {
     last_synced_at: lastCallAt,
-    status: payload.syncStatus ?? "idle",
+    status: typeof payload.syncStatus === "string" ? payload.syncStatus : "idle",
   };
   if (!snapshotRowCount) {
     return emptyPayload(
@@ -280,6 +303,7 @@ export function toAggregatePayload(
   };
 }
 
+/** Drop reasons per call stage, for the drop-analysis heatmap. */
 export interface KkbDropAnalysisPayload {
   stages: Array<{ key: string; label: string }>;
   buckets: Array<{
@@ -294,6 +318,7 @@ export interface KkbDropAnalysisPayload {
   safeguardingFlagged?: number;
 }
 
+/** Dashboard filters shared by the drop-analysis and funnel reports. */
 export type DropFilters = {
   state?: string;
   dateFrom?: string | null;
@@ -303,6 +328,7 @@ export type DropFilters = {
   channel?: string;
 };
 
+/** Turns optional drop-analysis filters into report arguments with defaults. */
 export function dropArgs(d: DropFilters) {
   return {
     state: all(d.state),
@@ -314,20 +340,21 @@ export function dropArgs(d: DropFilters) {
   };
 }
 
+/** Cleans a KKB or DKB drop-analysis report. */
 export function normalizeDropAnalysis(out: unknown): KkbDropAnalysisPayload {
   const empty: KkbDropAnalysisPayload = { stages: [], buckets: [], maxCell: 0, grandTotal: 0 };
-  if (!out || typeof out !== "object") return empty;
-  const p = out as KkbDropAnalysisPayload;
+  if (!isRecord(out)) return empty;
+  const p = out;
   return {
-    stages: Array.isArray(p.stages) ? p.stages : [],
-    buckets: Array.isArray(p.buckets) ? p.buckets : [],
-    maxCell: Number(p.maxCell ?? 0) || 0,
-    grandTotal: Number(p.grandTotal ?? 0) || 0,
-    safeguardingFlagged:
-      p.safeguardingFlagged != null ? Number(p.safeguardingFlagged) || 0 : undefined,
+    stages: sqlArray(p.stages),
+    buckets: sqlArray(p.buckets),
+    maxCell: toCount(p.maxCell),
+    grandTotal: toCount(p.grandTotal),
+    safeguardingFlagged: p.safeguardingFlagged != null ? toCount(p.safeguardingFlagged) : undefined,
   };
 }
 
+/** One campaign in the campaign list, with its call counts. */
 export interface CampaignListItem {
   campaignType: string;
   campaignDate: string | null;
@@ -340,27 +367,28 @@ export interface CampaignListItem {
   converted: number;
 }
 
+/** Cleans the campaign list report; non-object entries are dropped. */
 export function normalizeCampaignList(out: unknown): CampaignListItem[] {
   if (!Array.isArray(out)) return [];
-  return out.flatMap((it): CampaignListItem[] => {
-    if (!it || typeof it !== "object") return [];
-    const o = it as Record<string, unknown>;
+  return out.flatMap((o: unknown): CampaignListItem[] => {
+    if (!isRecord(o)) return [];
     return [
       {
         campaignType: String(o.campaignType ?? ""),
         campaignDate: o.campaignDate ? String(o.campaignDate) : null,
         language: o.language ? String(o.language) : null,
         region: o.region ? String(o.region) : null,
-        totalCalls: Number(o.totalCalls ?? 0) || 0,
-        answered: Number(o.answered ?? 0) || 0,
-        engaged: Number(o.engaged ?? 0) || 0,
-        highIntent: Number(o.highIntent ?? 0) || 0,
-        converted: Number(o.converted ?? 0) || 0,
+        totalCalls: toCount(o.totalCalls),
+        answered: toCount(o.answered),
+        engaged: toCount(o.engaged),
+        highIntent: toCount(o.highIntent),
+        converted: toCount(o.converted),
       },
     ];
   });
 }
 
+/** Why calls in one campaign dropped, compared with its region. */
 export interface CampaignDropCausesPayload {
   sampleCalls: number;
   region: string | null;
@@ -376,6 +404,7 @@ export interface CampaignDropCausesPayload {
   }>;
 }
 
+/** Filters for the per-campaign reports. */
 export type CampaignArgs = {
   campaign: string;
   state?: string;
@@ -384,6 +413,7 @@ export type CampaignArgs = {
   channel?: string;
 };
 
+/** Turns optional campaign filters into report arguments with defaults. */
 export function campaignArgs(d: CampaignArgs) {
   return {
     campaign: d.campaign,
@@ -394,6 +424,7 @@ export function campaignArgs(d: CampaignArgs) {
   };
 }
 
+/** Cleans the campaign drop-causes report. */
 export function normalizeCampaignDropCauses(out: unknown): CampaignDropCausesPayload {
   const empty: CampaignDropCausesPayload = {
     sampleCalls: 0,
@@ -401,19 +432,17 @@ export function normalizeCampaignDropCauses(out: unknown): CampaignDropCausesPay
     highIntentNonApply: { segment: 0, top: [] },
     phaseShare: [],
   };
-  if (!out || typeof out !== "object") return empty;
-  const p = out as CampaignDropCausesPayload;
+  if (!isRecord(out)) return empty;
+  const hina = isRecord(out.highIntentNonApply) ? out.highIntentNonApply : {};
   return {
-    sampleCalls: Number(p.sampleCalls ?? 0) || 0,
-    region: p.region ?? null,
-    highIntentNonApply: {
-      segment: Number(p.highIntentNonApply?.segment ?? 0) || 0,
-      top: Array.isArray(p.highIntentNonApply?.top) ? p.highIntentNonApply.top : [],
-    },
-    phaseShare: Array.isArray(p.phaseShare) ? p.phaseShare : [],
+    sampleCalls: toCount(out.sampleCalls),
+    region: typeof out.region === "string" ? out.region : null,
+    highIntentNonApply: { segment: toCount(hina.segment), top: sqlArray(hina.top) },
+    phaseShare: sqlArray(out.phaseShare),
   };
 }
 
+/** Phase share for one DKB campaign, compared with its region. */
 export interface DkbCampaignCausesPayload {
   sampleCalls: number;
   region: string | null;
@@ -425,63 +454,73 @@ export interface DkbCampaignCausesPayload {
   }>;
 }
 
+/** Cleans the DKB campaign-causes report. */
 export function normalizeDkbCampaignCauses(out: unknown): DkbCampaignCausesPayload {
   const empty: DkbCampaignCausesPayload = { sampleCalls: 0, region: null, phaseShare: [] };
-  if (!out || typeof out !== "object") return empty;
-  const p = out as DkbCampaignCausesPayload;
+  if (!isRecord(out)) return empty;
   return {
-    sampleCalls: Number(p.sampleCalls ?? 0) || 0,
-    region: p.region ?? null,
-    phaseShare: Array.isArray(p.phaseShare) ? p.phaseShare : [],
+    sampleCalls: toCount(out.sampleCalls),
+    region: typeof out.region === "string" ? out.region : null,
+    phaseShare: sqlArray(out.phaseShare),
   };
 }
 
+/** Funnel report filters for one program. */
 export type FunnelArgs = DropFilters & { program: ProgramId };
 
+/** Turns funnel filters into report arguments with defaults. */
 export function funnelArgs(d: FunnelArgs) {
   return { program: d.program, ...dropArgs(d) };
 }
 
+/** Cleans the funnel call-id report; the count falls back to the number of ids. */
 export function normalizeFunnelCallIds(out: unknown): { count: number; ids: string[] } {
-  const p = (out && typeof out === "object" ? out : {}) as { count?: number; ids?: unknown };
+  const p = isRecord(out) ? out : {};
   const ids = Array.isArray(p.ids) ? p.ids.map((x) => String(x)) : [];
   return { count: Number(p.count ?? ids.length) || ids.length, ids };
 }
 
+/** Keeps the finite numbers of the funnel-duration report. */
 export function normalizeFunnelDurations(out: unknown): Record<string, number> {
-  if (!out || typeof out !== "object") return {};
+  if (!isRecord(out)) return {};
   const res: Record<string, number> = {};
-  for (const [k, v] of Object.entries(out as Record<string, unknown>)) {
+  for (const [k, v] of Object.entries(out)) {
     const n = Number(v);
     if (Number.isFinite(n)) res[k] = n;
   }
   return res;
 }
 
+/** Number of calls with one call outcome. */
 export interface CallOutcomeCount {
   outcome: string;
   n: number;
 }
 
+/** Cleans the KKB call-outcome report, highest count first. */
 export function normalizeCallOutcomes(out: unknown): CallOutcomeCount[] {
   if (!Array.isArray(out)) return [];
-  return (out as Array<Record<string, unknown>>)
-    .map((r) => ({ outcome: String(r.outcome ?? "Unknown"), n: Number(r.n ?? 0) || 0 }))
+  return out
+    .map((x: unknown) => (isRecord(x) ? x : {}))
+    .map((r) => ({ outcome: String(r.outcome ?? "Unknown"), n: toCount(r.n) }))
     .sort((a, b) => b.n - a.n);
 }
 
+/** Values offered in the dashboard filter menus. */
 export interface ProgramFilterOptions {
   cities: string[];
   campaignTypes: string[];
   channels: string[];
 }
 
+/** Keeps the non-blank strings of a JSON array. */
 export const toStringArray = (v: unknown): string[] =>
   Array.isArray(v) ? v.flatMap((x) => (typeof x === "string" && x.trim() ? [x] : [])) : [];
 
+/** Cleans the filter-option report. */
 export function normalizeFilterOptions(out: unknown): ProgramFilterOptions {
-  if (!out || typeof out !== "object") return { cities: [], campaignTypes: [], channels: [] };
-  const o = out as Record<string, unknown>;
+  if (!isRecord(out)) return { cities: [], campaignTypes: [], channels: [] };
+  const o = out;
   return {
     cities: toStringArray(o.cities),
     campaignTypes: toStringArray(o.campaignTypes),
