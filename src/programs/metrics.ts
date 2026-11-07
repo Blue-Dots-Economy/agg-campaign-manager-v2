@@ -6,7 +6,7 @@ import type { ProgramConfig } from "./registry";
 export const HIGH_INTENT_MIN_SCORE = 5;
 
 /** Highest intent score; distributions clamp or bucket scores into 0..this value. */
-const MAX_INTENT_SCORE = 10;
+export const MAX_INTENT_SCORE = 10;
 
 // ---- DKB helpers (read from the raw header→value map) ----
 function dkbField(r: CallRow, key: string): string {
