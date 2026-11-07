@@ -21,25 +21,39 @@ function describeIssue(issue: z.ZodIssue): string {
   return issue.path.length ? `${issue.path.join(".")}: ${issue.message}` : issue.message;
 }
 
+/** Sets the HTTP status of the current server-function response. */
+export type SetStatus = (status: number) => void | Promise<void>;
+
 /**
- * Builds a server-function input validator that parses with a Zod schema.
- * The message names each bad field with the schema's message; it never repeats rejected values.
- *
- * @param schema - Schema for the input; unknown keys are dropped (Zod's default `strip`).
- * @returns A validator for `.inputValidator(...)` that resolves to the parsed input.
- * @throws {Error} From the validator, after setting HTTP status 400, when the input does not match.
+ * Returns a `parseInput` that reports bad input through `setStatus`.
+ * Tests pass a recorder; the app uses {@link parseInput}.
  */
-export function parseInput<S extends z.ZodTypeAny>(
-  schema: S,
-): (input: z.input<S>) => Promise<z.output<S>> {
-  return async (input) => {
-    const result = await schema.safeParseAsync(input, { errorMap: noEchoErrorMap });
-    if (result.success) return result.data;
-    const problems = [...new Set(result.error.issues.map(describeIssue))];
-    const { setResponseStatus } = await import("@tanstack/react-start/server");
-    setResponseStatus(400);
-    throw new Error(
-      `${INVALID_INPUT_MESSAGE}: ${problems.slice(0, MAX_ISSUES_IN_MESSAGE).join("; ")}`,
-    );
+export function createParseInput(setStatus: SetStatus) {
+  /**
+   * Builds a server-function input validator that parses with a Zod schema.
+   * The message names each bad field with the schema's message; it never repeats rejected values.
+   *
+   * @param schema - Schema for the input; unknown keys are dropped (Zod's default `strip`).
+   * @returns A validator for `.inputValidator(...)` that resolves to the parsed input.
+   * @throws {Error} From the validator, after setting HTTP status 400, when the input does not match.
+   */
+  return function parseInput<S extends z.ZodTypeAny>(
+    schema: S,
+  ): (input: z.input<S>) => Promise<z.output<S>> {
+    return async (input) => {
+      const result = await schema.safeParseAsync(input, { errorMap: noEchoErrorMap });
+      if (result.success) return result.data;
+      const problems = [...new Set(result.error.issues.map(describeIssue))];
+      await setStatus(400);
+      throw new Error(
+        `${INVALID_INPUT_MESSAGE}: ${problems.slice(0, MAX_ISSUES_IN_MESSAGE).join("; ")}`,
+      );
+    };
   };
 }
+
+/** Server-function input validator: parses with a Zod schema and answers 400 on bad input. */
+export const parseInput = createParseInput(async (status) => {
+  const { setResponseStatus } = await import("@tanstack/react-start/server");
+  setResponseStatus(status);
+});
