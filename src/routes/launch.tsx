@@ -60,36 +60,27 @@ import {
   regionInfo as getRegionInfo,
   type ParsedCsv,
 } from "@/lib/launch/csv";
+import {
+  buildCampaignType,
+  canAdvance,
+  concurrencyInputMax,
+  DEFAULT_CALL_STATUSES,
+  dayLabels,
+  exceedsAvailable,
+  formatBatchValidationError,
+  LAUNCH_STEPS,
+  LOW_CONCURRENCY_WARNING,
+  startedBatchStatus,
+  toLaunchContacts,
+  type ValidationReport,
+} from "@/lib/launch/wizard";
 import { buildCohort, type CohortIntent, type ConfidenceBand } from "@/lib/cohort";
 
 export const Route = createFileRoute("/launch")({
   component: LaunchWizard,
 });
 
-const STEPS = [
-  "Program",
-  "Agent",
-  "Audience",
-  "Schedule",
-  "Concurrency",
-  "Review",
-  "Launch",
-] as const;
-
-interface ValidationReport {
-  total: number;
-  valid: number;
-  invalid: number;
-  missingCols: string[];
-  problems: { row: number; reason: string; phone?: string; name?: string }[];
-  validRows: {
-    name: string;
-    phone: string;
-    cc: string;
-    extras: Record<string, string>;
-    rowIndex: number;
-  }[];
-}
+const STEPS = LAUNCH_STEPS;
 
 function LaunchWizard() {
   const { programId: ctxProgram, config: ctxConfig, setProgramId } = useProgram();
@@ -150,13 +141,7 @@ function LaunchWizard() {
 
   // Derive language + city_campaign from region.
   const regionInfo = useMemo(() => getRegionInfo(region), [region]);
-  const campaignType = useMemo(() => {
-    const lang = regionInfo.language || region || "";
-    const dayNum = (campaignDay.match(/\d+/) || ["1"])[0];
-    const intentTag =
-      source === "cohort" ? (cohortIntent === "drive" ? "DriveApplications" : "FillInfo") : "";
-    return `${program.toUpperCase()}_${lang}_${intentTag ? intentTag + "_" : ""}Day${dayNum}`;
-  }, [program, regionInfo.language, region, campaignDay, source, cohortIntent]);
+  const campaignType = buildCampaignType({ program, region, campaignDay, source, cohortIntent });
 
   useEffect(() => {
     if (source === "cohort" && !seekers && !seekersLoading) {
@@ -220,27 +205,12 @@ function LaunchWizard() {
   const next = () => setStep((s) => Math.min(STEPS.length - 1, s + 1));
   const back = () => setStep((s) => Math.max(0, s - 1));
 
-  const canNext = useMemo(() => {
-    if (step === 0) return !!program;
-    if (step === 1) return !!agentId;
-    if (step === 2) {
-      if (source === "cohort") return cohortContacts.length > 0;
-      if (!report) return false;
-      if (report.missingCols.length > 0) return false;
-      if (report.invalid === 0) return true;
-      return proceedInvalid;
-    }
-    if (step === 3) return schedule.startTime < schedule.endTime && schedule.days.length > 0;
-    if (step === 4) {
-      if (!(concurrency > 0 && maxRetries >= 0 && retryAfterHrs > 0)) return false;
-      if (Number.isFinite(available) && concurrency > (available as number)) return false;
-      return true;
-    }
-    return true;
-  }, [
+  const canNext = canAdvance({
     step,
     program,
     agentId,
+    source,
+    cohortCount: cohortContacts.length,
     report,
     proceedInvalid,
     schedule,
@@ -248,9 +218,7 @@ function LaunchWizard() {
     maxRetries,
     retryAfterHrs,
     available,
-    source,
-    cohortContacts.length,
-  ]);
+  });
 
   const onFile = useCallback(
     async (f: File) => {
@@ -265,7 +233,7 @@ function LaunchWizard() {
       setValidating(true);
       try {
         const res = await validateFn({ data: { headers: p.headers, rows: p.rows } });
-        setReport(res as ValidationReport);
+        setReport(res);
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Validation failed");
       } finally {
@@ -280,7 +248,7 @@ function LaunchWizard() {
     setLaunchError(null);
     setStartPending(false);
     try {
-      const started: any = await startBatchFn({
+      const started: unknown = await startBatchFn({
         data: {
           batchId: id,
           schedule: {
@@ -292,11 +260,10 @@ function LaunchWizard() {
           maxRetries,
           retryAfterHrs,
           concurrency,
-          selectedStatuses: selectedStatuses.length ? selectedStatuses : ["Pending"],
+          selectedStatuses: selectedStatuses.length ? selectedStatuses : DEFAULT_CALL_STATUSES,
         },
       });
-      const status = started?.status ?? started?.batch?.status ?? "started";
-      setStartStatus(String(status));
+      setStartStatus(startedBatchStatus(started));
       appendLaunchLog({
         date: new Date().toISOString(),
         program,
@@ -319,16 +286,7 @@ function LaunchWizard() {
     }
   };
 
-  const buildContacts = () =>
-    source === "cohort"
-      ? cohortContacts.map((c) => ({ ...c, _region: region }))
-      : (report?.validRows ?? []).map((r) => ({
-          contact_name: r.name,
-          contact_phone: r.phone,
-          country_code: r.cc,
-          ...r.extras,
-          _region: region,
-        }));
+  const buildContacts = () => toLaunchContacts(source, cohortContacts, report?.validRows, region);
 
   const requestCampaign = async () => {
     const contacts = buildContacts();
@@ -383,7 +341,7 @@ function LaunchWizard() {
   };
 
   const launch = async () => {
-    if (Number.isFinite(available) && concurrency > (available as number)) {
+    if (exceedsAvailable(concurrency, available)) {
       const msg = `Only ${available} concurrency available — reduce concurrency or stop a running batch.`;
       setLaunchError(msg);
       toast.error(msg);
@@ -394,55 +352,14 @@ function LaunchWizard() {
     setStartPending(false);
     setStartStatus(null);
     try {
-      const contacts =
-        source === "cohort"
-          ? cohortContacts.map((c) => ({ ...c, _region: region }))
-          : (report?.validRows ?? []).map((r) => ({
-              contact_name: r.name,
-              contact_phone: r.phone,
-              country_code: r.cc,
-              ...r.extras,
-              _region: region,
-            }));
+      const contacts = buildContacts();
       if (contacts.length === 0) {
         toast.error("No contacts to launch.");
         setLaunching(false);
         return;
       }
-      const created = (await createBatchFn({ data: { agentId, batchName, contacts } })) as
-        | {
-            ok: true;
-            batchId: string;
-            contactsInserted?: number;
-            totalRows?: number;
-            message?: string;
-          }
-        | {
-            ok: false;
-            batchId: null;
-            validation: {
-              message: string;
-              totalRows?: number;
-              validRows?: number;
-              invalidRows?: number;
-              errors: Array<{ row?: number; field?: string; message?: string; value?: any }>;
-            };
-          };
-
-      if (!created.ok) {
-        const v = created.validation;
-        const sample = (v.errors ?? [])
-          .slice(0, 5)
-          .map(
-            (er) =>
-              `row ${er.row ?? "?"}${er.field ? ` · ${er.field}` : ""}${er.message ? `: ${er.message}` : ""}`,
-          )
-          .join("\n");
-        const more = (v.errors?.length ?? 0) > 5 ? `\n…and ${v.errors!.length - 5} more` : "";
-        throw new Error(
-          `${v.message}${typeof v.invalidRows === "number" ? ` (${v.invalidRows} invalid of ${v.totalRows ?? "?"})` : ""}${sample ? `\n${sample}${more}` : ""}`,
-        );
-      }
+      const created = await createBatchFn({ data: { agentId, batchName, contacts } });
+      if (!created.ok) throw new Error(formatBatchValidationError(created.validation));
 
       const id = created.batchId;
       setBatchId(id);
@@ -672,7 +589,7 @@ function LaunchWizard() {
               "mb-4 max-w-2xl rounded-md border px-3 py-2 text-sm flex items-start gap-2",
               available === 0
                 ? "border-red-500/30 bg-red-500/15 text-red-700 dark:text-red-400"
-                : available <= 5
+                : available <= LOW_CONCURRENCY_WARNING
                   ? "border-amber-500/30 bg-amber-500/15 text-amber-800 dark:text-amber-300"
                   : "border-brand/20 bg-brand-soft text-brand",
             )}
@@ -687,7 +604,7 @@ function LaunchWizard() {
                   {usage.data.batches.length === 1 ? "" : "es"}.
                 </span>
               ) : null}
-              {concurrency > (available as number) && Number.isFinite(available) && (
+              {exceedsAvailable(concurrency, available) && (
                 <div className="mt-1 font-medium">
                   Reduce concurrency to {available} or stop a running batch to proceed.
                 </div>
@@ -700,10 +617,7 @@ function LaunchWizard() {
               value={concurrency}
               onChange={setConcurrency}
               min={1}
-              max={Math.max(
-                1,
-                Math.min(100, Number.isFinite(available) ? (available as number) : 100),
-              )}
+              max={concurrencyInputMax(available)}
             />
             <NumberField
               label="Max retries"
@@ -1241,17 +1155,6 @@ function InfoTile({
       <div className="text-sm font-medium truncate">{value}</div>
       {hint && <div className="text-xs text-muted-foreground">{hint}</div>}
     </div>
-  );
-}
-
-const DAY_NAMES = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-function dayLabels(days: number[]) {
-  return (
-    days
-      .slice()
-      .sort()
-      .map((d) => DAY_NAMES[d])
-      .join(", ") || "—"
   );
 }
 
