@@ -30,6 +30,7 @@ import {
   nonBlankId,
   parseBulkQueue,
   praise,
+  readBulkQueueOrEmpty,
   reviewPrefill,
   safeRecordingUrl,
   SESSION_COUNT_STORAGE_KEY,
@@ -188,7 +189,7 @@ export function CallReviewWorkspace({
       }
       playSwoosh();
       if (bulkMode) {
-        const queue = parseBulkQueue(sessionStorage.getItem(BULK_QUEUE_STORAGE_KEY));
+        const queue = readBulkQueueOrEmpty(sessionStorage.getItem(BULK_QUEUE_STORAGE_KEY));
         const { next, remaining } = nextAfterSubmit(queue, callId);
         const milestone = !next || (newCount > 0 && newCount % MILESTONE_EVERY === 0);
         toast.success(

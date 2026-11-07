@@ -165,6 +165,16 @@ export function parseBulkQueue(raw: string | null): string[] {
   return raw ? BulkQueueSchema.parse(JSON.parse(raw)) : [];
 }
 
+/** Reads the stored bulk review queue; an unreadable or wrongly shaped queue counts as empty. */
+export function readBulkQueueOrEmpty(raw: string | null): string[] {
+  try {
+    return parseBulkQueue(raw);
+  } catch {
+    // A broken queue must not undo a review that is already saved; the run just ends.
+    return [];
+  }
+}
+
 /** Position of the call in the bulk queue for the progress bar (unknown calls count as first). */
 export function bulkProgress(
   queue: readonly string[],

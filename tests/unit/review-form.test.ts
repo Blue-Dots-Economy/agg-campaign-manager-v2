@@ -8,6 +8,7 @@ import {
   parseIssueList,
   parseTurnFlags,
   praise,
+  readBulkQueueOrEmpty,
   ratingLabel,
   reviewPrefill,
   safeRecordingUrl,
@@ -178,6 +179,14 @@ describe("bulk queue", () => {
     expect(() => parseBulkQueue("[")).toThrow();
     expect(() => parseBulkQueue('{"a":1}')).toThrow();
     expect(() => parseBulkQueue("[1,2]")).toThrow();
+  });
+
+  test("readBulkQueueOrEmpty returns the stored ids, or no ids when the queue is unreadable", () => {
+    expect(readBulkQueueOrEmpty('["a","b"]')).toEqual(["a", "b"]);
+    expect(readBulkQueueOrEmpty(null)).toEqual([]);
+    expect(readBulkQueueOrEmpty("[")).toEqual([]);
+    expect(readBulkQueueOrEmpty('{"a":1}')).toEqual([]);
+    expect(readBulkQueueOrEmpty("[1,2]")).toEqual([]);
   });
 
   test("bulkProgress places the call and finds the next one", () => {
