@@ -16,7 +16,6 @@ import {
   LAST_HEADER_COL,
   LAST_ROW,
   RW_SCOPE,
-  SHEETS_API,
   SpreadsheetSchema,
   ValueRangeSchema,
   getAccessToken,
@@ -24,6 +23,7 @@ import {
   readColumn,
   readHeaderRow,
   sheetsCall,
+  spreadsheetUrl,
   statusOnly,
   valuesUrl,
   withText,
@@ -58,7 +58,7 @@ export async function readStagingCallIds(sheetId: string, tab: string): Promise<
   const tabs = await listSheetTabs(sheetId);
   if (!tabs.includes(tab)) {
     await sheetsCall(
-      `${SHEETS_API}${sheetId}:batchUpdate`,
+      spreadsheetUrl(sheetId, ":batchUpdate"),
       {
         method: "POST",
         token,
@@ -176,7 +176,7 @@ export async function updateStagingRows(
     values: [row.values],
   }));
   await sheetsCall(
-    `${SHEETS_API}${sheetId}/values:batchUpdate`,
+    spreadsheetUrl(sheetId, "/values:batchUpdate"),
     {
       method: "POST",
       token,
@@ -210,7 +210,7 @@ const REVIEW_EXCLUDE_NORM = new Set(["call_transcript", "final_summary"]);
 export async function listSheetTabs(sheetId: string): Promise<string[]> {
   const token = await getAccessToken();
   const data = await sheetsCall(
-    `${SHEETS_API}${sheetId}?fields=sheets.properties.title`,
+    spreadsheetUrl(sheetId, "?fields=sheets.properties.title"),
     { token, failMessage: withText("Sheets metadata failed") },
     SpreadsheetSchema,
   );
@@ -226,7 +226,7 @@ export async function deleteSheetTab(sheetId: string, title: string): Promise<bo
   const token = await getAccessToken(RW_SCOPE);
   try {
     const meta = await sheetsCall(
-      `${SHEETS_API}${sheetId}?fields=sheets.properties`,
+      spreadsheetUrl(sheetId, "?fields=sheets.properties"),
       { token, failMessage: statusOnly("Sheets metadata failed") },
       SpreadsheetSchema,
     );
@@ -234,7 +234,7 @@ export async function deleteSheetTab(sheetId: string, title: string): Promise<bo
       ?.sheetId;
     if (sheetTabId === undefined) return false;
     await sheetsCall(
-      `${SHEETS_API}${sheetId}:batchUpdate`,
+      spreadsheetUrl(sheetId, ":batchUpdate"),
       {
         method: "POST",
         token,
@@ -269,10 +269,12 @@ async function readSheetForTab(
   );
 
   // FORMATTED_VALUE + FORMATTED_STRING return date cells as shown ("2026-06-23"), not serials.
-  const url =
-    `${SHEETS_API}${sheetId}/values:batchGet?` +
-    ranges.map((r) => `ranges=${encodeURIComponent(r)}`).join("&") +
-    `&majorDimension=ROWS&valueRenderOption=FORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING`;
+  const url = spreadsheetUrl(
+    sheetId,
+    "/values:batchGet?" +
+      ranges.map((r) => `ranges=${encodeURIComponent(r)}`).join("&") +
+      `&majorDimension=ROWS&valueRenderOption=FORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING`,
+  );
   const data = await sheetsCall(
     url,
     { token, failMessage: withText("Sheets read failed") },

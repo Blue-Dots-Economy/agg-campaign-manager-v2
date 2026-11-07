@@ -15,6 +15,7 @@ import {
   writeStagingHeaders,
 } from "../../src/lib/sheets.server";
 import {
+  DEFAULT_SHEETS_API_BASE_URL,
   DEFAULT_SHEETS_RETRIES,
   DEFAULT_SHEETS_TIMEOUT_MS,
   readSheetsConfig,
@@ -390,16 +391,33 @@ describe("timeouts and retries", () => {
 describe("readSheetsConfig", () => {
   test("uses named defaults", () => {
     expect(readSheetsConfig({})).toEqual({
+      apiBaseUrl: DEFAULT_SHEETS_API_BASE_URL,
       timeoutMs: DEFAULT_SHEETS_TIMEOUT_MS,
       retries: DEFAULT_SHEETS_RETRIES,
     });
+    expect(DEFAULT_SHEETS_API_BASE_URL).toBe(SHEETS);
   });
   test("reads overrides and refuses invalid numbers", () => {
-    expect(readSheetsConfig({ SHEETS_TIMEOUT_MS: "1000", SHEETS_RETRIES: "0" })).toEqual({
+    expect(
+      readSheetsConfig({
+        SHEETS_API_BASE_URL: "http://127.0.0.1:4010/sheets/v4/spreadsheets/",
+        SHEETS_TIMEOUT_MS: "1000",
+        SHEETS_RETRIES: "0",
+      }),
+    ).toEqual({
+      apiBaseUrl: "http://127.0.0.1:4010/sheets/v4/spreadsheets/",
       timeoutMs: 1000,
       retries: 0,
     });
     expect(() => readSheetsConfig({ SHEETS_RETRIES: "-1" })).toThrow("SHEETS_RETRIES");
+  });
+  test("adds a missing trailing slash to the base URL and ignores a blank value", () => {
+    expect(readSheetsConfig({ SHEETS_API_BASE_URL: " http://mock/sheets " }).apiBaseUrl).toBe(
+      "http://mock/sheets/",
+    );
+    expect(readSheetsConfig({ SHEETS_API_BASE_URL: "  " }).apiBaseUrl).toBe(
+      DEFAULT_SHEETS_API_BASE_URL,
+    );
   });
 });
 

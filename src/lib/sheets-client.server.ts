@@ -14,8 +14,8 @@ export interface ServiceAccountJson {
   token_uri?: string;
 }
 
-/** Sheets API base URL for spreadsheets. */
-export const SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets/";
+/** Sheets spreadsheets URL used when `SHEETS_API_BASE_URL` is not set. Ends with a slash. */
+export const DEFAULT_SHEETS_API_BASE_URL = "https://sheets.googleapis.com/v4/spreadsheets/";
 const DEFAULT_TOKEN_URI = "https://oauth2.googleapis.com/token";
 /** OAuth scope for reads. */
 export const READ_SCOPE = "https://www.googleapis.com/auth/spreadsheets.readonly";
@@ -42,6 +42,8 @@ export const FIRST_DATA_ROW = 2;
 
 /** Sheets connection settings. */
 export interface SheetsConfig {
+  /** Spreadsheets URL ending with a slash; a spreadsheet id follows it. */
+  apiBaseUrl: string;
   timeoutMs: number;
   retries: number;
 }
@@ -52,7 +54,9 @@ export interface SheetsConfig {
  * @throws {Error} When `SHEETS_TIMEOUT_MS` or `SHEETS_RETRIES` is not a valid whole number.
  */
 export function readSheetsConfig(env: Record<string, string | undefined>): SheetsConfig {
+  const apiBaseUrl = env.SHEETS_API_BASE_URL?.trim() || DEFAULT_SHEETS_API_BASE_URL;
   return {
+    apiBaseUrl: apiBaseUrl.endsWith("/") ? apiBaseUrl : `${apiBaseUrl}/`,
     timeoutMs: intFromEnv(env, "SHEETS_TIMEOUT_MS", DEFAULT_SHEETS_TIMEOUT_MS, 1),
     retries: intFromEnv(env, "SHEETS_RETRIES", DEFAULT_SHEETS_RETRIES, 0),
   };
@@ -251,9 +255,13 @@ export async function getAccessToken(scope: string = READ_SCOPE): Promise<string
   return data.access_token;
 }
 
+/** URL of a spreadsheet under the configured Sheets base, followed by `suffix`. */
+export const spreadsheetUrl = (sheetId: string, suffix = "") =>
+  `${sheetsConfig().apiBaseUrl}${sheetId}${suffix}`;
+
 /** URL of a values range, with an optional query string. */
 export const valuesUrl = (sheetId: string, range: string, query = "") =>
-  `${SHEETS_API}${sheetId}/values/${range}${query}`;
+  spreadsheetUrl(sheetId, `/values/${range}${query}`);
 
 /**
  * Reads row 1 of a tab as trimmed strings.
