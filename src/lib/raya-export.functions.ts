@@ -7,12 +7,13 @@ import { FN_ROLES } from "@/auth/roles";
 import { parseInput } from "@/server/validation";
 import { programIdSchema } from "@/lib/input-schemas";
 
+/** A program's staging-sheet target. */
 export type { ExportTarget } from "./raya-export.server";
 
 /** Input of `getExportTarget`. */
 export const GetExportTargetInput = z.object({ program: programIdSchema });
 
-// ---------- target read ----------
+/** Returns the program's staging-sheet target, or null when none is set. */
 export const getExportTarget = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator(parseInput(GetExportTargetInput))
@@ -29,7 +30,7 @@ export const SetExportTargetInput = z.object({
   label: z.string().max(200).optional(),
 });
 
-// ---------- target write ----------
+/** Saves the program's staging sheet; refuses a master sheet. */
 export const setExportTarget = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator(parseInput(SetExportTargetInput))
@@ -46,7 +47,7 @@ export const ExportBatchToStagingInput = z.object({
   agentName: z.string().optional(),
 });
 
-// ---------- main export ----------
+/** Exports a Raya batch to the program's staging sheet. */
 export const exportBatchToStaging = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.campaigns)])
   .inputValidator(parseInput(ExportBatchToStagingInput))

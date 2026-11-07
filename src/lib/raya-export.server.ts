@@ -330,7 +330,6 @@ export async function exportBatch(data: ExportBatchInput) {
   const columns = registry[data.program].columns;
   const sheetId = target.sheet_id;
 
-  await removeLegacyTab(sheetId);
   const { existing, rowByCallId } = await prepareStagingTab(data.program, sheetId, columns);
 
   const contacts = await fetchAllBatchContacts(data.batchId);

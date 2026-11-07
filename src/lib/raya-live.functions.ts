@@ -7,12 +7,12 @@ import { requireRole } from "@/auth/middleware";
 import { FN_ROLES } from "@/auth/roles";
 import { parseInput } from "@/server/validation";
 import { programIdSchema } from "@/lib/input-schemas";
-import { errorMessage } from "@/lib/errors";
 import type { JsonObject } from "@/lib/json";
 import { getDb } from "@/server/db/client.server";
 import { programAgents } from "@/server/db/schema";
 import { logEvent } from "@/server/log.server";
 import { delay, rayaFetch } from "./raya-api.server";
+import { agentsReadFailed } from "./raya-live.server";
 import {
   BatchContactsPageSchema,
   BatchListReplySchema,
@@ -28,6 +28,7 @@ import {
   type LiveBatch,
 } from "./raya-live-batches";
 
+/** Live-batch shapes the campaigns page uses. */
 export type { BatchContactLite, BatchLiveDetail, LiveBatch };
 
 /** Batches read per agent; the campaigns page shows the most recent ones. */
@@ -42,6 +43,7 @@ const LIVE_CONTACTS_MAX_PAGES = 5;
 /** Input of `listProgramLiveBatches`. */
 export const ListProgramLiveBatchesInput = z.object({ program: programIdSchema });
 
+/** Lists the program's Raya batches across its agents, running batches first. */
 export const listProgramLiveBatches = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.campaigns)])
   .inputValidator(parseInput(ListProgramLiveBatchesInput))
@@ -56,7 +58,7 @@ export const listProgramLiveBatches = createServerFn({ method: "GET" })
         .from(programAgents)
         .where(eq(programAgents.program, data.program));
     } catch (e) {
-      return { ok: false as const, batches: [], error: errorMessage(e) };
+      return agentsReadFailed(e);
     }
     const all: LiveBatch[] = [];
     for (const a of agents) {
@@ -94,6 +96,7 @@ export const GetBatchLiveDetailInput = z.object({
   batchName: z.string().optional(),
 });
 
+/** Returns a batch's live progress, counted from up to 1,000 of its contacts. */
 export const getBatchLiveDetail = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.campaigns)])
   .inputValidator(parseInput(GetBatchLiveDetailInput))

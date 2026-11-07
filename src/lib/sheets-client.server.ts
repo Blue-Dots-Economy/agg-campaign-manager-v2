@@ -35,7 +35,7 @@ const TOKEN_RENEW_MARGIN_S = 60;
 export const LAST_ROW = 200_000;
 /** Last column read for header rows. */
 export const LAST_HEADER_COL = "ZZ";
-/** Longest part of a Sheets error reply quoted in an error message. */
+/** Longest Google error text quoted in an error message. */
 const ERROR_TEXT_MAX_CHARS = 300;
 /** First data row; row 1 holds the headers. */
 export const FIRST_DATA_ROW = 2;
@@ -114,10 +114,25 @@ function parseServiceAccount(): ServiceAccountJson {
   return parsed.data;
 }
 
-/** Text of an upstream error body, for error messages. */
-function bodyText(body: unknown): string {
-  if (body == null) return "";
-  return typeof body === "string" ? body : JSON.stringify(body);
+/** Google's error fields: `{ error: { message, status } }` from Sheets, `{ error: "code" }` from OAuth. */
+const GoogleErrorBody = z.object({
+  error: z.union([
+    z.string(),
+    z.object({ message: z.string().optional(), status: z.string().optional() }),
+  ]),
+});
+
+/**
+ * Returns Google's error message and status from a reply, or "".
+ * Other reply text is never quoted: it can echo cell values.
+ */
+function googleErrorText(body: unknown): string {
+  const parsed = GoogleErrorBody.safeParse(body);
+  if (!parsed.success) return "";
+  const { error } = parsed.data;
+  if (typeof error === "string") return error;
+  if (error.message && error.status) return `${error.message} (${error.status})`;
+  return error.message ?? error.status ?? "";
 }
 
 /** Options for one Sheets call. */
@@ -173,7 +188,7 @@ export async function sheetsCall<S extends z.ZodTypeAny>(
       error: e instanceof Error ? e.name : "Unknown error",
     });
     if (e instanceof UpstreamError && status !== undefined) {
-      throw new UpstreamError(req.failMessage(status, bodyText(e.body)), {
+      throw new UpstreamError(req.failMessage(status, googleErrorText(e.body)), {
         service: SERVICE,
         status,
         body: e.body,
@@ -189,9 +204,9 @@ export function isErrorStatus(e: unknown): boolean {
   return e instanceof UpstreamError && e.status !== undefined;
 }
 
-/** Error message builder that quotes the start of the reply. */
+/** Error message builder that adds Google's error text when there is any. */
 export const withText = (label: string) => (status: number, text: string) =>
-  `${label} (${status}): ${text.slice(0, ERROR_TEXT_MAX_CHARS)}`;
+  text ? `${label} (${status}): ${text.slice(0, ERROR_TEXT_MAX_CHARS)}` : `${label} (${status})`;
 /** Error message builder with the status only. */
 export const statusOnly = (label: string) => (status: number) => `${label} (${status})`;
 

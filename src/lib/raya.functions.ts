@@ -6,7 +6,7 @@ import { requireRole } from "@/auth/middleware";
 import { FN_ROLES } from "@/auth/roles";
 import { parseInput } from "@/server/validation";
 import { MAX_CONTACTS_PER_BATCH } from "@/lib/input-schemas";
-import { JsonObjectSchema, JsonValueSchema } from "@/lib/json";
+import { JsonObjectSchema, JsonValueSchema, type JsonObject } from "@/lib/json";
 import { DEFAULT_COUNTRY_CODE, validateContactRows } from "./contact-validation";
 import { delay, rayaFetch, RayaApiError } from "./raya-api.server";
 
@@ -86,11 +86,16 @@ export const CreateBatchReply = z.object({
 });
 type CreateBatchReply = z.infer<typeof CreateBatchReply>;
 
-/** Raya's row-level validation errors, passed to the page. */
-const ValidationErrors = z.array(JsonObjectSchema);
+/** Returns Raya's row-level validation errors for the page; entries that are not objects are skipped. */
+export function validationErrorList(errors: unknown): JsonObject[] {
+  if (!Array.isArray(errors)) return [];
+  return errors.flatMap((entry: unknown) => {
+    const parsed = JsonObjectSchema.safeParse(entry);
+    return parsed.success ? [parsed.data] : [];
+  });
+}
 
 function validationResult(r: CreateBatchReply) {
-  const errors = ValidationErrors.safeParse(r.errors);
   return {
     ok: false as const,
     batchId: null,
@@ -99,7 +104,7 @@ function validationResult(r: CreateBatchReply) {
       totalRows: r.totalRows ?? undefined,
       validRows: r.validRows ?? undefined,
       invalidRows: r.invalidRows ?? undefined,
-      errors: errors.success ? errors.data : [],
+      errors: validationErrorList(r.errors),
     },
   };
 }
@@ -114,7 +119,7 @@ export const CreateBatchInput = z.object({
     .max(MAX_CONTACTS_PER_BATCH, "Too many contacts for one batch."),
 });
 
-// ---------- createBatch ----------
+/** Creates a Raya batch with the contacts; returns the batch id or Raya's row-level validation errors. */
 export const rayaCreateBatch = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.launch)])
   .inputValidator(parseInput(CreateBatchInput))
@@ -184,7 +189,7 @@ export const StartBatchInput = z.object({
   selectedStatuses: z.array(z.string()).optional(),
 });
 
-// ---------- startBatch ----------
+/** Starts a created batch with its schedule and retry settings. */
 export const rayaStartBatch = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.launch)])
   .inputValidator(parseInput(StartBatchInput))
@@ -253,7 +258,7 @@ function pageQuery(page?: number, pageSize?: number, extra: Record<string, strin
   return q ? `?${q}` : "";
 }
 
-// ---------- listAgents ----------
+/** Lists Raya agents as id and name. */
 export const rayaListAgents = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator(parseInput(ListAgentsInput))
@@ -280,7 +285,7 @@ export const ValidateContactsInput = z.object({
   rows: z.array(z.array(z.string()).max(MAX_UPLOAD_COLUMNS)).max(MAX_UPLOAD_ROWS),
 });
 
-// ---------- validateContacts (no Raya call) ----------
+/** Checks an uploaded contact list before launch, without calling Raya. */
 export const validateContacts = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.launch)])
   .inputValidator(parseInput(ValidateContactsInput))
@@ -296,7 +301,7 @@ export const UpdateBatchInput = z.object({
   concurrency: optionalCount,
 });
 
-// ---------- updateBatch ----------
+/** Changes a batch's name, schedule or retry settings. */
 export const rayaUpdateBatch = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator(parseInput(UpdateBatchInput))
@@ -312,7 +317,7 @@ export const rayaUpdateBatch = createServerFn({ method: "POST" })
 /** Input of `rayaStopBatch`. */
 export const StopBatchInput = z.object({ batchId: requiredId("Missing batch id.") });
 
-// ---------- stopBatch ----------
+/** Stops a running batch. */
 export const rayaStopBatch = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.campaigns)])
   .inputValidator(parseInput(StopBatchInput))
@@ -334,7 +339,7 @@ export const ListBatchesInput = z
   .optional()
   .default({});
 
-// ---------- listBatches ----------
+/** Lists Raya batches, optionally for one agent. */
 export const rayaListBatches = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator(parseInput(ListBatchesInput))
@@ -354,7 +359,7 @@ export const GetBatchContactsInput = z.object({
   pageSize: z.number().optional(),
 });
 
-// ---------- getBatchContacts ----------
+/** Returns one page of a batch's contacts as Raya sends them. */
 export const rayaGetBatchContacts = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator(parseInput(GetBatchContactsInput))
@@ -374,7 +379,7 @@ export const InitiateCallInput = z.object({
   agentArgs: z.record(z.string(), z.unknown()).optional(),
 });
 
-// ---------- initiateCall ----------
+/** Places one test call from an agent to a phone number. */
 export const rayaInitiateCall = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator(parseInput(InitiateCallInput))
@@ -388,7 +393,7 @@ export const rayaInitiateCall = createServerFn({ method: "POST" })
     return rayaFetch("/call", { method: "POST", json: body }, RayaReply);
   });
 
-// ---------- key status (does not expose the key) ----------
+/** Tells whether RAYA_API_KEY is set, without returning the key. */
 export const rayaKeyStatus = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.admin)])
   .handler(async () => {

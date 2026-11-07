@@ -12,6 +12,11 @@ export interface FetchJsonOptions {
   retries?: number;
   /** First backoff delay; doubles per attempt. A `Retry-After` header wins when present. */
   baseDelayMs?: number;
+  /**
+   * Which failures use the retries. "transient" (default): 429, 5xx, timeouts and network errors.
+   * "rateLimitOnly": 429 only, for writes, since a 429 means the service did nothing.
+   */
+  retryOn?: "transient" | "rateLimitOnly";
 }
 
 /** Longest wait between attempts, so a large Retry-After header cannot stall a request. */
@@ -67,7 +72,14 @@ export async function fetchJson<S extends z.ZodTypeAny>(
   schema: S,
   options: FetchJsonOptions,
 ): Promise<z.infer<S>> {
-  const { service, timeoutMs, retries = 0, baseDelayMs = DEFAULT_BASE_DELAY_MS } = options;
+  const {
+    service,
+    timeoutMs,
+    retries = 0,
+    baseDelayMs = DEFAULT_BASE_DELAY_MS,
+    retryOn = "transient",
+  } = options;
+  const transient = retryOn === "transient";
 
   for (let attempt = 0; ; attempt += 1) {
     const canRetry = attempt < retries;
@@ -75,7 +87,7 @@ export async function fetchJson<S extends z.ZodTypeAny>(
     try {
       res = await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
     } catch (e) {
-      if (canRetry) {
+      if (canRetry && transient) {
         await sleep(backoffMs(attempt, baseDelayMs, null));
         continue;
       }
@@ -85,7 +97,10 @@ export async function fetchJson<S extends z.ZodTypeAny>(
 
     const body = parseBody(await res.text());
     if (!res.ok) {
-      if (canRetry && isRetryableStatus(res.status)) {
+      const retryable = transient
+        ? isRetryableStatus(res.status)
+        : res.status === TOO_MANY_REQUESTS;
+      if (canRetry && retryable) {
         await sleep(backoffMs(attempt, baseDelayMs, res.headers.get("retry-after")));
         continue;
       }

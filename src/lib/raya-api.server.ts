@@ -1,4 +1,4 @@
-// Server-side client for the Raya voice API: API key, timeout, retries for reads and typed errors.
+// Server-side client for the Raya voice API: API key, timeouts, retries and typed errors.
 import { z } from "zod";
 import { ResponseShapeError, UpstreamError } from "@/lib/errors";
 import { intFromEnv } from "@/server/http/env-number.server";
@@ -7,33 +7,38 @@ import { logEvent } from "@/server/log.server";
 
 /** Raya API base URL used when `RAYA_BASE_URL` is not set. */
 export const DEFAULT_RAYA_BASE_URL = "https://v1.getraya.app/api";
-/** Time limit per Raya request when `RAYA_TIMEOUT_MS` is not set. */
+/** Time limit per Raya read when `RAYA_TIMEOUT_MS` is not set. */
 export const DEFAULT_RAYA_TIMEOUT_MS = 30_000;
-/** Extra attempts for a Raya read when `RAYA_RETRIES` is not set. Writes are never repeated. */
+/**
+ * Time limit per Raya write when `RAYA_WRITE_TIMEOUT_MS` is not set. Creating a batch of up to
+ * 200,000 contacts can take minutes, and a timed-out write may still complete in Raya.
+ */
+export const DEFAULT_RAYA_WRITE_TIMEOUT_MS = 300_000;
+/** Extra attempts when `RAYA_RETRIES` is not set. Writes are repeated only after a 429. */
 export const DEFAULT_RAYA_RETRIES = 3;
 /** First wait before a retry; doubles per attempt. Raya's rate limit needs a wait of seconds. */
 const RAYA_RETRY_BASE_DELAY_MS = 2_000;
-/** Longest part of an upstream reply quoted in an error message. */
-const ERROR_TEXT_MAX_CHARS = 600;
 const SERVICE = "raya";
 
 /** Raya connection settings. */
 export interface RayaConfig {
   baseUrl: string;
   timeoutMs: number;
+  writeTimeoutMs: number;
   retries: number;
 }
 
 /**
  * Reads the Raya settings from the environment.
  *
- * @throws {Error} When `RAYA_TIMEOUT_MS` or `RAYA_RETRIES` is not a valid whole number.
+ * @throws {Error} When a timeout or `RAYA_RETRIES` is not a valid whole number.
  */
 export function readRayaConfig(env: Record<string, string | undefined>): RayaConfig {
   const baseUrl = env.RAYA_BASE_URL?.trim() || DEFAULT_RAYA_BASE_URL;
   return {
     baseUrl: baseUrl.replace(/\/$/, ""),
     timeoutMs: intFromEnv(env, "RAYA_TIMEOUT_MS", DEFAULT_RAYA_TIMEOUT_MS, 1),
+    writeTimeoutMs: intFromEnv(env, "RAYA_WRITE_TIMEOUT_MS", DEFAULT_RAYA_WRITE_TIMEOUT_MS, 1),
     retries: intFromEnv(env, "RAYA_RETRIES", DEFAULT_RAYA_RETRIES, 0),
   };
 }
@@ -59,38 +64,32 @@ export class RayaApiError extends UpstreamError {
 /** Waits `ms` milliseconds. Used to space out calls under Raya's rate limit. */
 export const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const ErrorBody = z.object({
-  message: z.unknown(),
-  error: z.unknown(),
-  detail: z.unknown(),
-});
-
-const nonEmptyString = (v: unknown): string | null => (typeof v === "string" && v ? v : null);
+/** Raya's own error text. Other reply fields can echo contact data, so they are never quoted. */
+const ErrorBody = z.object({ message: z.string().min(1) });
 
 /** Builds the message shown to the user for a Raya error status. */
 function rayaErrorMessage(status: number, body: unknown): string {
   if (status === 401) return "Raya rejected the API key (401). Check RAYA_API_KEY.";
   if (status === 429)
-    return "Raya rate limit hit (429). Retried several times but Raya is still throttling requests.";
-  if (body && typeof body === "object") {
-    const parsed = ErrorBody.partial().safeParse(body);
-    const text = parsed.success
-      ? (nonEmptyString(parsed.data.message) ??
-        nonEmptyString(parsed.data.error) ??
-        nonEmptyString(parsed.data.detail))
-      : null;
-    if (text) return `Raya API ${status}: ${text}`;
-    return `Raya API ${status}: ${JSON.stringify(body).slice(0, ERROR_TEXT_MAX_CHARS)}`;
-  }
-  if (typeof body === "string" && body.trim())
-    return `Raya API ${status}: ${body.slice(0, ERROR_TEXT_MAX_CHARS)}`;
-  return `Raya API ${status}`;
+    return "Raya rate limit hit (429). Raya is still throttling requests; wait a minute and try again.";
+  const parsed = ErrorBody.safeParse(body);
+  return parsed.success ? `Raya API ${status}: ${parsed.data.message}` : `Raya API ${status}`;
+}
+
+function isTimeout(e: unknown): boolean {
+  return e instanceof DOMException && e.name === "TimeoutError";
 }
 
 /** Turns a failed fetchJson call into the error callers handle. */
-function toRayaError(e: unknown): unknown {
+function toRayaError(e: unknown, isWrite: boolean): unknown {
   if (e instanceof UpstreamError && e.status !== undefined) {
     return new RayaApiError(e.status, e.body, rayaErrorMessage(e.status, e.body), e);
+  }
+  if (isWrite && e instanceof UpstreamError && isTimeout(e.cause)) {
+    return new UpstreamError(
+      "Raya did not answer in time. The change may still have been made: check the Campaigns page before trying again.",
+      { service: SERVICE, cause: e },
+    );
   }
   return e;
 }
@@ -108,7 +107,8 @@ export type RayaRequestInit = RequestInit & { json?: unknown };
 
 /**
  * Calls the Raya API and returns the parsed response body.
- * GET requests retry on 429, 5xx and timeouts; other methods are sent once.
+ * GET requests retry on 429, 5xx, timeouts and network errors. Writes retry only on 429,
+ * which means Raya did nothing, and get the longer write timeout.
  *
  * @param path - Path under the Raya base URL, including any query string.
  * @param init - Fetch options; `json` is sent as the request body.
@@ -146,8 +146,9 @@ export async function rayaFetch(
     body = JSON.stringify(json);
   }
 
-  const { baseUrl, timeoutMs, retries } = rayaConfig();
+  const { baseUrl, timeoutMs, writeTimeoutMs, retries } = rayaConfig();
   const method = (rest.method ?? "GET").toUpperCase();
+  const isWrite = method !== "GET";
   const started = Date.now();
   try {
     const data: unknown = await fetchJson(
@@ -156,8 +157,9 @@ export async function rayaFetch(
       schema,
       {
         service: SERVICE,
-        timeoutMs,
-        retries: method === "GET" ? retries : 0,
+        timeoutMs: isWrite ? writeTimeoutMs : timeoutMs,
+        retries,
+        retryOn: isWrite ? "rateLimitOnly" : "transient",
         baseDelayMs: RAYA_RETRY_BASE_DELAY_MS,
       },
     );
@@ -170,7 +172,7 @@ export async function rayaFetch(
     });
     return data;
   } catch (e) {
-    const err = toRayaError(e);
+    const err = toRayaError(e, isWrite);
     logEvent("error", {
       operation: "raya.request",
       status: "failure",
