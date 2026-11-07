@@ -41,6 +41,12 @@ import { fetchFunnelCallIds } from "@/lib/snapshot.functions";
 import { fetchAllReviewedCallIds } from "@/lib/review.functions";
 import { useAuth } from "@/auth/context";
 import type { OverviewFilterValue } from "@/components/metrics/OverviewFilters";
+import { numericMetrics } from "@/components/metrics/metric-values";
+import {
+  intentBuckets,
+  previousPeriodFilters,
+  rollupPerDay,
+} from "@/components/metrics/program-analytics";
 
 async function copyText(text: string): Promise<boolean> {
   try {
@@ -118,24 +124,7 @@ export function ProgramAnalytics({
   const data = query.data;
 
   // Previous-period baseline (default behavior, used only when no comparison override).
-  const prevFilters = (() => {
-    if (comparison) return null;
-    if (!filters.dateFrom || !filters.dateTo) return null;
-    const from = new Date(filters.dateFrom);
-    const to = new Date(filters.dateTo);
-    const dayMs = 24 * 60 * 60 * 1000;
-    const len = Math.max(1, Math.round((to.getTime() - from.getTime()) / dayMs) + 1);
-    const prevTo = new Date(from.getTime() - dayMs);
-    const prevFrom = new Date(prevTo.getTime() - (len - 1) * dayMs);
-    const iso = (d: Date) => d.toISOString().slice(0, 10);
-    return {
-      state: filters.state,
-      dateFrom: iso(prevFrom),
-      dateTo: iso(prevTo),
-      campaignType: filters.campaignType,
-      channel: filters.channel,
-    };
-  })();
+  const prevFilters = comparison ? null : previousPeriodFilters(filters);
   const prevQuery = useProgramAggregates(
     config,
     prevFilters ?? {
@@ -165,45 +154,8 @@ export function ProgramAnalytics({
       ? prevQuery.data?.metrics
       : undefined;
 
-  const perDay = data?.aggregates?.perDay ?? [];
-  const perDayRollup = useMemo(() => {
-    const m = new Map<
-      string,
-      {
-        day: string;
-        date: string;
-        label: string;
-        rows: number;
-        answered: number;
-        engaged: number;
-        converted: number;
-        new_jobs: number;
-        high_intent: number;
-      }
-    >();
-    for (const p of perDay) {
-      const key = p.date || p.day;
-      const cur = m.get(key) ?? {
-        day: p.day,
-        date: p.date,
-        label: p.date || p.day,
-        rows: 0,
-        answered: 0,
-        engaged: 0,
-        converted: 0,
-        new_jobs: 0,
-        high_intent: 0,
-      };
-      cur.rows += p.rows;
-      cur.answered += p.answered;
-      cur.engaged += p.engaged;
-      cur.converted += p.converted;
-      cur.new_jobs += p.new_jobs;
-      cur.high_intent += p.high_intent;
-      m.set(key, cur);
-    }
-    return [...m.values()].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-  }, [perDay]);
+  const perDay = data?.aggregates?.perDay;
+  const perDayRollup = useMemo(() => rollupPerDay(perDay ?? []), [perDay]);
 
   const fetchIds = useServerFn(fetchFunnelCallIds);
   const fetchAllReviewed = useServerFn(fetchAllReviewedCallIds);
@@ -233,6 +185,10 @@ export function ProgramAnalytics({
       ? prevQuery.data?.aggregates?.kpis
       : undefined;
 
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- the snapshot metrics record holds the overview fields by name; the overview reads absent ones as missing
+  const overviewMetrics = metrics as unknown as KkbMetrics & DkbMetrics;
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- same record shape as overviewMetrics, for the comparison period
+  const overviewPrevious = prevMetrics as unknown as (KkbMetrics & DkbMetrics) | undefined;
   const comparisonLabel = comparison ? `vs ${comparison.label} avg` : undefined;
 
   const handleStageClick = async (stage: string, action: "copy" | "review") => {
@@ -269,7 +225,7 @@ export function ProgramAnalytics({
       let queue = ids;
       try {
         const reviewed = await fetchAllReviewed({
-          data: { program: config.id as "seekers" | "providers" },
+          data: { program: config.id },
         });
         const done = new Set(reviewed);
         const remaining = ids.filter((id) => !done.has(id));
@@ -295,7 +251,9 @@ export function ProgramAnalytics({
           ? { description: `Resuming — ${skipped.toLocaleString()} already reviewed are skipped.` }
           : undefined,
       );
-      navigate({ to: "/review/$callId", params: { callId: queue[0] }, search: { bulk: "1" } });
+      const first = queue[0];
+      if (!first) return;
+      await navigate({ to: "/review/$callId", params: { callId: first }, search: { bulk: "1" } });
       return;
     }
     const ok = await copyText(ids.join(", "));
@@ -313,7 +271,7 @@ export function ProgramAnalytics({
     <div className="space-y-6">
       {campaign && config.id === "seekers" && (
         <div className="flex justify-end">
-          <NorthStarMetrics program={config.id} m={metrics as unknown as Record<string, number>} />
+          <NorthStarMetrics program={config.id} m={numericMetrics(metrics)} />
         </div>
       )}
       {comparison && (
@@ -325,8 +283,8 @@ export function ProgramAnalytics({
       {hasMetrics ? (
         isDkb ? (
           <DkbOverviewMetrics
-            m={metrics as unknown as DkbMetrics}
-            previous={prevMetrics as unknown as DkbMetrics | undefined}
+            m={overviewMetrics}
+            previous={overviewPrevious}
             perDay={perDayRollup}
             comparisonLabel={comparisonLabel}
             onFunnelStageClick={handleStageClick}
@@ -334,8 +292,8 @@ export function ProgramAnalytics({
           />
         ) : (
           <KkbOverviewMetrics
-            m={metrics as unknown as KkbMetrics}
-            previous={prevMetrics as unknown as KkbMetrics | undefined}
+            m={overviewMetrics}
+            previous={overviewPrevious}
             perDay={perDayRollup}
             comparisonLabel={comparisonLabel}
             onFunnelStageClick={handleStageClick}
@@ -356,7 +314,7 @@ export function ProgramAnalytics({
         </div>
       )}
 
-      {!isDkb && <NorthStarTrend program={config.id} campaigns={perDay} />}
+      {!isDkb && <NorthStarTrend program={config.id} campaigns={perDay ?? []} />}
 
       {isDkb ? (
         <>
@@ -475,8 +433,8 @@ export function ProgramAnalytics({
                       outerRadius={80}
                       paddingAngle={2}
                     >
-                      {jobStatus.map((_, i) => (
-                        <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                      {jobStatus.map((s, i) => (
+                        <Cell key={s.status} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                       ))}
                     </Pie>
                     <Tooltip {...tooltipStyle} />
@@ -620,21 +578,7 @@ export function ProgramAnalytics({
               <div className="h-64">
                 <ResponsiveContainer>
                   <BarChart
-                    data={(() => {
-                      const buckets = [
-                        { range: "Low (1–4)", count: 0 },
-                        { range: "Medium (5–7)", count: 0 },
-                        { range: "High (8–10)", count: 0 },
-                      ];
-                      for (const r of intents as Array<{ score: number | string; count: number }>) {
-                        const s = Number(r.score);
-                        if (!Number.isFinite(s) || s <= 0) continue;
-                        if (s <= 4) buckets[0].count += r.count;
-                        else if (s <= 7) buckets[1].count += r.count;
-                        else if (s <= 10) buckets[2].count += r.count;
-                      }
-                      return buckets;
-                    })()}
+                    data={intentBuckets(intents)}
                     margin={{ top: 10, right: 16, left: -10, bottom: 0 }}
                   >
                     <CartesianGrid
