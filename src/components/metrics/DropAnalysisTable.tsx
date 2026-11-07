@@ -1,22 +1,7 @@
 import { Fragment } from "react";
-
-export type DropRow = {
-  stage: string;
-  reason: string;
-  byRegion: Record<string, number>;
-  total: number;
-};
+import { regionsFromRows, type DropRow } from "./drop-rows";
 
 const fmt = (n: number) => n.toLocaleString();
-
-export function regionsFromRows(rows: DropRow[], onlyRegion?: string): string[] {
-  if (onlyRegion) return [onlyRegion];
-  const set = new Set<string>();
-  for (const r of rows) {
-    for (const k of Object.keys(r.byRegion ?? {})) set.add(k);
-  }
-  return Array.from(set).sort((a, b) => a.localeCompare(b));
-}
 
 export function DropAnalysisTable({ rows, onlyRegion }: { rows: DropRow[]; onlyRegion?: string }) {
   if (!rows || rows.length === 0) {
@@ -30,8 +15,9 @@ export function DropAnalysisTable({ rows, onlyRegion }: { rows: DropRow[]; onlyR
   // Group by stage in backend arrival order, then by total desc
   const byStage = new Map<string, DropRow[]>();
   for (const r of rows) {
-    if (!byStage.has(r.stage)) byStage.set(r.stage, []);
-    byStage.get(r.stage)!.push(r);
+    const stageRows = byStage.get(r.stage);
+    if (stageRows) stageRows.push(r);
+    else byStage.set(r.stage, [r]);
   }
   const stages = Array.from(byStage.keys());
 
@@ -59,8 +45,9 @@ export function DropAnalysisTable({ rows, onlyRegion }: { rows: DropRow[]; onlyR
             const reasons = (byStage.get(stage) ?? []).slice().sort((a, b) => b.total - a.total);
             const subByRegion: Record<string, number> = {};
             for (const reg of regions) {
-              subByRegion[reg] = reasons.reduce((s, r) => s + (r.byRegion?.[reg] ?? 0), 0);
-              grandByRegion[reg] += subByRegion[reg];
+              const sub = reasons.reduce((s, r) => s + (r.byRegion?.[reg] ?? 0), 0);
+              subByRegion[reg] = sub;
+              grandByRegion[reg] = (grandByRegion[reg] ?? 0) + sub;
             }
             const sT = reasons.reduce((s, r) => s + r.total, 0);
             grandT += sT;

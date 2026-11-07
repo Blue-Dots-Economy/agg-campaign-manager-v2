@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, useEffect } from "react";
 import { sankey, sankeyLinkHorizontal, sankeyJustify } from "d3-sankey";
-import type { DropRow } from "./DropAnalysisTable";
+import type { DropRow } from "./drop-rows";
 import type { KkbMetrics } from "./program-overviews";
 import { reasonColor } from "./reasonColors";
 

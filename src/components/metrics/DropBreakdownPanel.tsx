@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { regionsFromRows, type DropRow } from "./DropAnalysisTable";
+import { regionsFromRows, type DropRow } from "./drop-rows";
 import { reasonColor } from "./reasonColors";
 
 const fmt = (n: number) => n.toLocaleString();
