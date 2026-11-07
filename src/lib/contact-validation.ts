@@ -7,7 +7,7 @@ export const MAX_PROBLEMS_RETURNED = 500;
 /** Sheet row number of the first data row; row 1 holds the headers. */
 const FIRST_DATA_ROW_NUMBER = 2;
 /** Digits in an Indian mobile number without the country code. */
-const MOBILE_DIGITS = 10;
+export const MOBILE_DIGITS = 10;
 /** Indian mobile numbers start with 6, 7, 8 or 9. */
 const MOBILE_PATTERN = /^[6-9]\d{9}$/;
 
