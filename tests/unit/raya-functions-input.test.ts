@@ -6,13 +6,13 @@ import {
   InitiateCallInput,
   ListAgentsInput,
   ListBatchesInput,
-  MAX_CONTACTS_PER_BATCH,
   MAX_UPLOAD_ROWS,
   StartBatchInput,
   StopBatchInput,
   UpdateBatchInput,
   ValidateContactsInput,
 } from "../../src/lib/raya.functions";
+import { MAX_CONTACTS_PER_BATCH } from "../../src/server/validation";
 
 const contact = { contact_name: "A", contact_phone: "9876543210", country_code: "91" };
 const schedule = { timezone: "Asia/Kolkata", start_time: "09:00", end_time: "18:00", days: [1, 2] };

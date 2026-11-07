@@ -5,9 +5,9 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { requireRole } from "@/auth/middleware";
 import { FN_ROLES } from "@/auth/roles";
+import { parseInput, programIdSchema } from "@/server/validation";
 import { errorMessage } from "@/lib/errors";
 import type { JsonObject } from "@/lib/json";
-import { registry, type ProgramId } from "@/programs/registry";
 import { getDb } from "@/server/db/client.server";
 import { programAgents } from "@/server/db/schema";
 import { logEvent } from "@/server/log.server";
@@ -38,17 +38,12 @@ const LIVE_CONTACTS_PAGE_SIZE = 200;
 /** Pages read for the live view, so at most 1,000 contacts are counted. */
 const LIVE_CONTACTS_MAX_PAGES = 5;
 
-/** A program id from the program registry. */
-const ProgramIdSchema = z
-  .string()
-  .refine((v): v is ProgramId => Object.hasOwn(registry, v), "Unknown program");
-
 /** Input of `listProgramLiveBatches`. */
-export const ListProgramLiveBatchesInput = z.object({ program: ProgramIdSchema });
+export const ListProgramLiveBatchesInput = z.object({ program: programIdSchema });
 
 export const listProgramLiveBatches = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.campaigns)])
-  .inputValidator((d: unknown) => ListProgramLiveBatchesInput.parse(d))
+  .inputValidator(parseInput(ListProgramLiveBatchesInput))
   .handler(async ({ data }) => {
     if (!process.env.RAYA_API_KEY) {
       return { ok: false as const, batches: [], error: "RAYA_API_KEY not set" };
@@ -100,7 +95,7 @@ export const GetBatchLiveDetailInput = z.object({
 
 export const getBatchLiveDetail = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.campaigns)])
-  .inputValidator((d: unknown) => GetBatchLiveDetailInput.parse(d))
+  .inputValidator(parseInput(GetBatchLiveDetailInput))
   .handler(async ({ data }) => {
     if (!process.env.RAYA_API_KEY) {
       throw new Error("RAYA_API_KEY not set");

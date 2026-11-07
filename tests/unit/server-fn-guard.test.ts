@@ -8,16 +8,6 @@ const SESSION_ONLY = new Set(["me", "logout", "changePassword"]);
 
 const SRC = join(import.meta.dir, "../../src");
 
-/**
- * Files whose validators are still pass-through, owned by another change. The list may only
- * shrink: the last test fails once a listed file validates every input.
- */
-const VALIDATION_PENDING = new Set([
-  "lib/raya.functions.ts",
-  "lib/raya-export.functions.ts",
-  "lib/raya-live.functions.ts",
-]);
-
 function sources(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
     const path = join(dir, name);
@@ -109,7 +99,6 @@ describe("server functions", () => {
 
   test("none passes its input through unchecked", () => {
     const passThrough = fns
-      .filter((f) => !VALIDATION_PENDING.has(f.file))
       .filter((f) => f.validator !== null && isPassThrough(f.validator))
       .map((f) => `${f.file}: ${f.name}`);
     expect(passThrough).toEqual([]);
@@ -117,7 +106,6 @@ describe("server functions", () => {
 
   test("each validator parses its input with parseInput", () => {
     const unparsed = fns
-      .filter((f) => !VALIDATION_PENDING.has(f.file))
       .filter((f) => f.validator !== null && !f.validator.startsWith("parseInput("))
       .map((f) => `${f.file}: ${f.name}`);
     expect(unparsed).toEqual([]);
@@ -130,15 +118,5 @@ describe("server functions", () => {
     expect(isPassThrough("(data: Array<Record<string, unknown>>) => data")).toBe(true);
     expect(isPassThrough("parseInput(programInput)")).toBe(false);
     expect(isPassThrough("(d: unknown) => schema.parse(d)")).toBe(false);
-  });
-
-  test("every pending file still has a validator to fix", () => {
-    const pendingDone = [...VALIDATION_PENDING].filter(
-      (file) =>
-        !fns.some(
-          (f) => f.file === file && f.validator !== null && !f.validator.startsWith("parseInput("),
-        ),
-    );
-    expect(pendingDone).toEqual([]);
   });
 });
