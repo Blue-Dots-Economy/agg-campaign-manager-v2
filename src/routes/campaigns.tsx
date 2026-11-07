@@ -47,46 +47,20 @@ import { rayaStopBatch } from "@/lib/raya.functions";
 import { exportBatchToStaging } from "@/lib/raya-export.functions";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import {
+  formatSchedule,
+  maskPhone,
+  RUNNING_STATUSES,
+  searchBatches,
+  splitActiveBatches,
+  statusBadgeClass,
+} from "@/lib/campaigns/batches";
 
 export const Route = createFileRoute("/campaigns")({ component: CampaignsPage });
 
 const RECENT_WINDOW_DAYS = 2;
 const PAGE_SIZE = 12;
-const RUNNING_STATUSES = new Set([
-  "running",
-  "in_progress",
-  "in progress",
-  "processing",
-  "active",
-  "live",
-  "started",
-]);
 
-function statusBadgeClass(status: string): string {
-  if (RUNNING_STATUSES.has(status))
-    return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30";
-  if (status === "scheduled" || status === "queued" || status === "pending")
-    return "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30";
-  if (status === "stopping" || status === "paused")
-    return "bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30";
-  if (status === "completed" || status === "finished")
-    return "bg-brand-soft text-brand border-brand/30";
-  if (status === "stopped" || status === "failed")
-    return "bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/30";
-  return "bg-muted text-muted-foreground border-border";
-}
-function maskPhone(p: string): string {
-  if (!p) return "—";
-  if (p.length <= 4) return p;
-  return p.slice(0, p.length - 6).replace(/\d/g, "•") + p.slice(-4).padStart(6, "•");
-}
-function formatSchedule(s: any): string {
-  if (!s) return "—";
-  const days = Array.isArray(s.days) ? s.days : [];
-  const dayNames = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const dayStr = days.map((d: number) => dayNames[d] ?? d).join(", ");
-  return `${dayStr || "—"} · ${s.start_time ?? "?"}–${s.end_time ?? "?"} ${s.timezone ?? ""}`.trim();
-}
 function useTabVisible() {
   const [visible, setVisible] = useState(typeof document !== "undefined" ? !document.hidden : true);
   useEffect(() => {
@@ -473,29 +447,7 @@ function LiveBatchesSection({
   const [showInactive, setShowInactive] = useState(false);
   const [search, setSearch] = useState("");
 
-  const { active, inactive } = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const filtered = q
-      ? batches.filter(
-          (b) => b.batchName.toLowerCase().includes(q) || b.agentName.toLowerCase().includes(q),
-        )
-      : batches;
-    const active: LiveBatch[] = [];
-    const inactive: LiveBatch[] = [];
-    for (const b of filtered) {
-      const isActive =
-        RUNNING_STATUSES.has(b.status) ||
-        b.status === "scheduled" ||
-        b.status === "queued" ||
-        b.status === "pending" ||
-        b.status === "stopping" ||
-        b.status === "paused" ||
-        b.status === "not started" ||
-        b.status === "not_started";
-      (isActive ? active : inactive).push(b);
-    }
-    return { active, inactive };
-  }, [batches, search]);
+  const { active, inactive } = splitActiveBatches(searchBatches(batches, search));
 
   const runningCount = active.filter((b) => RUNNING_STATUSES.has(b.status)).length;
 
