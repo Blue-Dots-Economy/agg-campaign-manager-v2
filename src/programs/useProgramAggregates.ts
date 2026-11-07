@@ -201,11 +201,10 @@ export function useSyncProgram(programId: ProgramId) {
   const qc = useQueryClient();
   const fn = useServerFn(syncProgramSnapshot);
   return useMutation({
-    mutationFn: (vars?: { force?: boolean; silent?: boolean }) =>
-      fn({ data: { program: programId, force: vars?.force ?? false } }).then((r) => ({
-        ...r,
-        silent: vars?.silent ?? false,
-      })),
+    mutationFn: async (vars?: { force?: boolean; silent?: boolean }) => {
+      const r = await fn({ data: { program: programId, force: vars?.force ?? false } });
+      return { ...r, silent: vars?.silent ?? false };
+    },
     onSuccess: (res) => {
       // Invalidate every query — a sync can change the rows underlying
       // aggregates, campaign lists, drop analysis, funnel durations, and
@@ -214,8 +213,9 @@ export function useSyncProgram(programId: ProgramId) {
       qc.invalidateQueries();
       if (res.silent) return;
       if (res.skipped) return; // a sync was already running — nothing to brag about
+      const firstError = res.errors[0];
       if (res.ok) toast.success(`Synced · ${res.rowCount} rows`);
-      else if (res.errors.length > 0) toast.error(res.errors[0].message);
+      else if (firstError) toast.error(firstError.message);
     },
     onError: (e, vars) => {
       if (vars?.silent) return;
