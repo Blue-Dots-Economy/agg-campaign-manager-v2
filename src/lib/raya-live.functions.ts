@@ -27,6 +27,7 @@ import {
   type LiveBatch,
 } from "./raya-live-batches";
 
+/** Live-batch shapes the campaigns page uses. */
 export type { BatchContactLite, BatchLiveDetail, LiveBatch };
 
 /** Batches read per agent; the campaigns page shows the most recent ones. */
@@ -57,6 +58,7 @@ export function agentsReadFailed(e: unknown) {
   return { ok: false as const, batches: [], error: AGENTS_READ_FAILED_MESSAGE };
 }
 
+/** Lists the program's Raya batches across its agents, running batches first. */
 export const listProgramLiveBatches = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.campaigns)])
   .inputValidator(parseInput(ListProgramLiveBatchesInput))
@@ -109,6 +111,7 @@ export const GetBatchLiveDetailInput = z.object({
   batchName: z.string().optional(),
 });
 
+/** Returns a batch's live progress, counted from up to 1,000 of its contacts. */
 export const getBatchLiveDetail = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.campaigns)])
   .inputValidator(parseInput(GetBatchLiveDetailInput))
