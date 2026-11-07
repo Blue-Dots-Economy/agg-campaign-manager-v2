@@ -2,7 +2,6 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { ArrowLeft, ChevronDown } from "lucide-react";
 import type { ChannelValue } from "@/components/metrics/OverviewFilters";
-import { format } from "date-fns";
 import { useProgram } from "@/programs/context";
 import { useCampaignList } from "@/programs/useProgramAggregates";
 import { ProgramAnalytics } from "@/components/metrics/ProgramAnalytics";
@@ -11,6 +10,14 @@ import { CampaignSuccess } from "@/components/campaigns/CampaignSuccess";
 import { CampaignVerdictDkb } from "@/components/campaigns/CampaignVerdictDkb";
 import { CampaignSuccessDkb } from "@/components/campaigns/CampaignSuccessDkb";
 import { humanizeCampaignType } from "@/lib/campaign-name";
+import { formatCampaignDate } from "@/lib/campaigns/list";
+import {
+  CampaignSearchSchema,
+  campaignOptionValue,
+  findCampaign,
+  parseCampaignOption,
+  sortCampaignsNewestFirst,
+} from "@/lib/campaigns/detail";
 import { LoadingState, NoDataState } from "@/components/EmptyState";
 import {
   Select,
@@ -21,41 +28,20 @@ import {
 } from "@/components/ui/select";
 
 export const Route = createFileRoute("/campaigns_/$campaign")({
-  validateSearch: (s: Record<string, unknown>) => ({
-    date: typeof s.date === "string" ? s.date : undefined,
-    channel:
-      s.channel === "outbound" || s.channel === "inbound" || s.channel === "all"
-        ? s.channel
-        : undefined,
-  }),
+  validateSearch: (s: Record<string, unknown>) => CampaignSearchSchema.parse(s),
   component: CampaignReviewDetail,
 });
-
-function parseDate(s: string | null): Date | null {
-  if (!s) return null;
-  const [y, m, d] = s.split("-").map(Number);
-  if (!y || !m || !d) return null;
-  return new Date(y, m - 1, d);
-}
 
 function CampaignReviewDetail() {
   const { campaign: rawCampaign } = Route.useParams();
   const { date, channel } = Route.useSearch();
-  const channelFilter = (channel ?? "all") as ChannelValue;
+  const channelFilter: ChannelValue = channel ?? "all";
   const navigate = useNavigate();
   const { config } = useProgram();
   const { data: campaigns, isLoading } = useCampaignList(config, { channel: channelFilter });
 
-  const sorted = useMemo(
-    () =>
-      (campaigns ?? [])
-        .slice()
-        .sort((a, b) => (b.campaignDate ?? "").localeCompare(a.campaignDate ?? "")),
-    [campaigns],
-  );
-  const current =
-    sorted.find((c) => c.campaignType === rawCampaign && (date ? c.campaignDate === date : true)) ??
-    sorted.find((c) => c.campaignType === rawCampaign);
+  const sorted = useMemo(() => sortCampaignsNewestFirst(campaigns ?? []), [campaigns]);
+  const current = findCampaign(sorted, rawCampaign, date);
 
   if (isLoading && !campaigns) return <LoadingState />;
 
@@ -76,12 +62,9 @@ function CampaignReviewDetail() {
   const region = current.region ?? null;
   const scopeDate = current.campaignDate ?? null;
   const detailFilters = { dateFrom: scopeDate, dateTo: scopeDate, channel: channelFilter };
-  const dateLabel = (() => {
-    const d = parseDate(current.campaignDate);
-    return d ? format(d, "MMM d, yyyy") : "—";
-  })();
+  const dateLabel = formatCampaignDate(current.campaignDate);
   const label = region ?? "all";
-  const currentComposite = `${current.campaignType} ${current.campaignDate ?? ""}`;
+  const currentComposite = campaignOptionValue(current);
 
   return (
     <div className="space-y-6">
@@ -105,13 +88,11 @@ function CampaignReviewDetail() {
           <Select
             value={currentComposite}
             onValueChange={(v) => {
-              const idx = v.indexOf(" ");
-              const type = idx === -1 ? v : v.slice(0, idx);
-              const d = idx === -1 ? "" : v.slice(idx + 1);
+              const picked = parseCampaignOption(v);
               navigate({
                 to: "/campaigns/$campaign",
-                params: { campaign: type },
-                search: { date: d || undefined, channel: channel ?? undefined },
+                params: { campaign: picked.campaignType },
+                search: { date: picked.date, channel: channel ?? undefined },
               });
             }}
           >
@@ -123,7 +104,7 @@ function CampaignReviewDetail() {
               {sorted.map((c) => (
                 <SelectItem
                   key={`${c.campaignType}__${c.campaignDate ?? "nodate"}`}
-                  value={`${c.campaignType} ${c.campaignDate ?? ""}`}
+                  value={campaignOptionValue(c)}
                 >
                   {humanizeCampaignType(c.campaignType)}
                   {c.campaignDate ? ` · ${c.campaignDate}` : ""}
