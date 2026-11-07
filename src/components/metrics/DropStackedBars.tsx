@@ -1,4 +1,4 @@
-import type { DropRow } from "./DropAnalysisTable";
+import type { DropRow } from "./drop-rows";
 import { reasonColor } from "./reasonColors";
 
 const fmt = (n: number) => n.toLocaleString();
@@ -15,8 +15,10 @@ export function DropStackedBars({ rows, onlyRegion }: { rows: DropRow[]; onlyReg
     const v = valueOf(r);
     if (v <= 0) continue;
     reasonTotals.set(r.reason, (reasonTotals.get(r.reason) ?? 0) + v);
-    if (!stageMap.has(r.stage)) stageMap.set(r.stage, []);
-    stageMap.get(r.stage)!.push({ reason: r.reason, value: v });
+    const item = { reason: r.reason, value: v };
+    const stageItems = stageMap.get(r.stage);
+    if (stageItems) stageItems.push(item);
+    else stageMap.set(r.stage, [item]);
   }
 
   const stages = Array.from(stageMap.entries())
