@@ -1,17 +1,13 @@
 name: CI
-# This repo had no CI. It is a Lovable-synced TanStack Start app: all 179 of its
-# commits are from the Lovable bot (178 gpt-engineer-app[bot], 1 Lovable) pushed
-# straight to `main`, so this runs on every one of them as well as on pull
-# requests.
+# Runs on every pull request and every push to `main`.
 #
-# What gates and what does not, measured on the untouched repo:
-#   * typecheck  BLOCKING  - 0 errors today
+# What gates and what does not:
+#   * typecheck  BLOCKING  - `bun run typecheck` (src, tests and scripts)
 #   * build      BLOCKING  - passes today with no secrets or env
-#   * lint       BLOCKING  - ESLint errors fail the job. Rules that still have
-#                            findings are warnings until their count reaches 0
-#                            (`bun run lint:report`). Prettier is a separate,
-#                            advisory step: it reports through annotations and
-#                            the run summary rather than turning green silently.
+#   * lint       BLOCKING  - ESLint errors and unformatted files (Prettier) fail
+#                            the job. Rules that still have findings are
+#                            warnings until their count reaches 0
+#                            (`bun run lint:report`).
 #   * smoke-image BLOCKING - builds the Dockerfile WITHOUT pushing, boots it and
 #                            probes it. Exercises the image on every PR so a broken
 #                            Dockerfile is caught in review, not when a release tag
@@ -31,7 +27,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  # Cancel superseded PR runs, but never a push to main: the Lovable bot commits
+  # Cancel superseded PR runs, but never a push to main: pushes can arrive
   # in bursts, and cancelling the earlier runs would leave those commits with no
   # result at all, which hides a red one. cancel-in-progress: false alone is not
   # enough for that: GitHub keeps only ONE pending run per group and cancels the
@@ -307,17 +303,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Prettier check
-        id: prettier
-        continue-on-error: true
         run: bun x prettier --check .
-
-      # A step that fails under continue-on-error leaves the job green, which is
-      # how an advisory check quietly becomes a check nobody looks at. Say it out
-      # loud instead.
-      - name: Report Prettier
-        if: always() && steps.prettier.outcome == 'failure'
-        run: |
-          echo "::warning title=Prettier would reformat files::Advisory only. Files a PR touches should be formatted; run bun run format on them."
 
   sonar:
     name: sonar

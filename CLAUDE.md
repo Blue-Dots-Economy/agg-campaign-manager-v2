@@ -78,7 +78,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 - **Bun is required.** The lockfile is `bun.lock`. Do not use npm, pnpm or yarn, and do not commit another lockfile. `bunfig.toml` holds a 24-hour supply-chain guard (`minimumReleaseAge`); ask the user before adding a package to its exclude list.
 - `vite.config.ts` uses `@lovable.dev/vite-tanstack-config`, which already adds the TanStack Start, React, Tailwind, path-alias and Nitro plugins. Do not add them again.
 - `src/routeTree.gen.ts` is generated. Do not edit it by hand.
-- Prettier settings are in `.prettierrc` (double quotes, semicolons, 100 columns). Format the files you change; do not reformat files you did not change.
+- Prettier settings are in `.prettierrc` (double quotes, semicolons, 100 columns). The repository is formatted and CI fails on unformatted files; run `bun run format` before committing. The formatting commit is listed in `.git-blame-ignore-revs` (`git config blame.ignoreRevsFile .git-blame-ignore-revs`).
 
 ## Common commands
 
@@ -125,9 +125,9 @@ Apply them to every line you write or change. Existing code does not meet all of
 
 ## CI
 
-`.github/workflows/ci.yaml` runs on every PR and every push to `main`. Blocking: `typecheck`, `build`, `lint` (ESLint errors), `migrations` (bootstrap, migrate, schema drift, `bun test tests`) and `smoke-image` (builds and boots the Docker image). Advisory: the Prettier check inside `lint`, and `sonar`. Images are published by `build-images.yaml` on release tags only.
+`.github/workflows/ci.yaml` runs on every PR and every push to `main`. Blocking: `typecheck`, `build`, `lint` (ESLint errors and Prettier), `migrations` (bootstrap, migrate, schema drift, `bun test tests`) and `smoke-image` (builds and boots the Docker image). Advisory: `sonar`. Images are published by `build-images.yaml` on release tags only.
 
-ESLint rules that still have findings in existing code are warnings (a ratchet); each moves to error once its count reaches 0. Do not add new warnings, and format the files you change with Prettier.
+ESLint rules that still have findings in existing code are warnings (a ratchet); each moves to error once its count reaches 0. Do not add new warnings.
 
 ## Commits and pull requests
 
