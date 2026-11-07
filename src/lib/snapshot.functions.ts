@@ -112,29 +112,8 @@ export const fetchProgramAggregates = createServerFn({ method: "GET" })
   .inputValidator(parseInput(funnelArgsSchema))
   .handler(async ({ data }): Promise<AggregatePayload> => {
     try {
-      let out: unknown;
-      try {
-        out = await (
-          await reports()
-        ).programAggregatePayload({
-          program: data.program,
-          state: all(data.state),
-          dateFrom: data.dateFrom,
-          dateTo: data.dateTo,
-          campaignType: data.campaignType ?? "all",
-          campaign: data.campaign,
-          channel: data.channel ?? "all",
-        });
-      } catch (e) {
-        const { logEvent } = await import("@/server/log.server");
-        logEvent("error", {
-          operation: "snapshot.programAggregatePayload",
-          status: "failure",
-          error: e,
-        });
-        return failedPayload();
-      }
-      // From the calls themselves; program_sync_state is no longer written.
+      const out = await (await reports()).programAggregatePayload(funnelArgs(data));
+      // The stored call count and last load time come from the calls themselves.
       return toAggregatePayload(out, await callStats(data.program));
     } catch (e) {
       const { logEvent } = await import("@/server/log.server");
