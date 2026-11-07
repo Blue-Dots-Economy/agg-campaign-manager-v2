@@ -10,7 +10,9 @@ import { programAgents } from "@/server/db/schema";
 import { isRecord, parseInput } from "@/server/validation";
 import { CONCURRENCY_CAP_DEFAULT } from "./concurrency-cap";
 import { errorMessage } from "./errors";
+import type { JsonObject } from "./json";
 import { delay, rayaFetch } from "./raya-api.server";
+import { BatchListReplySchema, batchItems } from "./raya-live-batches";
 
 /** Batches requested per agent; enough to cover every batch an agent runs at once. */
 const BATCH_PAGE_SIZE = 100;
@@ -41,22 +43,14 @@ interface ActiveBatch {
   status: string;
 }
 
-/** Reads the batch list out of a Raya response, which uses `items`, `data`, `batches` or a bare array. */
-function batchItems(parsed: unknown): Record<string, unknown>[] {
-  const list = isRecord(parsed)
-    ? (parsed.items ?? parsed.data ?? parsed.batches)
-    : Array.isArray(parsed)
-      ? parsed
-      : undefined;
-  return Array.isArray(list) ? list.filter(isRecord) : [];
-}
-
-async function rayaListAgentBatches(agentId: string): Promise<Record<string, unknown>[]> {
+async function rayaListAgentBatches(agentId: string): Promise<JsonObject[]> {
   const qs = new URLSearchParams({ agent_id: agentId, page_size: String(BATCH_PAGE_SIZE) });
-  return batchItems(await rayaFetch(`/batch?${qs.toString()}`, { method: "GET" }));
+  return batchItems(
+    await rayaFetch(`/batch?${qs.toString()}`, { method: "GET" }, BatchListReplySchema),
+  );
 }
 
-function pickConcurrency(item: Record<string, unknown>): number {
+function pickConcurrency(item: JsonObject): number {
   const nested = (key: string) => {
     const v = item[key];
     return isRecord(v) ? v.concurrency : undefined;

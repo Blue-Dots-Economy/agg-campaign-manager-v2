@@ -30,27 +30,22 @@ const columns = {
 const rayaAgentSchema = z
   .object({ name: z.unknown(), agent_name: z.unknown(), title: z.unknown() })
   .partial();
-const rayaAgentResponseSchema = rayaAgentSchema.extend({
-  agent: rayaAgentSchema.optional(),
-  data: rayaAgentSchema.optional(),
-});
 
-/** Picks the agent object out of a Raya response, which may wrap it in `agent` or `data`. */
-function agentFromResponse(parsed: unknown): z.output<typeof rayaAgentSchema> {
-  const res = rayaAgentResponseSchema.safeParse(parsed);
-  if (!res.success) return {};
-  return res.data.agent ?? res.data.data ?? res.data;
-}
+/** Raya's agent reply: the agent itself, or the agent under `agent` or `data`. Any other shape reads as an empty agent. */
+const RayaAgentReply = rayaAgentSchema
+  .extend({ agent: rayaAgentSchema.optional(), data: rayaAgentSchema.optional() })
+  .catch({});
 
 async function rayaGetAgent(
   agentId: string,
 ): Promise<{ ok: true; name: string } | { ok: false; error: string }> {
   try {
-    const a = agentFromResponse(
-      await rayaFetch(`/agent/${encodeURIComponent(agentId)}`, {
-        method: "GET",
-      }),
+    const reply = await rayaFetch(
+      `/agent/${encodeURIComponent(agentId)}`,
+      { method: "GET" },
+      RayaAgentReply,
     );
+    const a = reply.agent ?? reply.data ?? reply;
     const name = String(a.name ?? a.agent_name ?? a.title ?? "Unnamed agent");
     return { ok: true, name };
   } catch (e) {
