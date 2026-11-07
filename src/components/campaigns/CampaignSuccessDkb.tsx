@@ -8,6 +8,7 @@ import {
 } from "@/programs/useProgramAggregates";
 import type { DkbMetrics } from "@/components/metrics/program-overviews";
 import { humanizeCampaignType } from "@/lib/campaign-name";
+import { numericMetrics } from "@/components/metrics/metric-values";
 
 interface Props {
   campaign: string;
@@ -17,14 +18,20 @@ interface Props {
   filters?: Pick<OverviewFilters, "dateFrom" | "dateTo" | "channel">;
 }
 
-function outcomeRate(m: Partial<DkbMetrics> | undefined | null): number | null {
+/** DkbMetrics fields as numbers; any of them can be missing from a snapshot. */
+type DkbMetricsValues = Partial<Omit<DkbMetrics, "providerFunnel">>;
+
+/** Job outcomes (new or active postings) a campaign needs before they count as significant. */
+const MIN_SIGNIFICANT_OUTCOMES = 10;
+
+function outcomeRate(m: DkbMetricsValues | undefined | null): number | null {
   if (!m) return null;
   const denom = m.companiesCalled ?? 0;
   if (denom <= 0) return null;
   return ((m.newJobsPosted ?? 0) + (m.jobsActive ?? 0)) / denom;
 }
 
-function score(m: Partial<DkbMetrics> | undefined | null): number | null {
+function score(m: DkbMetricsValues | undefined | null): number | null {
   if (!m) return null;
   const total = m.totalCalls ?? 0;
   const answered = m.answeredCalls ?? 0;
@@ -41,7 +48,7 @@ function score(m: Partial<DkbMetrics> | undefined | null): number | null {
   );
 }
 
-export function CampaignSuccessDkb({ campaign, language, region, campaignDate, filters }: Props) {
+export function CampaignSuccessDkb({ campaign, region, campaignDate, filters }: Props) {
   const { config } = useProgram();
   const dateFrom = filters?.dateFrom ?? null;
   const dateTo = filters?.dateTo ?? null;
@@ -87,9 +94,9 @@ export function CampaignSuccessDkb({ campaign, language, region, campaignDate, f
     channel,
   });
 
-  const thisM = thisAgg.data?.metrics as Partial<DkbMetrics> | undefined;
-  const regionM = regionAgg.data?.metrics as Partial<DkbMetrics> | undefined;
-  const prevM = prevEntry ? (prevAgg.data?.metrics as Partial<DkbMetrics> | undefined) : undefined;
+  const thisM = thisAgg.data ? numericMetrics(thisAgg.data.metrics) : undefined;
+  const regionM = regionAgg.data ? numericMetrics(regionAgg.data.metrics) : undefined;
+  const prevM = prevEntry && prevAgg.data ? numericMetrics(prevAgg.data.metrics) : undefined;
 
   if (!thisM || !thisM.totalCalls) return null;
 
@@ -107,7 +114,7 @@ export function CampaignSuccessDkb({ campaign, language, region, campaignDate, f
   const c1Pass = c1Applicable && (thisScore ?? 0) > (prevScore ?? 0);
   const c2Applicable = regionScore != null && thisScore != null;
   const c2Pass = c2Applicable && (thisScore ?? 0) > (regionScore ?? 0);
-  const c3Pass = thisOutcome >= regionOutcome && outcomeTotal >= 10;
+  const c3Pass = thisOutcome >= regionOutcome && outcomeTotal >= MIN_SIGNIFICANT_OUTCOMES;
 
   const passCount = (c1Pass ? 1 : 0) + (c2Pass ? 1 : 0) + (c3Pass ? 1 : 0);
   const applicableCount = (c1Applicable ? 1 : 0) + (c2Applicable ? 1 : 0) + 1;
@@ -122,8 +129,8 @@ export function CampaignSuccessDkb({ campaign, language, region, campaignDate, f
   const c1Detail = !c1Applicable
     ? "No earlier campaign to compare"
     : c1Pass
-      ? `Beat the previous campaign (${humanizeCampaignType(prevEntry!.campaignType)})`
-      : `Below the previous campaign (${humanizeCampaignType(prevEntry!.campaignType)})`;
+      ? `Beat the previous campaign (${humanizeCampaignType(prevEntry?.campaignType)})`
+      : `Below the previous campaign (${humanizeCampaignType(prevEntry?.campaignType)})`;
   const c2Detail = c2Pass ? `Above the ${regionLabel} average` : `Below the ${regionLabel} average`;
   const c3Detail = c3Pass
     ? `Significant outcome (${newJobs.toLocaleString()} new jobs + ${active.toLocaleString()} refreshed)`

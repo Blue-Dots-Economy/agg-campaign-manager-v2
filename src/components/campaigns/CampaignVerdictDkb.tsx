@@ -4,8 +4,9 @@ import { useProgram } from "@/programs/context";
 import { useProgramAggregates, type OverviewFilters } from "@/programs/useProgramAggregates";
 import { useDkbCampaignInsights } from "@/programs/useDkbCampaignInsights";
 import type { DkbMetrics } from "@/components/metrics/program-overviews";
+import { numericMetrics, type MetricValues } from "@/components/metrics/metric-values";
 
-type Metrics = Partial<DkbMetrics> & Record<string, number | undefined>;
+type Metrics = Partial<Omit<DkbMetrics, "providerFunnel">> & MetricValues;
 
 interface MetricSpec {
   key: string;
@@ -95,8 +96,8 @@ export function CampaignVerdictDkb({ campaign, region, filters }: Props) {
   const causes = useDkbCampaignInsights(campaign, { dateFrom, dateTo });
 
   const { worked, didnt, phaseShare, sampleCalls } = useMemo(() => {
-    const cm = (campaignAgg.data?.metrics ?? {}) as Metrics;
-    const rm = (regionAgg.data?.metrics ?? {}) as Metrics;
+    const cm: Metrics = numericMetrics(campaignAgg.data?.metrics);
+    const rm: Metrics = numericMetrics(regionAgg.data?.metrics);
     const findings: Finding[] = [];
     for (const spec of SPECS) {
       const c = spec.compute(cm);

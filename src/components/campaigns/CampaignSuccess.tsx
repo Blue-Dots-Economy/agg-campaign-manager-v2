@@ -8,6 +8,7 @@ import {
 } from "@/programs/useProgramAggregates";
 import type { KkbMetrics } from "@/components/metrics/program-overviews";
 import { humanizeCampaignType } from "@/lib/campaign-name";
+import { numericMetrics } from "@/components/metrics/metric-values";
 
 interface Props {
   campaign: string;
@@ -17,7 +18,13 @@ interface Props {
   filters?: Pick<OverviewFilters, "dateFrom" | "dateTo" | "channel">;
 }
 
-function score(m: Partial<KkbMetrics> | undefined | null): number | null {
+/** KkbMetrics fields as numbers; any of them can be missing from a snapshot. */
+type KkbMetricsValues = Partial<Omit<KkbMetrics, "hasInterviewData">>;
+
+/** Application attempts a campaign needs before its applications count as significant. */
+const MIN_SIGNIFICANT_APPLICATIONS = 10;
+
+function score(m: KkbMetricsValues | undefined | null): number | null {
   if (!m) return null;
   const answered = m.answeredCalls ?? 0;
   const total = m.totalCalls ?? 0;
@@ -33,7 +40,7 @@ function score(m: Partial<KkbMetrics> | undefined | null): number | null {
   );
 }
 
-function attemptRate(m: Partial<KkbMetrics> | undefined | null): number | null {
+function attemptRate(m: KkbMetricsValues | undefined | null): number | null {
   if (!m) return null;
   const answered = m.answeredCalls ?? 0;
   if (answered <= 0) return null;
@@ -84,9 +91,9 @@ export function CampaignSuccess({ campaign, language, region, campaignDate, filt
     channel,
   });
 
-  const thisM = thisAgg.data?.metrics as Partial<KkbMetrics> | undefined;
-  const regionM = regionAgg.data?.metrics as Partial<KkbMetrics> | undefined;
-  const prevM = prevEntry ? (prevAgg.data?.metrics as Partial<KkbMetrics> | undefined) : undefined;
+  const thisM = thisAgg.data ? numericMetrics(thisAgg.data.metrics) : undefined;
+  const regionM = regionAgg.data ? numericMetrics(regionAgg.data.metrics) : undefined;
+  const prevM = prevEntry && prevAgg.data ? numericMetrics(prevAgg.data.metrics) : undefined;
 
   if (!region) return null;
   if (!thisM || !thisM.totalCalls) return null;
@@ -105,7 +112,7 @@ export function CampaignSuccess({ campaign, language, region, campaignDate, filt
   const c1Pass = c1Applicable && (thisScore ?? 0) > (prevScore ?? 0);
   const c2Applicable = regionScore != null && thisScore != null;
   const c2Pass = c2Applicable && (thisScore ?? 0) > (regionScore ?? 0);
-  const c3Pass = thisAttempt >= regionAttempt && applicationsTotal >= 10;
+  const c3Pass = thisAttempt >= regionAttempt && applicationsTotal >= MIN_SIGNIFICANT_APPLICATIONS;
 
   const passCount = (c1Pass ? 1 : 0) + (c2Pass ? 1 : 0) + (c3Pass ? 1 : 0);
   const applicableCount = (c1Applicable ? 1 : 0) + (c2Applicable ? 1 : 0) + 1;
@@ -120,8 +127,8 @@ export function CampaignSuccess({ campaign, language, region, campaignDate, filt
   const c1Detail = !c1Applicable
     ? "No earlier campaign to compare"
     : c1Pass
-      ? `Beat the previous campaign (${humanizeCampaignType(prevEntry!.campaignType)})`
-      : `Below the previous campaign (${humanizeCampaignType(prevEntry!.campaignType)})`;
+      ? `Beat the previous campaign (${humanizeCampaignType(prevEntry?.campaignType)})`
+      : `Below the previous campaign (${humanizeCampaignType(prevEntry?.campaignType)})`;
   const c2Detail = c2Pass ? `Above the ${region} average` : `Below the ${region} average`;
   const c3Detail = c3Pass
     ? `Significant applications (${applicationsTotal.toLocaleString()} attempts · ${submitted.toLocaleString()} submitted + ${blocked.toLocaleString()} blocked)`
