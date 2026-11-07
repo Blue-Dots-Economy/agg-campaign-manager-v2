@@ -111,7 +111,7 @@ Local end-to-end checks: `scripts/e2e/` (`setup.sh` brings up Postgres in Docker
 - **External systems** — the Raya voice API (`src/lib/raya-api.server.ts`, `RAYA_API_KEY`) and Google Sheets (`src/lib/sheets.server.ts`, `GOOGLE_SERVICE_ACCOUNT_JSON`). Cron endpoints under `src/routes/api/` authenticate with `CRON_SECRET` (`src/server/auth/cron.server.ts`).
 - **Programs** — program-specific columns, KPIs and drop reasons come from config (`src/programs/`, `src/lib/program-overrides.ts`), not from code in components.
 
-Environment variables read today: `DATABASE_URL`, `MIGRATOR_DATABASE_URL`, `SESSION_SECRET`, `RAYA_API_KEY`, `RAYA_BASE_URL`, `RAYA_TIMEOUT_MS`, `RAYA_RETRIES`, `GOOGLE_SERVICE_ACCOUNT_JSON`, `SHEETS_TIMEOUT_MS`, `SHEETS_RETRIES`, `CRON_SECRET`, `CRON_SECRET_PREVIOUS`. Never put a secret behind a `VITE_` prefix; those values are bundled into the browser.
+Environment variables read today: `DATABASE_URL`, `MIGRATOR_DATABASE_URL`, `SESSION_SECRET`, `RAYA_API_KEY`, `RAYA_BASE_URL`, `RAYA_TIMEOUT_MS`, `RAYA_WRITE_TIMEOUT_MS`, `RAYA_RETRIES`, `GOOGLE_SERVICE_ACCOUNT_JSON`, `SHEETS_TIMEOUT_MS`, `SHEETS_RETRIES`, `CRON_SECRET`, `CRON_SECRET_PREVIOUS`. Never put a secret behind a `VITE_` prefix; those values are bundled into the browser.
 
 ## Project rules (`.claude/rules/`)
 

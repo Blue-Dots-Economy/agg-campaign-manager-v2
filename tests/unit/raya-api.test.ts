@@ -5,12 +5,15 @@ import {
   DEFAULT_RAYA_BASE_URL,
   DEFAULT_RAYA_RETRIES,
   DEFAULT_RAYA_TIMEOUT_MS,
+  DEFAULT_RAYA_WRITE_TIMEOUT_MS,
   RayaApiError,
   rayaFetch,
   readRayaConfig,
 } from "../../src/lib/raya-api.server";
 
 const PHONE = "9876543210";
+/** Retry-After of 0, so retries do not wait in tests. */
+const NO_WAIT = { "retry-after": "0" };
 const realFetch = globalThis.fetch;
 const realKey = process.env.RAYA_API_KEY;
 
@@ -125,8 +128,6 @@ describe("rayaFetch requests", () => {
 });
 
 describe("rayaFetch retry policy", () => {
-  const NO_WAIT = { "retry-after": "0" };
-
   test("retries a GET after a 429 or 5xx", async () => {
     const calls = stubFetch([json({}, 429, NO_WAIT), json({}, 503, NO_WAIT), json({ ok: 1 })]);
     expect(await rayaFetch("/batch?agent_id=a", { method: "GET" })).toEqual({ ok: 1 });
@@ -139,8 +140,14 @@ describe("rayaFetch retry policy", () => {
     expect(calls.length).toBe(2);
   });
 
-  test("never repeats a write", async () => {
+  test("retries a write after a 429, since Raya did nothing", async () => {
     const calls = stubFetch([json({}, 429, NO_WAIT), json({ batchId: 1 })]);
+    expect(await rayaFetch("/batch", { method: "POST", json: {} })).toEqual({ batchId: 1 });
+    expect(calls.length).toBe(2);
+  });
+
+  test("never repeats a write after a 5xx", async () => {
+    const calls = stubFetch([json({}, 503, NO_WAIT), json({ batchId: 1 })]);
     const err = await rayaFetch("/batch", { method: "POST", json: {} }).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(RayaApiError);
     expect(calls.length).toBe(1);
@@ -190,19 +197,69 @@ describe("readRayaConfig", () => {
     expect(readRayaConfig({})).toEqual({
       baseUrl: DEFAULT_RAYA_BASE_URL,
       timeoutMs: DEFAULT_RAYA_TIMEOUT_MS,
+      writeTimeoutMs: DEFAULT_RAYA_WRITE_TIMEOUT_MS,
       retries: DEFAULT_RAYA_RETRIES,
     });
+    expect(DEFAULT_RAYA_WRITE_TIMEOUT_MS).toBeGreaterThan(DEFAULT_RAYA_TIMEOUT_MS);
   });
   test("reads overrides and drops a trailing slash", () => {
     expect(
       readRayaConfig({
         RAYA_BASE_URL: "https://raya.test/api/",
         RAYA_TIMEOUT_MS: "5000",
+        RAYA_WRITE_TIMEOUT_MS: "90000",
         RAYA_RETRIES: "0",
       }),
-    ).toEqual({ baseUrl: "https://raya.test/api", timeoutMs: 5000, retries: 0 });
+    ).toEqual({
+      baseUrl: "https://raya.test/api",
+      timeoutMs: 5000,
+      writeTimeoutMs: 90000,
+      retries: 0,
+    });
   });
   test("refuses invalid numbers", () => {
     expect(() => readRayaConfig({ RAYA_TIMEOUT_MS: "soon" })).toThrow("RAYA_TIMEOUT_MS");
+  });
+});
+
+describe("rayaFetch error messages", () => {
+  test("a 429 message says Raya is throttling, not how often it was retried", async () => {
+    stubFetch(Array.from({ length: DEFAULT_RAYA_RETRIES + 1 }, () => json({}, 429, NO_WAIT)));
+    const err = await rayaFetch("/batch", { method: "POST", json: {} }, z.unknown()).catch(
+      (e: unknown) => e,
+    );
+    expect(err instanceof Error && err.message).toBe(
+      "Raya rate limit hit (429). Raya is still throttling requests; wait a minute and try again.",
+    );
+  });
+
+  test("quote only Raya's message field, never other reply text", async () => {
+    stubFetch([json({ error: `bad ${PHONE}`, detail: PHONE }, 400)]);
+    const fromObject = await rayaFetch("/batch/1").catch((e: unknown) => e);
+    expect(fromObject instanceof Error && fromObject.message).toBe("Raya API 400");
+
+    stubFetch([new Response(`oops ${PHONE}`, { status: 500 })]);
+    const fromText = await rayaFetch("/call", { method: "POST", json: {} }).catch(
+      (e: unknown) => e,
+    );
+    expect(fromText instanceof Error && fromText.message).toBe("Raya API 500");
+
+    stubFetch([json({ data: { phone: PHONE } }, 422)]);
+    const noMessage = await rayaFetch("/call", { method: "POST", json: {} }).catch(
+      (e: unknown) => e,
+    );
+    expect(noMessage instanceof Error && noMessage.message).toBe("Raya API 422");
+  });
+
+  test("a write timeout tells the user to check before trying again", async () => {
+    const stub = async () => {
+      throw new DOMException("timed out", "TimeoutError");
+    };
+    globalThis.fetch = Object.assign(stub, { preconnect: realFetch.preconnect });
+    const write = await rayaFetch("/batch", { method: "POST", json: {} }).catch((e: unknown) => e);
+    expect(write).toBeInstanceOf(UpstreamError);
+    expect(write instanceof Error && write.message).toContain(
+      "check the Campaigns page before trying again",
+    );
   });
 });
