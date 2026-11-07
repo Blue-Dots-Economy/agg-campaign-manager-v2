@@ -32,7 +32,7 @@ import {
   deleteProgramAgent,
   loadAgent,
 } from "@/lib/agents.functions";
-import { registry, type ProgramId } from "@/programs/registry";
+import { isProgramId, registry, type ProgramId } from "@/programs/registry";
 
 function maskId(id: string) {
   if (id.length <= 14) return id;
@@ -122,7 +122,7 @@ function ProgramAgents({ program }: { program: ProgramId }) {
                 <Bot className="h-4 w-4 text-brand" />
                 <div className="font-medium">{a.name || "Unnamed agent"}</div>
                 <Badge variant="outline" className="text-[10px]">
-                  {registry[a.program as ProgramId]?.label ?? a.program}
+                  {isProgramId(a.program) ? registry[a.program].label : a.program}
                 </Badge>
                 <StatusBadge status={a.status} lastError={a.last_error} />
               </div>
@@ -277,7 +277,12 @@ function AddAgentDialog({
         <div className="space-y-3 pt-2">
           <div>
             <Label>Program</Label>
-            <Select value={program} onValueChange={(v) => setProgram(v as ProgramId)}>
+            <Select
+              value={program}
+              onValueChange={(v) => {
+                if (isProgramId(v)) setProgram(v);
+              }}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>

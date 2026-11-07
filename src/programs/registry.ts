@@ -1,4 +1,5 @@
 // Program config registry. Add a new program = add a new ProgramConfig here.
+import { isOneOf } from "@/lib/guards";
 
 export type KpiKey = string;
 
@@ -177,6 +178,14 @@ export const providers: ProgramConfig = {
 
 export const registry: Record<"seekers" | "providers", ProgramConfig> = { seekers, providers };
 export type ProgramId = keyof typeof registry;
+
+/** Every program id, for narrowing strings from the URL, selects and the server. */
+export const PROGRAM_IDS: readonly ProgramId[] = ["seekers", "providers"];
+
+/** Checks that a string is a known program id. */
+export function isProgramId(value: string): value is ProgramId {
+  return isOneOf(PROGRAM_IDS, value);
+}
 
 export function sheetLabelFor(config: ProgramConfig): string {
   return `${config.label} master sheet`;
