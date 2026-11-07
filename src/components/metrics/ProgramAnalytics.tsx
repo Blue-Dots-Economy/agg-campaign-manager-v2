@@ -42,6 +42,7 @@ import { fetchAllReviewedCallIds } from "@/lib/review.functions";
 import { useAuth } from "@/auth/context";
 import type { OverviewFilterValue } from "@/components/metrics/OverviewFilters";
 import { numericMetrics } from "@/components/metrics/metric-values";
+import { BULK_QUEUE_STORAGE_KEY } from "@/lib/review/review-form";
 import {
   intentBuckets,
   previousPeriodFilters,
@@ -241,7 +242,7 @@ export function ProgramAnalytics({
       }
       const skipped = ids.length - queue.length;
       try {
-        window.sessionStorage.setItem("bulk_review_queue", JSON.stringify(queue));
+        window.sessionStorage.setItem(BULK_QUEUE_STORAGE_KEY, JSON.stringify(queue));
       } catch {
         /* ignore */
       }

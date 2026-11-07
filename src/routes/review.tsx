@@ -21,6 +21,7 @@ import { CallCard } from "@/components/review/CallCard";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { BULK_QUEUE_STORAGE_KEY } from "@/lib/review/review-form";
 
 export const Route = createFileRoute("/review")({
   validateSearch: (s: Record<string, unknown>) => ({
@@ -30,7 +31,6 @@ export const Route = createFileRoute("/review")({
 });
 
 const FILTER_KEY = "review_filters_v1";
-const BULK_KEY = "bulk_review_queue";
 const PREFILL_KEY = "review_prefill_ids";
 /** Calls shown per page. */
 const PAGE_SIZE = 20;
@@ -147,7 +147,7 @@ function ReviewHub() {
     const first = ids[0];
     if (!first) return;
     try {
-      window.sessionStorage.setItem(BULK_KEY, JSON.stringify(ids));
+      window.sessionStorage.setItem(BULK_QUEUE_STORAGE_KEY, JSON.stringify(ids));
     } catch {
       // Storage can be blocked; the review page then opens without a queue.
     }
