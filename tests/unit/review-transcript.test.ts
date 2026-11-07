@@ -65,3 +65,31 @@ describe("normaliseSpeaker", () => {
     }
   });
 });
+
+describe("speaker lines", () => {
+  const cases: [string, { speaker: string; content: string }[]][] = [
+    ["Bot: hello", [{ speaker: "Bot", content: "hello" }]],
+    ["  user -  hi there", [{ speaker: "user", content: "hi there" }]],
+    ["Speaker 2: yes", [{ speaker: "Speaker 2", content: "yes" }]],
+    ["Speaker  12 - ok", [{ speaker: "Speaker  12", content: "ok" }]],
+    ["Speaker3:x", [{ speaker: "Speaker3", content: "x" }]],
+    ["ASSISTANT :  spaced  ", [{ speaker: "ASSISTANT", content: "spaced" }]],
+    ["Employer:", [{ speaker: "Employer", content: "" }]],
+    ["Botanist: not a speaker", []],
+    ["Speaker: missing number", []],
+  ];
+  for (const [line, turns] of cases) {
+    test(`reads ${JSON.stringify(line)}`, () => {
+      expect(
+        normaliseTranscript(line).map((t) => ({ speaker: t.speaker, content: t.content })),
+      ).toEqual(turns.map((t) => ({ speaker: t.speaker, content: t.content })));
+    });
+  }
+
+  test("handles a very long line without a separator quickly", () => {
+    const line = "Speaker 1" + " ".repeat(50_000) + "x";
+    const start = performance.now();
+    expect(normaliseTranscript(line)).toEqual([]);
+    expect(performance.now() - start).toBeLessThan(200);
+  });
+});

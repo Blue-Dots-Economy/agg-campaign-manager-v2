@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { HIGH_INTENT_MIN_SCORE } from "@/programs/metrics";
 import { getReviewKey, type JobReviewStatus, type ReviewCall } from "@/lib/review-ui";
+import { compareCodeUnits } from "@/lib/sort";
 
 /** Outcome choices in the review hub. */
 export const OUTCOME_OPTIONS = ["All", "Completed", "Early Disconnect"];
@@ -82,7 +83,7 @@ export function parseIst(s: string | undefined): number {
 export function dayNum(s: string | undefined): number {
   const t = (s ?? "").trimEnd();
   let i = t.length;
-  while (i > 0 && t.charCodeAt(i - 1) >= 48 && t.charCodeAt(i - 1) <= 57) i--;
+  while (i > 0 && (t.codePointAt(i - 1) ?? 0) >= 48 && (t.codePointAt(i - 1) ?? 0) <= 57) i--;
   return i < t.length ? Number(t.slice(i)) : 0;
 }
 
@@ -116,11 +117,11 @@ export function searchTokens(search: string): string[] {
 export function reviewFilterOptions(calls: ReviewCall[]) {
   return {
     days: distinct(calls.map((c) => c.campaign_day)).sort((a, b) => dayNum(b) - dayNum(a)),
-    dates: distinct(calls.map((c) => c.campaign_date)).sort(),
-    campaigns: distinct(calls.map((c) => c.campaign_type)).sort(),
-    langs: distinct(calls.map((c) => c.language)).sort(),
-    cities: distinct(calls.map((c) => c.city_campaign)).sort(),
-    drops: distinct(calls.map((c) => c.drop_reason)).sort(),
+    dates: distinct(calls.map((c) => c.campaign_date)).sort(compareCodeUnits),
+    campaigns: distinct(calls.map((c) => c.campaign_type)).sort(compareCodeUnits),
+    langs: distinct(calls.map((c) => c.language)).sort(compareCodeUnits),
+    cities: distinct(calls.map((c) => c.city_campaign)).sort(compareCodeUnits),
+    drops: distinct(calls.map((c) => c.drop_reason)).sort(compareCodeUnits),
   };
 }
 

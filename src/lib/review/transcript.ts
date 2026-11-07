@@ -7,7 +7,18 @@ export interface Turn {
   no_audio?: boolean;
 }
 
-const SPEAKER_LINE = /^\s*(Bot|Employer|Assistant|User|Speaker\s*\d+)\s*[:-]\s*(.*)$/i;
+/** Speaker label at the start of a transcript line. */
+const SPEAKER_LABEL = /^(?:Bot|Employer|Assistant|User|Speaker[ \t]*\d+)/i;
+
+/** Splits "Speaker: text" (or "Speaker - text") into its parts; null when the line has no speaker. */
+function speakerLine(line: string): { speaker: string; content: string } | null {
+  const text = line.trimStart();
+  const speaker = SPEAKER_LABEL.exec(text)?.[0];
+  if (!speaker) return null;
+  const rest = text.slice(speaker.length).trimStart();
+  if (!rest.startsWith(":") && !rest.startsWith("-")) return null;
+  return { speaker, content: rest.slice(1).trimStart() };
+}
 
 function field(value: unknown, key: string): unknown {
   return typeof value === "object" && value !== null ? Reflect.get(value, key) : undefined;
@@ -31,9 +42,9 @@ export function normaliseTranscript(raw: unknown): Turn[] {
     }
     const turns: Turn[] = [];
     for (const line of s.split(/\r?\n/)) {
-      const m = line.match(SPEAKER_LINE);
+      const turn = speakerLine(line);
       const last = turns.at(-1);
-      if (m) turns.push({ speaker: m[1] ?? "", content: m[2] ?? "" });
+      if (turn) turns.push(turn);
       else if (line.trim() && last) last.content += " " + line.trim();
     }
     return turns;

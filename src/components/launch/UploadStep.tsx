@@ -68,6 +68,15 @@ export function UploadStep({
           if (f) onFile(f);
         }}
         onClick={() => inputRef.current?.click()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            inputRef.current?.click();
+          }
+        }}
+        role="button"
+        tabIndex={0}
+        aria-label="Upload a contacts CSV"
         className={cn(
           "flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed py-10 cursor-pointer transition-colors",
           drag ? "border-brand bg-brand-soft" : "border-border bg-muted/40",

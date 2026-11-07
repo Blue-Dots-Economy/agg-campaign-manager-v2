@@ -132,7 +132,7 @@ export function TurnFlagsEditor({
   const turnNumbers = Array.from({ length: turnCount }, (_, i) => i + 1);
 
   function addFlag() {
-    const n = parseInt(flagTurn, 10);
+    const n = Number.parseInt(flagTurn, 10);
     if (!n || !flagNote.trim()) {
       toast.error("Pick a turn and write a note.");
       return;

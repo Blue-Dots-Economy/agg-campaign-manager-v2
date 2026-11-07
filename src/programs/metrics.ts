@@ -66,7 +66,7 @@ export function computeKpis(config: ProgramConfig, rows: CallRow[]): Record<stri
 
 /** Day number from a "Day N" label; `NaN` when the label has no number. */
 function dayNumber(label: string): number {
-  return parseInt(label.split(" ")[1] ?? "", 10);
+  return Number.parseInt(label.split(" ")[1] ?? "", 10);
 }
 
 /** Per-day call counts, sorted by day number. */

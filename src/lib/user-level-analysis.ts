@@ -19,7 +19,7 @@ export function formatJoined(raw: string): string {
   if (iso) return monthDayYear(Number(iso[2]), Number(iso[3]), iso[1] ?? "", raw);
   const parts = raw.trim().split("/");
   if (parts.length === 3) {
-    const [m, d, y] = parts.map((p) => parseInt(p, 10));
+    const [m, d, y] = parts.map((p) => Number.parseInt(p, 10));
     if (m && d && y) return monthDayYear(m, d, y, raw);
   }
   return raw;
