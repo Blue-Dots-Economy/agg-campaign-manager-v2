@@ -3,27 +3,35 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { desc, eq, sql } from "drizzle-orm";
+import { z } from "zod";
 import { requireRole } from "@/auth/middleware";
 import { FN_ROLES } from "@/auth/roles";
 import { getDb } from "@/server/db/client.server";
 import { sqlNamed } from "@/server/db/columns";
 import { launchedBatches, launchedBatchInputs } from "@/server/db/schema";
+import { contactSchema, MAX_CONTACTS_PER_BATCH, parseInput } from "@/server/validation";
 
-function normalizePhone(v: any): string {
+/** Digits in an Indian mobile number without the country code. */
+const PHONE_DIGITS = 10;
+
+/** Recent batches read to find the highest campaign day so far. */
+const RECENT_BATCHES_FOR_DAY = 50;
+
+function normalizePhone(v: unknown): string {
   const digits = String(v ?? "").replace(/\D+/g, "");
-  return digits.length >= 10 ? digits.slice(-10) : digits;
+  return digits.length >= PHONE_DIGITS ? digits.slice(-PHONE_DIGITS) : digits;
 }
 
 function normalizeKey(k: string): string {
   return String(k ?? "")
     .trim()
     .toLowerCase()
-    .replace(/[\s\-]+/g, "_");
+    .replace(/[\s-]+/g, "_");
 }
 
-function pickRaw(row: Record<string, any>, candidates: string[]): string | null {
-  const normalized = new Map<string, any>();
-  Object.entries(row ?? {}).forEach(([k, v]) => normalized.set(normalizeKey(k), v));
+function pickRaw(row: Record<string, unknown>, candidates: string[]): string | null {
+  const normalized = new Map<string, unknown>();
+  Object.entries(row).forEach(([k, v]) => normalized.set(normalizeKey(k), v));
   for (const key of candidates) {
     const value = normalized.get(normalizeKey(key));
     if (value != null && String(value).trim() !== "") return String(value).trim();
@@ -31,6 +39,7 @@ function pickRaw(row: Record<string, any>, candidates: string[]): string | null 
   return null;
 }
 
+/** A launched batch with its campaign metadata, keyed by SQL column name. */
 export interface LaunchedBatchRow {
   batch_id: string;
   program: string;
@@ -47,29 +56,29 @@ export interface LaunchedBatchRow {
   updated_at: string;
 }
 
+const optText = z.string().max(500).optional();
+
 export const recordLaunchedBatch = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.launch)])
   .inputValidator(
-    (d: {
-      batchId: string;
-      program: string;
-      agentId?: string;
-      agentName?: string;
-      batchName?: string;
-      campaignDay?: string;
-      campaignDate?: string;
-      campaignType?: string;
-      language?: string;
-      cityCampaign?: string;
-      region?: string;
-      inputRows?: Array<Record<string, any>>;
-    }) => {
-      if (!d.batchId) throw new Error("batchId required");
-      if (!d.program) throw new Error("program required");
-      return d;
-    },
+    parseInput(
+      z.object({
+        batchId: z.string().min(1).max(200),
+        program: z.string().min(1).max(100),
+        agentId: optText,
+        agentName: optText,
+        batchName: optText,
+        campaignDay: optText,
+        campaignDate: optText,
+        campaignType: optText,
+        language: optText,
+        cityCampaign: optText,
+        region: optText,
+        inputRows: z.array(contactSchema).max(MAX_CONTACTS_PER_BATCH).optional(),
+      }),
+    ),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data }): Promise<LaunchedBatchRow> => {
     const db = getDb();
     const payload = {
       batchId: data.batchId,
@@ -134,22 +143,20 @@ export const recordLaunchedBatch = createServerFn({ method: "POST" })
       }
     }
 
-    return row as LaunchedBatchRow;
+    if (!row) throw new Error("Batch was not recorded");
+    return row;
   });
 
 export const getNextCampaignDay = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.launch)])
-  .inputValidator((d: { program: string }) => {
-    if (!d.program) throw new Error("program required");
-    return d;
-  })
+  .inputValidator(parseInput(z.object({ program: z.string().min(1).max(100) })))
   .handler(async ({ data }) => {
     const rows = await getDb()
       .select({ campaign_day: launchedBatches.campaignDay })
       .from(launchedBatches)
       .where(eq(launchedBatches.program, data.program))
       .orderBy(desc(launchedBatches.createdAt))
-      .limit(50);
+      .limit(RECENT_BATCHES_FOR_DAY);
     let maxN = 0;
     for (const r of rows) {
       const m = String(r.campaign_day ?? "").match(/(\d+)/);

@@ -4,7 +4,7 @@ export const ROLES = ["admin", "jfc", "coordinator", "user", "owner", "ecosystem
 export type Role = (typeof ROLES)[number];
 
 export function isRole(v: unknown): v is Role {
-  return typeof v === "string" && (ROLES as readonly string[]).includes(v);
+  return ROLES.some((r) => r === v);
 }
 
 // Route prefixes each role may open. "*" = everything.
