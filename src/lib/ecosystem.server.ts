@@ -1,9 +1,10 @@
-// Server-only helpers for the Ecosystem View.
-// Reads Google Sheets via the shared sheets.server reader and produces a
-// compact, UI-shaped payload.
+// Server-only loader for the Ecosystem View: reads the region's job and seeker sheets and
+// returns a compact payload for the page.
+import { logEvent } from "@/server/log.server";
 import { listSheetTabs, readSheet, getSheetRowCount } from "./sheets.server";
 import { REGION_CONFIGS, type RegionConfig } from "./ecosystem-config";
 
+/** One job post in a district. */
 export interface EcoJob {
   id: string;
   title: string;
@@ -29,6 +30,7 @@ export interface EcoJob {
   location_state: string;
 }
 
+/** One job application. */
 export interface EcoApplication {
   id: string;
   seeker_role: string;
@@ -37,12 +39,14 @@ export interface EcoApplication {
   applied_date: string;
 }
 
+/** Everything the Ecosystem View shows for one district. */
 export interface EcoPayload {
   jobs: EcoJob[];
   applications: {
     total: number;
     buckets: { week: number; month: number; older: number };
-    sample: EcoApplication[]; // capped
+    /** At most APPLICATION_SAMPLE_SIZE applications. */
+    sample: EcoApplication[];
   };
   seekerCounts: { profiles: number; accounts: number; orgs: number };
   lastSyncedAt: string;
@@ -56,24 +60,25 @@ const normKey = (h: string): string =>
     .replace(/[\s\-()./]+/g, "_")
     .replace(/_+$/g, "");
 
-function indexHeaders(headers: string[]): Record<string, number> {
-  const idx: Record<string, number> = {};
+/** Column index per normalized header; the first column wins when headers repeat. */
+type HeaderIndex = Map<string, number>;
+
+function indexHeaders(headers: string[]): HeaderIndex {
+  const idx: HeaderIndex = new Map();
   headers.forEach((h, i) => {
     const k = normKey(h);
-    if (!(k in idx)) idx[k] = i;
+    if (!idx.has(k)) idx.set(k, i);
   });
   return idx;
 }
 
-function pick(idx: Record<string, number>, row: string[], aliases: string[]): string {
+/** Returns the first non-blank cell among the alias columns, or "". */
+function pick(idx: HeaderIndex, row: string[], aliases: string[]): string {
   for (const a of aliases) {
-    const k = normKey(a);
-    if (k in idx) {
-      const v = row[idx[k]];
-      if (v !== undefined && v !== null && String(v).trim() !== "") {
-        return String(v);
-      }
-    }
+    const i = idx.get(normKey(a));
+    if (i === undefined) continue;
+    const v = row[i];
+    if (v !== undefined && v.trim() !== "") return v;
   }
   return "";
 }
@@ -123,7 +128,7 @@ async function readJobs(
   const idx = indexHeaders(headers);
 
   const REQUIRED = ["current_openings", "openings", "role", "title"];
-  for (const r of REQUIRED) if (!(r in idx)) unmapped.add(`jobs:${r}`);
+  for (const r of REQUIRED) if (!idx.has(r)) unmapped.add(`jobs:${r}`);
 
   const districtCi = ci(district);
   const mapped: EcoJob[] = rows.map((row, i) => {
@@ -214,10 +219,10 @@ async function readApplications(
   const { headers, rows } = await readSheet(cfg.jobsSheet, tab);
   const idx = indexHeaders(headers);
   if (
-    !("applied_at" in idx) &&
-    !("applied_date" in idx) &&
-    !("created_at" in idx) &&
-    !("timestamp" in idx)
+    !idx.has("applied_at") &&
+    !idx.has("applied_date") &&
+    !idx.has("created_at") &&
+    !idx.has("timestamp")
   ) {
     unmapped.add("applications:applied_date");
   }
@@ -238,7 +243,7 @@ async function readApplications(
   }));
 
   // Filter by district column if present; else by job_id membership.
-  const districtCol = "user_district" in idx || "llm_location_district" in idx;
+  const districtCol = idx.has("user_district") || idx.has("llm_location_district");
   let out = mapped;
   if (districtCol) {
     const filtered = mapped.filter((a) => ci(a.location || "") === districtCi);
@@ -259,22 +264,17 @@ async function readSeekerCounts(
   // Read all rows but only the light columns we need (id, user_id, organization/institution, district).
   const { headers, rows } = await readSheet(cfg.seekerSheet, tab);
   const idx = indexHeaders(headers);
-  if (!("user_id" in idx)) unmapped.add("seekers:user_id");
+  if (!idx.has("user_id")) unmapped.add("seekers:user_id");
 
   const districtCi = ci(district);
-  const districtColKey =
-    "location_district" in idx ? "location_district" : "district" in idx ? "district" : null;
+  const districtCol = idx.get("location_district") ?? idx.get("district");
 
   const profiles = new Set<string>();
   const accounts = new Set<string>();
   const orgs = new Set<string>();
   let matched = 0;
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    if (districtColKey) {
-      const v = row[idx[districtColKey]] ?? "";
-      if (ci(String(v)) !== districtCi) continue;
-    }
+  for (const [i, row] of rows.entries()) {
+    if (districtCol !== undefined && ci(row[districtCol] ?? "") !== districtCi) continue;
     matched++;
     const id = pick(idx, row, ["id"]) || `row-${i}`;
     profiles.add(id);
@@ -296,23 +296,51 @@ async function readSeekerCounts(
     try {
       const total = await getSheetRowCount(cfg.seekerSheet, tab);
       return { profiles: total, accounts: total, orgs: orgs.size };
-    } catch {
+    } catch (e) {
+      // The row count is a fallback figure; without it the page still shows the rows read.
+      logEvent("warn", {
+        operation: "ecosystem.seekerRowCount",
+        status: "skipped",
+        error: e instanceof Error ? e.name : "Unknown error",
+      });
       return { profiles: rows.length, accounts: 0, orgs: 0 };
     }
   }
   return { profiles: profiles.size, accounts: accounts.size, orgs: orgs.size };
 }
 
+/** Applications sent to the page as a sample; the totals still count all of them. */
+const APPLICATION_SAMPLE_SIZE = 500;
+/** Applications newer than this many days count as "this week". */
+const WEEK_DAYS = 7;
+/** Applications up to this many days old count as "this month". */
+const MONTH_DAYS = 30;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+/** Reads jobs, then the applications for those jobs. */
+async function readJobsAndApplications(cfg: RegionConfig, district: string, unmapped: Set<string>) {
+  const jobs = await readJobs(cfg, district, unmapped);
+  const jobIds = new Set(jobs.map((j) => j.id).filter(Boolean));
+  const apps = await readApplications(cfg, district, jobIds, unmapped);
+  return { jobs, apps };
+}
+
+/**
+ * Loads the Ecosystem View for one district of a region.
+ *
+ * @throws {Error} When the region is unknown.
+ * @throws {UpstreamError} When a sheet cannot be read.
+ */
 export async function loadEcosystem(state: string, district: string): Promise<EcoPayload> {
   const cfg = REGION_CONFIGS[state];
   if (!cfg) throw new Error(`Unknown region state: ${state}`);
-  const unmapped = new Set<string>();
-
-  const jobs = await readJobs(cfg, district, unmapped);
-  const jobIds = new Set(jobs.map((j) => j.id).filter(Boolean));
-
-  const apps = await readApplications(cfg, district, jobIds, unmapped);
-  const seekerCounts = await readSeekerCounts(cfg, district, unmapped);
+  // Separate sets keep the unmapped list in jobs, applications, seekers order.
+  const jobsUnmapped = new Set<string>();
+  const seekersUnmapped = new Set<string>();
+  const [{ jobs, apps }, seekerCounts] = await Promise.all([
+    readJobsAndApplications(cfg, district, jobsUnmapped),
+    readSeekerCounts(cfg, district, seekersUnmapped),
+  ]);
 
   const now = Date.now();
   const buckets = { week: 0, month: 0, older: 0 };
@@ -322,9 +350,9 @@ export async function loadEcosystem(state: string, district: string): Promise<Ec
       buckets.older++;
       continue;
     }
-    const days = (now - t) / (1000 * 60 * 60 * 24);
-    if (days < 7) buckets.week++;
-    else if (days <= 30) buckets.month++;
+    const days = (now - t) / MS_PER_DAY;
+    if (days < WEEK_DAYS) buckets.week++;
+    else if (days <= MONTH_DAYS) buckets.month++;
     else buckets.older++;
   }
 
@@ -333,10 +361,10 @@ export async function loadEcosystem(state: string, district: string): Promise<Ec
     applications: {
       total: apps.length,
       buckets,
-      sample: apps.slice(0, 500),
+      sample: apps.slice(0, APPLICATION_SAMPLE_SIZE),
     },
     seekerCounts,
     lastSyncedAt: new Date().toISOString(),
-    unmapped: Array.from(unmapped),
+    unmapped: [...jobsUnmapped, ...seekersUnmapped],
   };
 }

@@ -10,7 +10,7 @@ import { programAgents } from "@/server/db/schema";
 import { isRecord, parseInput } from "@/server/validation";
 import { CONCURRENCY_CAP_DEFAULT } from "./concurrency-cap";
 import { errorMessage } from "./errors";
-import { delay, rayaFetch } from "./raya-api";
+import { delay, rayaFetch } from "./raya-api.server";
 
 /** Batches requested per agent; enough to cover every batch an agent runs at once. */
 const BATCH_PAGE_SIZE = 100;

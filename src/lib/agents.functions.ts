@@ -8,7 +8,7 @@ import type { SqlNamedSelect } from "@/server/db/columns";
 import { programAgents } from "@/server/db/schema";
 import { errorMessage } from "./errors";
 import { parseInput, programIdSchema } from "@/server/validation";
-import { rayaFetch, RayaApiError } from "./raya-api";
+import { rayaFetch, RayaApiError } from "./raya-api.server";
 
 /** A Raya agent registered for a program, as the settings page lists it. */
 export type ProgramAgent = Pick<
