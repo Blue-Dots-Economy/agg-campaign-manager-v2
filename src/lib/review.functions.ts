@@ -7,7 +7,9 @@ import { FN_ROLES } from "@/auth/roles";
 import { getDb } from "@/server/db/client.server";
 import { fromSqlNames } from "@/server/db/columns";
 import { callRows, sheetConnections, transcriptReviews } from "@/server/db/schema";
+import type { LogFields } from "@/server/log.server";
 import { parseInput } from "@/server/validation";
+import { UpstreamError } from "@/lib/errors";
 import { isRecord, programIdSchema } from "@/lib/input-schemas";
 import {
   getCallDetail,
@@ -272,6 +274,19 @@ const FEEDBACK_COLUMNS = [
   "dataset",
 ];
 
+/**
+ * Log fields for a failed review-sheet append. The error message is left out: Google's reply can
+ * repeat the row, which holds the contact's phone number.
+ */
+export function sheetAppendFailure(e: unknown): LogFields {
+  return {
+    operation: "review.sheetAppend",
+    status: "failure",
+    error_type: e instanceof Error ? e.name : "unknown",
+    http_status: e instanceof UpstreamError ? e.status : undefined,
+  };
+}
+
 /** Stores the signed-in user's review of a call and appends it to the master sheet. */
 export const submitReview = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.campaigns)])
@@ -319,7 +334,7 @@ export const submitReview = createServerFn({ method: "POST" })
       await appendStagingRows(sheet_id, tab, [row]);
     } catch (e) {
       const { logEvent } = await import("@/server/log.server");
-      logEvent("error", { operation: "review.sheetAppend", status: "failure", error: e });
+      logEvent("error", sheetAppendFailure(e));
     }
 
     return { ok: true };
