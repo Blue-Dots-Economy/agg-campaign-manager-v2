@@ -35,6 +35,27 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { cn } from "@/lib/utils";
 import { playSwoosh } from "@/lib/sfx";
 import { normaliseSpeaker, normaliseTranscript } from "@/lib/review/transcript";
+import {
+  BULK_QUEUE_STORAGE_KEY,
+  bulkProgress,
+  findCall,
+  MAX_RATING,
+  MILESTONE_EVERY,
+  nextAfterSubmit,
+  NO_ISSUES,
+  nonBlankId,
+  NOTES_MAX_LENGTH,
+  parseBulkQueue,
+  praise,
+  ratingLabel,
+  reviewPrefill,
+  safeRecordingUrl,
+  SESSION_COUNT_STORAGE_KEY,
+  SHARED_ADMIN_EMAIL,
+  submitHint,
+  toggleIssue,
+  type TurnFlag,
+} from "@/lib/review/review-form";
 
 export const Route = createFileRoute("/review_/$callId")({
   validateSearch: (s: Record<string, unknown>) => ({
@@ -43,9 +64,23 @@ export const Route = createFileRoute("/review_/$callId")({
   component: TranscriptReview,
 });
 
-type TurnFlag = { turn: number; note: string };
+interface IssueOption {
+  id: string;
+  color: string;
+  desc: string;
+  /** Programs that offer this issue; all programs when absent. */
+  datasets?: string[];
+}
 
-const ISSUE_OPTIONS = [
+/** Pause before moving on after a review, long enough for the check-mark animation. */
+const CELEBRATE_MS = 170;
+
+/** Longer pause for the milestone animation. */
+const CELEBRATE_MILESTONE_MS = 420;
+
+const RATING_STEPS = Array.from({ length: MAX_RATING }, (_, i) => i + 1);
+
+const ISSUE_OPTIONS: IssueOption[] = [
   { id: "Latency Issue", color: "bg-red-500", desc: "Bot paused too long between responses" },
   {
     id: "Flow Broken",
@@ -73,26 +108,11 @@ const ISSUE_OPTIONS = [
     id: "Irrelevant Job Shared",
     color: "bg-indigo-500",
     desc: "Job recommendation didn't match the seeker",
-    datasets: ["seekers"] as string[],
+    datasets: ["seekers"],
   },
   { id: "Weak Introduction", color: "bg-violet-500", desc: "Introduction needs to be better" },
-  { id: "No Issues", color: "bg-emerald-500", desc: "Everything looked correct" },
+  { id: NO_ISSUES, color: "bg-emerald-500", desc: "Everything looked correct" },
 ];
-
-const ENCOURAGERS = [
-  "Nice work!",
-  "Another one down!",
-  "On a roll!",
-  "Great catch!",
-  "Keep it going!",
-  "Smooth — next!",
-];
-function praise(count: number, hasNext: boolean, total: number): string {
-  if (!hasNext) return `Batch complete — you reviewed all ${total}. Incredible work.`;
-  if (count > 0 && count % 25 === 0) return `${count} reviews this session — you're crushing it!`;
-  if (count > 0 && count % 10 === 0) return `${count} in a row — you're on fire!`;
-  return ENCOURAGERS[count % ENCOURAGERS.length];
-}
 
 function TranscriptReview() {
   const { callId } = Route.useParams();
@@ -104,17 +124,11 @@ function TranscriptReview() {
   const dataset = programId;
   const { session } = useAuth();
   const reviewerEmail = (session?.email || "").toLowerCase();
-  const isAdmin = reviewerEmail === "admin@bluedots.com";
+  const isAdmin = reviewerEmail === SHARED_ADMIN_EMAIL;
 
   const callsQuery = useReviewCalls(dataset);
   const calls = callsQuery.data ?? null;
-  const call = useMemo(
-    () =>
-      calls?.find((c) => String(c.call_id) === callId) ??
-      calls?.find((c) => c.job_id === callId) ??
-      null,
-    [calls, callId],
-  );
+  const call = useMemo(() => findCall(calls, callId), [calls, callId]);
 
   const detailFn = useServerFn(fetchCallDetail);
   const detailQuery = useQuery({
@@ -143,7 +157,7 @@ function TranscriptReview() {
   const [sessionReviewed, setSessionReviewed] = useState<number>(() => {
     if (typeof window === "undefined") return 0;
     try {
-      return Number(window.sessionStorage.getItem("reviews_done_session")) || 0;
+      return Number(window.sessionStorage.getItem(SESSION_COUNT_STORAGE_KEY)) || 0;
     } catch {
       return 0;
     }
@@ -165,37 +179,18 @@ function TranscriptReview() {
 
   // Prefill my previous review if present
   useEffect(() => {
-    const mine = existingReviews.find(
-      (r) => (r.reviewer_email || "").toLowerCase() === reviewerEmail,
-    );
-    if (!mine) return;
-    if (mine.quantitative_issues)
-      setIssues(
-        mine.quantitative_issues
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean),
-      );
-    if (mine.turn_flags) {
-      try {
-        const p = JSON.parse(mine.turn_flags);
-        if (Array.isArray(p)) setFlags(p);
-      } catch {
-        /* ignore */
-      }
-    }
-    setNotes(mine.reviewer_notes || "");
-    setRating(mine.overall_rating ?? 0);
+    const prefill = reviewPrefill(existingReviews, reviewerEmail);
+    if (!prefill) return;
+    if (prefill.issues) setIssues(prefill.issues);
+    if (prefill.flags) setFlags(prefill.flags);
+    setNotes(prefill.notes);
+    setRating(prefill.rating);
   }, [existingReviews, reviewerEmail]);
 
   const flaggedSet = useMemo(() => new Set(flags.map((f) => f.turn)), [flags]);
 
-  function toggleIssue(id: string) {
-    setIssues((prev) => {
-      if (id === "No Issues") return prev.includes(id) ? [] : ["No Issues"];
-      const next = prev.filter((x) => x !== "No Issues");
-      return next.includes(id) ? next.filter((x) => x !== id) : [...next, id];
-    });
+  function onToggleIssue(id: string) {
+    setIssues((prev) => toggleIssue(prev, id));
   }
   function addFlag() {
     const n = parseInt(flagTurn, 10);
@@ -234,9 +229,8 @@ function TranscriptReview() {
       return;
     }
     setSubmitting(true);
-    const callIdStr = call.call_id && String(call.call_id).trim() ? String(call.call_id) : null;
-    const jobIdStr = call.job_id && String(call.job_id).trim() ? String(call.job_id) : null;
-    const callAny = call as unknown as Record<string, string | undefined>;
+    const callIdStr = nonBlankId(call.call_id);
+    const jobIdStr = nonBlankId(call.job_id);
     const review = {
       job_id: jobIdStr ?? callIdStr ?? "unknown",
       call_id: callIdStr ?? jobIdStr ?? "unknown",
@@ -245,7 +239,7 @@ function TranscriptReview() {
       language: call.language,
       city_campaign: call.city_campaign,
       company_name: call.company_name,
-      contact_phone: callAny.contact_phone ?? null,
+      contact_phone: call.contact_phone ?? null,
       call_outcome: call.call_outcome,
       job_status_in_master: call.job_status,
       reviewer_notes: notes,
@@ -262,18 +256,15 @@ function TranscriptReview() {
       const newCount = sessionReviewed + 1;
       setSessionReviewed(newCount);
       try {
-        window.sessionStorage.setItem("reviews_done_session", String(newCount));
+        window.sessionStorage.setItem(SESSION_COUNT_STORAGE_KEY, String(newCount));
       } catch {
         /* ignore */
       }
       playSwoosh();
       if (bulkMode) {
-        const raw = sessionStorage.getItem("bulk_review_queue");
-        const queue: string[] = raw ? JSON.parse(raw) : [];
-        const idx = queue.indexOf(callId);
-        const next = idx >= 0 && idx < queue.length - 1 ? queue[idx + 1] : null;
-        const remaining = queue.length - (idx + 1);
-        const milestone = !next || (newCount > 0 && newCount % 10 === 0);
+        const queue = parseBulkQueue(sessionStorage.getItem(BULK_QUEUE_STORAGE_KEY));
+        const { next, remaining } = nextAfterSubmit(queue, callId);
+        const milestone = !next || (newCount > 0 && newCount % MILESTONE_EVERY === 0);
         toast.success(
           praise(newCount, !!next, queue.length),
           next
@@ -287,20 +278,23 @@ function TranscriptReview() {
               navigate({ to: "/review/$callId", params: { callId: next }, search: { bulk: "1" } });
             } else {
               try {
-                sessionStorage.removeItem("bulk_review_queue");
+                sessionStorage.removeItem(BULK_QUEUE_STORAGE_KEY);
               } catch {
                 /* ignore */
               }
               navigate({ to: "/review", search: { prefill: undefined } });
             }
           },
-          milestone ? 420 : 170,
+          milestone ? CELEBRATE_MILESTONE_MS : CELEBRATE_MS,
         );
         return;
       }
       toast.success("Review submitted — nice work!");
       setCelebrate("normal");
-      window.setTimeout(() => navigate({ to: "/review", search: { prefill: undefined } }), 170);
+      window.setTimeout(
+        () => navigate({ to: "/review", search: { prefill: undefined } }),
+        CELEBRATE_MS,
+      );
     } catch (e) {
       toast.error(`Failed to submit: ${e instanceof Error ? e.message : "Try again."}`);
       setSubmitting(false);
@@ -331,25 +325,15 @@ function TranscriptReview() {
   const bulkInfo = (() => {
     if (!bulkMode) return null;
     try {
-      const raw = sessionStorage.getItem("bulk_review_queue");
-      const queue: string[] = raw ? JSON.parse(raw) : [];
-      const idx = Math.max(0, queue.indexOf(callId));
-      const next = idx < queue.length - 1 ? queue[idx + 1] : null;
-      return { idx, total: queue.length, next };
+      return bulkProgress(parseBulkQueue(sessionStorage.getItem(BULK_QUEUE_STORAGE_KEY)), callId);
     } catch {
+      // A missing or unreadable queue hides the bulk progress bar.
       return null;
     }
   })();
-  const bulkPct =
-    bulkInfo && bulkInfo.total > 0 ? Math.round((bulkInfo.idx / bulkInfo.total) * 100) : 0;
+  const bulkPct = bulkInfo?.pct ?? 0;
   const canSubmit = issues.length > 0 && rating > 0 && !isAdmin;
-  const submitHint = isAdmin
-    ? "The admin account can't submit reviews — sign in with your own email"
-    : issues.length === 0
-      ? "Select at least one issue"
-      : rating === 0
-        ? "Add an overall rating to submit"
-        : "";
+  const hint = submitHint(isAdmin, issues.length, rating);
 
   return (
     <div className="space-y-4">
@@ -402,16 +386,13 @@ function TranscriptReview() {
       <div className="flex flex-wrap items-center gap-2">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/40 px-2.5 py-1 text-xs text-muted-foreground">
           <span
-            className={cn(
-              "h-1.5 w-1.5 rounded-full",
-              reviewerEmail === "admin@bluedots.com" ? "bg-amber-500" : "bg-emerald-500",
-            )}
+            className={cn("h-1.5 w-1.5 rounded-full", isAdmin ? "bg-amber-500" : "bg-emerald-500")}
           />
           Reviewing as{" "}
           <span className="font-medium text-foreground">{reviewerEmail || "unknown"}</span>
         </span>
       </div>
-      {reviewerEmail === "admin@bluedots.com" && (
+      {isAdmin && (
         <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/15 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>
@@ -518,12 +499,7 @@ function TranscriptReview() {
             </div>
             <div className="border-t border-border p-4">
               <AudioPlayer
-                src={
-                  typeof recordingUrl === "string" &&
-                  recordingUrl.startsWith("https://api.getraya.app/call_recording/")
-                    ? recordingUrl
-                    : undefined
-                }
+                src={safeRecordingUrl(recordingUrl)}
                 companyName={call.call_id || call.job_id}
                 duration={Number(call.call_duration_seconds) || 0}
                 datetime={call.call_datetime_ist}
@@ -619,7 +595,7 @@ function TranscriptReview() {
                     >
                       <Checkbox
                         checked={checked}
-                        onCheckedChange={() => toggleIssue(opt.id)}
+                        onCheckedChange={() => onToggleIssue(opt.id)}
                         className="mt-0.5"
                       />
                       <span className={cn("mt-1 h-2.5 w-2.5 shrink-0 rounded-full", opt.color)} />
@@ -698,18 +674,20 @@ function TranscriptReview() {
             <Textarea
               id="notes"
               value={notes}
-              onChange={(e) => setNotes(e.target.value.slice(0, 500))}
+              onChange={(e) => setNotes(e.target.value.slice(0, NOTES_MAX_LENGTH))}
               rows={3}
               className="mt-2"
               placeholder="Anything else worth mentioning…"
             />
-            <div className="mt-1 text-right text-xs text-muted-foreground">{notes.length}/500</div>
+            <div className="mt-1 text-right text-xs text-muted-foreground">
+              {notes.length}/{NOTES_MAX_LENGTH}
+            </div>
           </div>
 
           <div className="rounded-xl border border-border bg-card p-4">
             <Label className="text-sm font-semibold">Overall call quality</Label>
             <div className="mt-2 flex items-center gap-1">
-              {[1, 2, 3, 4, 5].map((n) => (
+              {RATING_STEPS.map((n) => (
                 <button
                   key={n}
                   type="button"
@@ -725,26 +703,14 @@ function TranscriptReview() {
                   />
                 </button>
               ))}
-              <span className="ml-2 text-xs text-muted-foreground">
-                {rating === 0
-                  ? "Not rated"
-                  : rating === 1
-                    ? "Very poor"
-                    : rating === 2
-                      ? "Poor"
-                      : rating === 3
-                        ? "Okay"
-                        : rating === 4
-                          ? "Good"
-                          : "Excellent"}
-              </span>
+              <span className="ml-2 text-xs text-muted-foreground">{ratingLabel(rating)}</span>
             </div>
           </div>
 
           <div className="sticky bottom-0 z-10 -mx-1 border-t border-border bg-card/95 px-1 pb-1 pt-3 backdrop-blur supports-[backdrop-filter]:bg-card/80">
             {!canSubmit && (
               <p className="mb-2 text-center text-[11px] font-medium text-muted-foreground">
-                {submitHint}
+                {hint}
               </p>
             )}
             <Button
