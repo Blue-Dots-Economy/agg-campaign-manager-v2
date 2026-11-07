@@ -1,21 +1,21 @@
 import { createServerFn } from "@tanstack/react-start";
 import { asc, eq } from "drizzle-orm";
-import { type ProgramId } from "@/programs/registry";
+import { z } from "zod";
 import { requireRole } from "@/auth/middleware";
 import { FN_ROLES } from "@/auth/roles";
 import { getDb } from "@/server/db/client.server";
+import type { SqlNamedSelect } from "@/server/db/columns";
 import { programAgents } from "@/server/db/schema";
-import { rayaFetch, RayaApiError } from "./raya-api";
+import { errorMessage } from "./errors";
+import { parseInput } from "@/server/validation";
+import { programIdSchema } from "@/lib/input-schemas";
+import { rayaFetch, RayaApiError } from "./raya-api.server";
 
-export interface ProgramAgent {
-  id: string;
-  program: ProgramId;
-  agent_id: string;
-  name: string;
-  status: string;
-  last_error: string | null;
-  created_at: string;
-}
+/** A Raya agent registered for a program, as the settings page lists it. */
+export type ProgramAgent = Pick<
+  SqlNamedSelect<typeof programAgents>,
+  "id" | "program" | "agent_id" | "name" | "status" | "last_error" | "created_at"
+>;
 
 const columns = {
   id: programAgents.id,
@@ -27,59 +27,77 @@ const columns = {
   created_at: programAgents.createdAt,
 };
 
+/** Raya agent fields this app reads. */
+const rayaAgentSchema = z
+  .object({ name: z.unknown(), agent_name: z.unknown(), title: z.unknown() })
+  .partial();
+
+/** Raya's agent reply: the agent itself, or the agent under `agent` or `data`. Any other shape reads as an empty agent. */
+const RayaAgentReply = rayaAgentSchema
+  .extend({ agent: rayaAgentSchema.optional(), data: rayaAgentSchema.optional() })
+  .catch({});
+
 async function rayaGetAgent(
   agentId: string,
-): Promise<{ ok: true; name: string; raw: any } | { ok: false; error: string }> {
+): Promise<{ ok: true; name: string } | { ok: false; error: string }> {
   try {
-    const parsed = (await rayaFetch(`/agent/${encodeURIComponent(agentId)}`, {
-      method: "GET",
-    })) as any;
-    const a = (parsed?.agent ?? parsed?.data ?? parsed) as any;
-    const name = String(a?.name ?? a?.agent_name ?? a?.title ?? "Unnamed agent");
-    return { ok: true, name, raw: a };
+    const reply = await rayaFetch(
+      `/agent/${encodeURIComponent(agentId)}`,
+      { method: "GET" },
+      RayaAgentReply,
+    );
+    const a = reply.agent ?? reply.data ?? reply;
+    const name = String(a.name ?? a.agent_name ?? a.title ?? "Unnamed agent");
+    return { ok: true, name };
   } catch (e) {
     if (e instanceof RayaApiError && e.status === 404)
       return { ok: false, error: `Agent not found (404): ${agentId}` };
-    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    return { ok: false, error: errorMessage(e) };
   }
 }
 
+const agentIdSchema = z.string().trim().min(1, "agentId required").max(200);
+const rowIdSchema = z.object({ id: z.string().uuid() });
+
+/** Looks up a Raya agent by id, to preview its name before saving. */
 export const loadAgent = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator((d: { agentId: string }) => {
-    if (!d.agentId?.trim()) throw new Error("agentId required");
-    return d;
-  })
-  .handler(async ({ data }) => rayaGetAgent(data.agentId.trim()));
+  .inputValidator(parseInput(z.object({ agentId: agentIdSchema })))
+  .handler(async ({ data }) => rayaGetAgent(data.agentId));
 
+/** Lists the registered agents, optionally for one program. */
 export const listProgramAgents = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.requestCampaign)])
-  .inputValidator((d: { program?: ProgramId }) => d)
-  .handler(async ({ data }) => {
-    const rows = await getDb()
+  .inputValidator(parseInput(z.object({ program: programIdSchema.optional() })))
+  .handler(async ({ data }): Promise<ProgramAgent[]> => {
+    return getDb()
       .select(columns)
       .from(programAgents)
       .where(data.program ? eq(programAgents.program, data.program) : undefined)
       .orderBy(asc(programAgents.createdAt));
-    return rows as ProgramAgent[];
   });
 
+/** Registers or updates an agent for a program and records whether Raya knows it. */
 export const createProgramAgent = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator((d: { program: ProgramId; agentId: string; name?: string }) => {
-    if (!d.program) throw new Error("program required");
-    if (!d.agentId?.trim()) throw new Error("agentId required");
-    return d;
-  })
+  .inputValidator(
+    parseInput(
+      z.object({
+        program: programIdSchema,
+        agentId: agentIdSchema,
+        name: z.string().max(200).optional(),
+      }),
+    ),
+  )
   .handler(async ({ data }) => {
-    const fetched = await rayaGetAgent(data.agentId.trim());
+    const fetched = await rayaGetAgent(data.agentId);
     const status = fetched.ok ? "loaded" : "error";
     const last_error = fetched.ok ? null : fetched.error;
-    const name = data.name?.trim() || (fetched.ok ? fetched.name : data.agentId.trim());
+    const name = data.name?.trim() || (fetched.ok ? fetched.name : data.agentId);
 
     const values = {
       program: data.program,
-      agentId: data.agentId.trim(),
+      agentId: data.agentId,
       name,
       status,
       lastError: last_error,
@@ -89,12 +107,15 @@ export const createProgramAgent = createServerFn({ method: "POST" })
       .values(values)
       .onConflictDoUpdate({ target: [programAgents.program, programAgents.agentId], set: values })
       .returning(columns);
-    return { ok: fetched.ok, row: row as ProgramAgent, error: fetched.ok ? null : fetched.error };
+    if (!row) throw new Error("Agent was not saved");
+    const saved: ProgramAgent = row;
+    return { ok: fetched.ok, row: saved, error: fetched.ok ? null : fetched.error };
   });
 
+/** Checks a registered agent against Raya again and stores the result. */
 export const refreshProgramAgent = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator((d: { id: string }) => d)
+  .inputValidator(parseInput(rowIdSchema))
   .handler(async ({ data }) => {
     const db = getDb();
     const [row] = await db.select(columns).from(programAgents).where(eq(programAgents.id, data.id));
@@ -108,16 +129,15 @@ export const refreshProgramAgent = createServerFn({ method: "POST" })
       .set(patch)
       .where(eq(programAgents.id, data.id))
       .returning(columns);
-    return {
-      ok: fetched.ok,
-      row: updated as ProgramAgent,
-      error: fetched.ok ? null : fetched.error,
-    };
+    if (!updated) throw new Error("Agent not found");
+    const saved: ProgramAgent = updated;
+    return { ok: fetched.ok, row: saved, error: fetched.ok ? null : fetched.error };
   });
 
+/** Removes a registered agent. */
 export const deleteProgramAgent = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator((d: { id: string }) => d)
+  .inputValidator(parseInput(rowIdSchema))
   .handler(async ({ data }) => {
     await getDb().delete(programAgents).where(eq(programAgents.id, data.id));
     return { ok: true };

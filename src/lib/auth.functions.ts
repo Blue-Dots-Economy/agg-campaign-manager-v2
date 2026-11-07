@@ -1,7 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { FN_ROLES, ROLES, type Role } from "@/auth/roles";
+import { FN_ROLES, isRole, type Role } from "@/auth/roles";
 import { requireRole, sessionMiddleware } from "@/auth/middleware";
+import { parseInput } from "@/server/validation";
 
 const GENERIC_LOGIN_ERROR = "Email or password is incorrect";
 
@@ -22,6 +23,7 @@ async function db() {
   return { db: getDb(), appUsers: schema.appUsers, ...orm };
 }
 
+/** The signed-in user, as the browser sees it. */
 export interface MeResult {
   email: string;
   name: string | null;
@@ -35,7 +37,7 @@ export interface MeResult {
 
 // The only public server function.
 export const login = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ email, password: z.string().max(200) }).parse(d))
+  .inputValidator(parseInput(z.object({ email, password: z.string().max(200) })))
   .handler(async ({ data }): Promise<{ role: Role; mustChangePassword: boolean }> => {
     const { db: d, appUsers, eq } = await db();
     const pw = await import("@/server/auth/password.server");
@@ -47,7 +49,8 @@ export const login = createServerFn({ method: "POST" })
     };
     const [u] = await d.select().from(appUsers).where(eq(appUsers.email, data.email)).limit(1);
 
-    if (!u || !u.active || !u.passwordHash || pw.isLocked(u.lockedUntil, now)) return refuse(null);
+    if (!u || !u.active || !u.passwordHash || !isRole(u.role) || pw.isLocked(u.lockedUntil, now))
+      return refuse(null);
     if (!(await pw.verifyPassword(data.password, u.passwordHash))) {
       const next = pw.afterFailedLogin(u.failedLoginCount, now);
       await d
@@ -64,7 +67,7 @@ export const login = createServerFn({ method: "POST" })
       .set({ failedLoginCount: 0, lockedUntil: null })
       .where(eq(appUsers.id, u.id));
     await startSession(u.id);
-    return { role: u.role as Role, mustChangePassword: u.mustChangePassword };
+    return { role: u.role, mustChangePassword: u.mustChangePassword };
   });
 
 async function refuseLogin(): Promise<never> {
@@ -73,6 +76,7 @@ async function refuseLogin(): Promise<never> {
   throw new Error(GENERIC_LOGIN_ERROR);
 }
 
+/** Ends the session. */
 export const logout = createServerFn({ method: "POST" })
   .middleware([sessionMiddleware])
   .handler(async () => {
@@ -81,6 +85,7 @@ export const logout = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/** Returns the signed-in user. */
 export const me = createServerFn({ method: "GET" })
   .middleware([sessionMiddleware])
   .handler(async ({ context }): Promise<MeResult> => {
@@ -88,10 +93,13 @@ export const me = createServerFn({ method: "GET" })
     return rest;
   });
 
+/** Changes the signed-in user's password after checking the current one. */
 export const changePassword = createServerFn({ method: "POST" })
   .middleware([sessionMiddleware])
-  .inputValidator((d: unknown) =>
-    z.object({ currentPassword: z.string().max(200), newPassword: z.string().max(200) }).parse(d),
+  .inputValidator(
+    parseInput(
+      z.object({ currentPassword: z.string().max(200), newPassword: z.string().max(200) }),
+    ),
   )
   .handler(async ({ data, context }) => {
     const { db: d, appUsers, eq } = await db();
@@ -115,6 +123,7 @@ export const changePassword = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/** A user as the settings page lists it. */
 export interface AppUser {
   email: string;
   name: string | null;
@@ -133,13 +142,14 @@ export interface AppUser {
 const profile = z.object({
   email,
   name: optText,
-  role: z.enum(ROLES),
+  role: z.string().refine(isRole, "Unknown role"),
   district: optText,
   program: optText,
   node_type: optText,
   node_name: optText,
 });
 
+/** Lists every user for the settings page. */
 export const listAppUsers = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.admin)])
   .handler(async (): Promise<AppUser[]> => {
@@ -163,9 +173,10 @@ export const listAppUsers = createServerFn({ method: "GET" })
     }));
   });
 
+/** Creates a user and returns a one-time temporary password. */
 export const createAppUser = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator((d: unknown) => profile.parse(d))
+  .inputValidator(parseInput(profile))
   .handler(async ({ data }): Promise<{ temporaryPassword: string }> => {
     const { db: d, appUsers, eq } = await db();
     const pw = await import("@/server/auth/password.server");
@@ -199,9 +210,10 @@ async function activeAdminCount(): Promise<number> {
   return r?.n ?? 0;
 }
 
+/** Updates a user's profile and role; refuses to demote the last active admin. */
 export const updateAppUser = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator((d: unknown) => profile.parse(d))
+  .inputValidator(parseInput(profile))
   .handler(async ({ data }) => {
     const { db: d, appUsers, eq } = await db();
     const [u] = await d.select().from(appUsers).where(eq(appUsers.email, data.email)).limit(1);
@@ -229,9 +241,10 @@ export const updateAppUser = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/** Gives a user a new temporary password and unlocks the account. */
 export const resetAppUserPassword = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator((d: unknown) => z.object({ email }).parse(d))
+  .inputValidator(parseInput(z.object({ email })))
   .handler(async ({ data }): Promise<{ temporaryPassword: string }> => {
     const { db: d, appUsers, eq } = await db();
     const pw = await import("@/server/auth/password.server");
@@ -251,9 +264,10 @@ export const resetAppUserPassword = createServerFn({ method: "POST" })
     return { temporaryPassword };
   });
 
+/** Activates or deactivates a user; refuses to deactivate yourself or the last active admin. */
 export const setAppUserActive = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator((d: unknown) => z.object({ email, active: z.boolean() }).parse(d))
+  .inputValidator(parseInput(z.object({ email, active: z.boolean() })))
   .handler(async ({ data, context }) => {
     const { db: d, appUsers, eq } = await db();
     if (!data.active) {

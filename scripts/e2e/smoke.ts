@@ -110,8 +110,9 @@ function discoverServerFns(): ServerFn[] {
     );
     const re =
       /export const (\w+) = createServerFn\(\{\s*method:\s*"(GET|POST)"[^)]*\)([\s\S]*?)\.handler\(/g;
-    for (const m of text.matchAll(re)) {
-      const mw = /\.middleware\(\[([^\]]*)\]\)/.exec(m[3])?.[1] ?? "";
+    for (const [, name, method, chain = ""] of text.matchAll(re)) {
+      if (!name) continue;
+      const mw = /\.middleware\(\[([^\]]*)\]\)/.exec(chain)?.[1] ?? "";
       const inline = /requireRole\(FN_ROLES\.(\w+)\)/.exec(mw)?.[1];
       const viaConst = mw
         .split(",")
@@ -120,8 +121,8 @@ function discoverServerFns(): ServerFn[] {
       const key = inline ?? viaConst ?? null;
       out.push({
         file: relative(SRC, path),
-        name: m[1],
-        method: m[2] === "GET" ? "GET" : "POST",
+        name,
+        method: method === "GET" ? "GET" : "POST",
         group: isFnGroup(key) ? key : null,
       });
     }
@@ -220,7 +221,30 @@ if (adminCookie) {
   check("cross-site POST is 403", res.status === 403, `got ${res.status}`);
 }
 
-// 6. A dashboard number matches the database.
+// 6. Malformed input: 400 for a role the function allows, 403 for one it refuses (roles are
+// checked before input).
+const adminOnlyFn = {
+  file: "lib/snapshot.functions.ts",
+  name: "fetchCampaignDayRowsFn",
+  method: "GET",
+} as const;
+const MALFORMED_INPUT = { program: "not-a-program", day: 42 };
+const deniedRole = ROLES.find((role) => !FN_ROLES.admin.includes(role));
+const deniedCookie = deniedRole ? cookies.get(deniedRole) : undefined;
+if (adminCookie) {
+  const res = await callFn(adminOnlyFn, { cookie: adminCookie, data: MALFORMED_INPUT });
+  check("malformed input is 400 for an allowed role", res.status === 400, `got ${res.status}`);
+}
+if (deniedRole && deniedCookie) {
+  const res = await callFn(adminOnlyFn, { cookie: deniedCookie, data: MALFORMED_INPUT });
+  check(
+    `malformed input is 403 for a denied role (${deniedRole})`,
+    res.status === 403,
+    `got ${res.status}`,
+  );
+}
+
+// 7. A dashboard number matches the database.
 if (adminCookie) {
   const db = new pg.Client({ connectionString: DATABASE_URL });
   await db.connect();

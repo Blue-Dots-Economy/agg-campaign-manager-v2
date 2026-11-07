@@ -113,6 +113,24 @@ describe("fetchJson", () => {
     }
   });
 
+  test("with retryOn rateLimitOnly, retries a 429 only", async () => {
+    const opts = { ...FAST, retries: 2, retryOn: "rateLimitOnly" as const };
+    const ok = stubFetch([json({}, 429), json({ id: "a", count: 1 })]);
+    expect(await fetchJson("https://x", {}, Item, opts)).toEqual({ id: "a", count: 1 });
+    expect(ok).toHaveLength(2);
+
+    const fiveHundred = stubFetch([json({}, 503), json({ id: "a", count: 1 })]);
+    await expect(fetchJson("https://x", {}, Item, opts)).rejects.toBeInstanceOf(UpstreamError);
+    expect(fiveHundred).toHaveLength(1);
+
+    const network = stubFetch([
+      () => Promise.reject(new TypeError("fetch failed")),
+      json({ id: "a", count: 1 }),
+    ]);
+    await expect(fetchJson("https://x", {}, Item, opts)).rejects.toBeInstanceOf(UpstreamError);
+    expect(network).toHaveLength(1);
+  });
+
   test("retries a network failure when retries are allowed", async () => {
     const calls = stubFetch([
       () => Promise.reject(new TypeError("fetch failed")),

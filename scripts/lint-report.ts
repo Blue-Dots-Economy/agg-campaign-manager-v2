@@ -22,7 +22,7 @@ export interface LintResultLike {
 
 const SERVER_FILES = /\.(functions|server)\.ts$/;
 const SERVER_DIRS = ["src/server/", "src/auth/", "src/routes/api/"];
-const SERVER_ENTRIES = new Set(["src/server.ts", "src/start.ts", "src/lib/raya-api.ts"]);
+const SERVER_ENTRIES = new Set(["src/server.ts", "src/start.ts"]);
 const ERROR_SEVERITY = 2;
 
 /**
