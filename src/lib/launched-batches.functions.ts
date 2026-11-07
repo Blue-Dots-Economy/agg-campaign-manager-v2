@@ -7,7 +7,7 @@ import { z } from "zod";
 import { requireRole } from "@/auth/middleware";
 import { FN_ROLES } from "@/auth/roles";
 import { getDb } from "@/server/db/client.server";
-import { sqlNamed } from "@/server/db/columns";
+import { sqlNamed, type SqlNamedSelect } from "@/server/db/columns";
 import { launchedBatches, launchedBatchInputs } from "@/server/db/schema";
 import { contactSchema, MAX_CONTACTS_PER_BATCH, parseInput } from "@/server/validation";
 
@@ -40,21 +40,7 @@ function pickRaw(row: Record<string, unknown>, candidates: string[]): string | n
 }
 
 /** A launched batch with its campaign metadata, keyed by SQL column name. */
-export interface LaunchedBatchRow {
-  batch_id: string;
-  program: string;
-  agent_id: string | null;
-  agent_name: string | null;
-  batch_name: string | null;
-  campaign_day: string | null;
-  campaign_date: string | null;
-  campaign_type: string | null;
-  language: string | null;
-  city_campaign: string | null;
-  region: string | null;
-  created_at: string;
-  updated_at: string;
-}
+export type LaunchedBatchRow = SqlNamedSelect<typeof launchedBatches>;
 
 const optText = z.string().max(500).optional();
 

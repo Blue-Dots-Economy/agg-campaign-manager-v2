@@ -14,6 +14,11 @@ export type SqlNamed<T extends PgTable> = {
   [K in keyof Columns<T> as SqlName<T, K>]: Columns<T>[K];
 };
 
+/** A selected row of the table keyed by SQL column name. */
+export type SqlNamedSelect<T extends PgTable> = {
+  [K in keyof T["$inferSelect"] as SqlName<T, K>]: T["$inferSelect"][K];
+};
+
 /** An insert row of the table keyed by SQL column name. */
 export type SqlNamedInsert<T extends PgTable> = {
   [K in keyof T["$inferInsert"] as SqlName<T, K>]: T["$inferInsert"][K];

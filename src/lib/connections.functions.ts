@@ -6,25 +6,18 @@ import type { ProgramId } from "@/programs/registry";
 import { requireRole } from "@/auth/middleware";
 import { FN_ROLES } from "@/auth/roles";
 import { getDb } from "@/server/db/client.server";
-import { fromSqlNames, sqlNamed, type SqlNamedInsert } from "@/server/db/columns";
+import {
+  fromSqlNames,
+  sqlNamed,
+  type SqlNamedInsert,
+  type SqlNamedSelect,
+} from "@/server/db/columns";
 import { sheetConnections } from "@/server/db/schema";
 import { parseInput, programIdSchema } from "@/server/validation";
 import { errorMessage } from "./errors";
 
 /** A Google Sheet connection of a program, keyed by SQL column name. */
-export interface SheetConnection {
-  id: string;
-  program: string;
-  name: string;
-  sheet_id: string;
-  tab_name: string | null;
-  enabled: boolean;
-  status: string;
-  row_count: number | null;
-  last_synced_at: string | null;
-  last_error: string | null;
-  created_at: string;
-}
+export type SheetConnection = SqlNamedSelect<typeof sheetConnections>;
 
 type ConnectionPatch = Partial<SqlNamedInsert<typeof sheetConnections>>;
 

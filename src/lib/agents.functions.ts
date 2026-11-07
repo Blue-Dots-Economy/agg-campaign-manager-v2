@@ -4,21 +4,17 @@ import { z } from "zod";
 import { requireRole } from "@/auth/middleware";
 import { FN_ROLES } from "@/auth/roles";
 import { getDb } from "@/server/db/client.server";
+import type { SqlNamedSelect } from "@/server/db/columns";
 import { programAgents } from "@/server/db/schema";
 import { errorMessage } from "./errors";
 import { parseInput, programIdSchema } from "@/server/validation";
 import { rayaFetch, RayaApiError } from "./raya-api";
 
 /** A Raya agent registered for a program, as the settings page lists it. */
-export interface ProgramAgent {
-  id: string;
-  program: string;
-  agent_id: string;
-  name: string;
-  status: string;
-  last_error: string | null;
-  created_at: string;
-}
+export type ProgramAgent = Pick<
+  SqlNamedSelect<typeof programAgents>,
+  "id" | "program" | "agent_id" | "name" | "status" | "last_error" | "created_at"
+>;
 
 const columns = {
   id: programAgents.id,
