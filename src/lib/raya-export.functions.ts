@@ -23,6 +23,21 @@ import {
   writeStagingHeaders,
 } from "./sheets.server";
 import { registry, type ProgramId } from "@/programs/registry";
+import {
+  asStr,
+  campaignTypeFor,
+  detectRegionForContact,
+  normalize,
+  parseSheetId,
+} from "./raya-export-format";
+import {
+  buildRow,
+  mergeCallDetail,
+  pickLastCall,
+  type BuildCtx,
+  type InputRow,
+  type LaunchMeta,
+} from "./raya-export-rows";
 
 async function exportTarget(program: string): Promise<ExportTarget | null> {
   const [row] = await getDb()
@@ -51,16 +66,6 @@ export interface ExportTarget {
   enabled: boolean;
   last_exported_at: string | null;
   last_error: string | null;
-}
-
-// ---------- read sheet id from URL ----------
-function parseSheetId(input: string): string {
-  const t = input.trim();
-  if (!t) return "";
-  const m = t.match(/\/d\/([A-Za-z0-9-_]+)/);
-  if (m) return m[1];
-  if (/^[A-Za-z0-9-_]{20,}$/.test(t)) return t;
-  return "";
 }
 
 // ---------- target read ----------
@@ -112,410 +117,6 @@ export const setExportTarget = createServerFn({ method: "POST" })
     return row as unknown as ExportTarget;
   });
 
-// ---------- helpers ----------
-function normalize(k: string): string {
-  return String(k ?? "")
-    .trim()
-    .toLowerCase()
-    .replace(/[\s\-]+/g, "_");
-}
-
-function asStr(v: any): string {
-  if (v == null) return "";
-  if (typeof v === "object") {
-    try {
-      return JSON.stringify(v);
-    } catch {
-      return String(v);
-    }
-  }
-  return String(v);
-}
-
-function asArr(v: any): any[] {
-  if (Array.isArray(v)) return v;
-  if (v == null || v === "") return [];
-  if (typeof v === "string") {
-    try {
-      const p = JSON.parse(v);
-      return Array.isArray(p) ? p : [];
-    } catch {
-      return [];
-    }
-  }
-  return [];
-}
-
-function jsonStringOrEmptyArray(v: any): string {
-  if (v == null || v === "") return "[]";
-  if (typeof v === "string") return v.trim() || "[]";
-  try {
-    return JSON.stringify(v);
-  } catch {
-    return "[]";
-  }
-}
-
-function nonEmpty(v: any): boolean {
-  if (v == null || v === "") return false;
-  if (Array.isArray(v)) return v.length > 0;
-  if (typeof v === "object") return Object.keys(v).length > 0;
-  return String(v).trim().length > 0;
-}
-
-function stripIst(s: string): string {
-  return String(s ?? "")
-    .replace(/\s*IST\s*$/i, "")
-    .trim();
-}
-
-function datePart(s: string): string {
-  const t = stripIst(s);
-  if (!t) return "";
-  const m = t.match(/^(\d{4}-\d{2}-\d{2})/);
-  if (m) return m[1];
-  const d = new Date(t);
-  return Number.isFinite(d.getTime()) ? d.toISOString().slice(0, 10) : "";
-}
-
-function pickLastCall(contact: any): any | null {
-  const arr = contact?.calls ?? null;
-  if (!Array.isArray(arr) || arr.length === 0) return null;
-  const completed = arr.filter(isCompletedCall);
-  if (completed.length === 0) return null;
-  const sorted = [...completed].sort((a, b) => {
-    const ta = Date.parse(stripIst(pickCallTime(a))) || 0;
-    const tb = Date.parse(stripIst(pickCallTime(b))) || 0;
-    return tb - ta;
-  });
-  return sorted[0] ?? null;
-}
-
-function pickCallTime(call: any): any {
-  return (
-    call?.call_start_time ??
-    call?.start_time ??
-    call?.call_start_time_ist ??
-    call?.created_at ??
-    call?.call_time ??
-    ""
-  );
-}
-
-function isCompletedCall(call: any): boolean {
-  if (!call) return false;
-  const callId = asStr(call?.uuid ?? call?.id ?? call?.execution_id ?? "").trim();
-  if (!callId) return false;
-  const status = normalize(asStr(call?.status ?? call?.call_status ?? call?.state ?? ""));
-  if (["pending", "queued", "scheduled", "in_progress", "running", "started"].includes(status)) {
-    return false;
-  }
-  return true;
-}
-
-// ---------- region detection ----------
-type Region = { region: string; language: string; city: string };
-
-function detectRegionFromText(s: string): Region | null {
-  const t = (s || "").toLowerCase();
-  if (/(^|[^a-z])ka([^a-z]|$)|kannada|hubli|dharwad|karnataka/.test(t))
-    return { region: "KA", language: "Kannada", city: "Hubli-Dharwad" };
-  if (/(^|[^a-z])gzb([^a-z]|$)|hindi|ghaziabad|uttar.?pradesh/.test(t))
-    return { region: "GZB", language: "Hindi", city: "Ghaziabad" };
-  return null;
-}
-
-function detectRegionForContact(
-  contact: any,
-  fallbacks: { batchName?: string; agentName?: string; program?: string },
-): Region {
-  const args = contact?.agent_args ?? contact?.metadata ?? contact?.args ?? {};
-  const explicit = args?._region ?? args?.region ?? contact?.region ?? contact?._region ?? "";
-  const fromExplicit = detectRegionFromText(String(explicit));
-  if (fromExplicit) return fromExplicit;
-  const cityHint = args?.city_campaign ?? args?.city ?? contact?.city_campaign ?? "";
-  const fromCity = detectRegionFromText(String(cityHint));
-  if (fromCity) return fromCity;
-  for (const txt of [fallbacks.batchName, fallbacks.agentName, fallbacks.program]) {
-    const r = detectRegionFromText(String(txt ?? ""));
-    if (r) return r;
-  }
-  return { region: "", language: "", city: "" };
-}
-
-// ---------- format helpers (master-sheet-exact) ----------
-function fmtPhone(v: any): string {
-  const digits = String(v ?? "").replace(/\D+/g, "");
-  if (digits.length >= 10) return digits.slice(-10);
-  return digits;
-}
-
-function fmtInt(v: any): string {
-  const n = Number(v);
-  if (!Number.isFinite(n)) return "0";
-  return String(Math.trunc(n));
-}
-
-function fmtDateTimeIstFromApi(v: any): string {
-  const raw = stripIst(String(v ?? "")).replace(/T/, " ");
-  const m = raw.match(/^(\d{4}-\d{2}-\d{2})[ T]?(\d{2}:\d{2}:\d{2})?/);
-  if (m) return `${m[1]} ${m[2] ?? "00:00:00"}`;
-  const d = new Date(raw);
-  if (!Number.isFinite(d.getTime())) return raw;
-  return d.toISOString().slice(0, 19).replace("T", " ");
-}
-
-function fmtDateOnly(v: any): string {
-  const raw = stripIst(String(v ?? "")).replace(/T/, " ");
-  const m = raw.match(/^(\d{4}-\d{2}-\d{2})/);
-  if (m) return m[1];
-  const d = new Date(raw);
-  return Number.isFinite(d.getTime()) ? d.toISOString().slice(0, 10) : "";
-}
-
-function yesNo(v: any, fallback = false): string {
-  if (typeof v === "boolean") return v ? "Yes" : "No";
-  if (typeof v === "number") return v > 0 ? "Yes" : "No";
-  const s = String(v ?? "")
-    .trim()
-    .toLowerCase();
-  if (!s) return fallback ? "Yes" : "No";
-  if (["yes", "y", "true", "1", "completed", "success"].includes(s)) return "Yes";
-  if (["no", "n", "false", "0", "none", "null", "undefined"].includes(s)) return "No";
-  return fallback ? "Yes" : "No";
-}
-
-// Raya's per-call outcome string is the source of truth — pass through, only
-// normalize obvious aliases. Falls back to derived bucket if Raya omitted it.
-function rayaOutcomeOrDerive(
-  rayaOutcome: string,
-  fallback: {
-    contactStatus: string;
-    durationSec: number;
-    applied: boolean;
-    jobsShown: boolean;
-    engaged: boolean;
-  },
-): string {
-  const t = String(rayaOutcome ?? "").trim();
-  if (t) return t;
-  const s = normalize(fallback.contactStatus);
-  if (s === "pending") return "Pending";
-  if (fallback.durationSec <= 0) return "No Answer";
-  if (fallback.applied || fallback.jobsShown || fallback.engaged) return "Completed";
-  return "Early Disconnect";
-}
-
-function computeIntent(opts: {
-  durationSec: number;
-  applied: boolean;
-  triedToApply: boolean;
-  jobsShown: boolean;
-  userIntent: string;
-}): { score: number; reasoning: string } {
-  const d = opts.durationSec;
-  let dur = 0;
-  if (d >= 180) dur = 4;
-  else if (d >= 120) dur = 3;
-  else if (d >= 60) dur = 2;
-  else if (d >= 30) dur = 1;
-  let app = 0;
-  if (opts.applied) app = 4;
-  else if (opts.triedToApply) app = 2;
-  let eng = 0;
-  if (opts.jobsShown) eng += 1;
-  if (nonEmpty(opts.userIntent)) eng += 1;
-  const score = dur + app + eng;
-  // Master format: "Duration {s}s (+{d})|Application (+{a})|Engagement (+{e}) → {total}/10"
-  const reasoning = `Duration ${d}s (+${dur})|Application (+${app})|Engagement (+${eng}) → ${score}/10`;
-  return { score, reasoning };
-}
-
-// ---------- per-contact row builder ----------
-interface LaunchMeta {
-  campaignDay?: string | null;
-  campaignDate?: string | null;
-  campaignType?: string | null;
-  language?: string | null;
-  cityCampaign?: string | null;
-  region?: string | null;
-  batchName?: string | null;
-  agentName?: string | null;
-}
-interface InputRow {
-  contact_name?: string | null;
-  recommendations?: string | null;
-  user_intent?: string | null;
-  raw?: Record<string, any> | null;
-}
-interface BuildCtx {
-  columns: string[];
-  program: ProgramId;
-  batchName: string;
-  agentName: string;
-  launchMeta: LaunchMeta;
-  inputByPhone: Map<string, InputRow>;
-}
-
-function buildRow(contact: any, lastCall: any, ctx: BuildCtx): string[] | null {
-  // Skip contacts with no completed call (no call recordings/duration).
-  // lastCall presence is required.
-  if (!lastCall) return null;
-
-  const lm = ctx.launchMeta;
-  const detectedRegion = detectRegionForContact(contact, {
-    batchName: ctx.batchName,
-    agentName: ctx.agentName,
-    program: ctx.program,
-  });
-  const region = {
-    region: String(lm.region ?? detectedRegion.region),
-    language: String(lm.language ?? detectedRegion.language),
-    city: String(lm.cityCampaign ?? detectedRegion.city),
-  };
-
-  // ============================================================
-  // SINGLE SOURCE OF TRUTH: calls[last].call_output
-  // ============================================================
-  const callOutput = lastCall?.call_output ?? {};
-  const contactArgs = contact?.agent_args ?? contact?.args ?? contact?.metadata ?? {};
-  const phoneRaw = asStr(contact?.contact_phone ?? contact?.phone ?? contactArgs?.phone);
-  const phone = fmtPhone(phoneRaw);
-  const input = ctx.inputByPhone.get(phone) ?? null;
-  const inputRaw = input?.raw ?? {};
-  const getInput = (k: string) => inputRaw?.[k] ?? inputRaw?.[normalize(k)] ?? "";
-
-  // Call-object fields
-  const callId = asStr(lastCall?.uuid ?? lastCall?.id ?? lastCall?.execution_id ?? "");
-  if (!callId) return null;
-  const callDur = Number(lastCall?.call_duration ?? lastCall?.duration ?? 0);
-  const callDateIst = pickCallTime(lastCall); // call.call_start_time
-  const callRecording = asStr(
-    lastCall?.call_recording_url ??
-      lastCall?.recording_url ??
-      lastCall?.enhanced_recording_url ??
-      lastCall?.recording ??
-      "",
-  );
-  const rayaOutcomeStr = asStr(lastCall?.outcome ?? lastCall?.call_outcome ?? "");
-
-  // call_output fields — these are authoritative; no agent_args/input/transcript fallbacks here
-  const jobsRecommendedArr = asArr(callOutput?.jobs_recommended);
-  const jobsAppliedArr = asArr(callOutput?.jobs_applied);
-  const jobsFailedArr = asArr(callOutput?.jobs_failed_to_apply);
-  const finalSummary = asStr(callOutput?.final_summary ?? "");
-  const primaryTopic = asStr(callOutput?.primary_topic ?? "");
-  const dropReason = asStr(callOutput?.drop_reason ?? "");
-  const seekerName = asStr(callOutput?.seeker_name ?? contact?.name ?? "");
-  const userIntentRaw = asStr(callOutput?.user_intent ?? "");
-  const appliedToJob = yesNo(callOutput?.applied_to_job, jobsAppliedArr.length > 0);
-  const jobsShown = yesNo(callOutput?.jobs_shown, jobsRecommendedArr.length > 0);
-  const callEngaged = yesNo(callOutput?.call_engaged, nonEmpty(primaryTopic));
-  const callAnswered = yesNo(callOutput?.call_answered, callDur > 0);
-  const applicationsCount = Number(callOutput?.applications_count ?? jobsAppliedArr.length ?? 0);
-
-  // Computed
-  const triedToApply = jobsAppliedArr.length > 0 || jobsFailedArr.length > 0;
-  const contactStatus = asStr(contact?.status ?? "");
-  const outcome = rayaOutcomeOrDerive(rayaOutcomeStr, {
-    contactStatus,
-    durationSec: callDur,
-    applied: appliedToJob === "Yes",
-    jobsShown: jobsShown === "Yes",
-    engaged: callEngaged === "Yes",
-  });
-  const intent = computeIntent({
-    durationSec: callDur,
-    applied: appliedToJob === "Yes",
-    triedToApply,
-    jobsShown: jobsShown === "Yes",
-    userIntent: userIntentRaw,
-  });
-
-  // Campaign metadata (from launched_batches join)
-  const campaignDay = String(lm.campaignDay ?? "").trim();
-  const campaignDate =
-    fmtDateOnly(lm.campaignDate) || datePart(callDateIst) || new Date().toISOString().slice(0, 10);
-  const dayNum = (campaignDay.match(/\d+/) || ["1"])[0];
-  const campaignType =
-    String(lm.campaignType ?? "").trim() ||
-    `${ctx.program.toUpperCase()}_${region.language || ""}_Day${dayNum}`;
-
-  const byCol: Record<string, string> = {
-    campaign_day: campaignDay,
-    campaign_date: campaignDate,
-    campaign_type: campaignType,
-    language: region.language,
-    call_id: callId,
-    phone,
-    contact_phone: phone,
-    call_duration_seconds: fmtInt(callDur),
-    call_datetime_ist: fmtDateTimeIstFromApi(callDateIst),
-    call_outcome: outcome,
-    call_answered: callAnswered,
-    call_engaged: callEngaged,
-    applied_to_job: appliedToJob,
-    applications_count: fmtInt(applicationsCount),
-    jobs_shown: jobsShown,
-    primary_topic: primaryTopic,
-    call_language: region.language,
-    call_recording_url: callRecording,
-    final_summary: finalSummary,
-    call_transcript: jsonStringOrEmptyArray(lastCall?.call_transcript ?? lastCall?.transcript),
-    tried_to_apply: triedToApply ? "Yes" : "No",
-    drop_reason: dropReason,
-    city_campaign: region.city,
-    seeker_name: seekerName,
-    user_intent: userIntentRaw,
-    jobs_recommended: JSON.stringify(jobsRecommendedArr),
-    jobs_applied: JSON.stringify(jobsAppliedArr),
-    jobs_failed_to_apply: JSON.stringify(jobsFailedArr),
-    intent_score: fmtInt(intent.score),
-    intent_score_reasoning: intent.reasoning,
-    // DKB extras (best-effort passthrough from call_output / contact)
-    job_id: asStr(callOutput?.job_id ?? contactArgs?.job_id ?? getInput("job_id")),
-    company_name: asStr(
-      callOutput?.company_name ?? contactArgs?.company_name ?? getInput("company_name"),
-    ),
-    job_role_input: asStr(contactArgs?.job_role_input ?? getInput("job_role_input")),
-    num_vacancies_input: asStr(contactArgs?.num_vacancies_input ?? getInput("num_vacancies_input")),
-    city_input: asStr(contactArgs?.city_input ?? getInput("city_input")),
-    location_input: asStr(contactArgs?.location_input ?? getInput("location_input")),
-    salary_input: asStr(contactArgs?.salary_input ?? getInput("salary_input")),
-    qualification_input: asStr(contactArgs?.qualification_input ?? getInput("qualification_input")),
-    call_status: contactStatus,
-    contact_attempts: asStr(contact?.contact_attempts ?? contact?.attempts ?? ""),
-    phases_reached: asStr(callOutput?.phases_reached ?? ""),
-    job_status: asStr(callOutput?.job_status ?? ""),
-    job_role_value: asStr(callOutput?.job_role_value ?? ""),
-    num_vacancies_value: asStr(callOutput?.num_vacancies_value ?? ""),
-    salary_value: asStr(callOutput?.salary_value ?? ""),
-    location_value: asStr(callOutput?.location_value ?? ""),
-    qualification_value: asStr(callOutput?.qualification_value ?? ""),
-    fields_updated: asStr(callOutput?.fields_updated ?? ""),
-    new_job_mentioned: asStr(callOutput?.new_job_mentioned ?? ""),
-    new_job_role: asStr(callOutput?.new_job_role ?? ""),
-    new_job_vacancies: asStr(callOutput?.new_job_vacancies ?? ""),
-    new_job_salary: asStr(callOutput?.new_job_salary ?? ""),
-    new_job_location: asStr(callOutput?.new_job_location ?? ""),
-    new_job_qualification: asStr(callOutput?.new_job_qualification ?? ""),
-    new_job_posted: asStr(callOutput?.new_job_posted ?? ""),
-    talent_insights_shown: asStr(callOutput?.talent_insights_shown ?? ""),
-  };
-
-  return ctx.columns.map((col) => {
-    const nk = normalize(col);
-    if (Object.prototype.hasOwnProperty.call(byCol, nk)) return byCol[nk];
-    // case-insensitive header (e.g., "Intent Score")
-    const lower = col.toLowerCase();
-    if (Object.prototype.hasOwnProperty.call(byCol, lower)) return byCol[lower];
-    // best-effort fall through to contact field or agent_args
-    const fb =
-      (contact as any)?.[col] ?? (contact as any)?.[nk] ?? contactArgs?.[col] ?? contactArgs?.[nk];
-    return asStr(fb);
-  });
-}
-
 // ---------- fetch all batch contacts ----------
 async function fetchAllBatchContacts(batchId: string): Promise<any[]> {
   const pageSize = 200;
@@ -550,18 +151,6 @@ async function fetchCallDetail(callId: string): Promise<any | null> {
   }
 }
 
-function mergeCallDetail(call: any, detail: any | null): any {
-  if (!detail || typeof detail !== "object") return call;
-  return {
-    ...call,
-    ...detail,
-    call_output: {
-      ...(call?.call_output ?? {}),
-      ...(detail?.call_output ?? {}),
-    },
-  };
-}
-
 async function nextCampaignDay(program: ProgramId): Promise<string> {
   const rows = await getDb()
     .select({ campaign_day: launchedBatches.campaignDay })
@@ -575,11 +164,6 @@ async function nextCampaignDay(program: ProgramId): Promise<string> {
     if (m) maxN = Math.max(maxN, Number(m[1]));
   }
   return `Day ${maxN + 1}`;
-}
-
-function campaignTypeFor(program: ProgramId, language: string, campaignDay: string): string {
-  const dayNum = (String(campaignDay).match(/\d+/) || ["1"])[0];
-  return `${program.toUpperCase()}_${language || ""}_Day${dayNum}`;
 }
 
 // ---------- main export ----------
