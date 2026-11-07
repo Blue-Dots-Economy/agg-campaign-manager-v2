@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  sortedKeys,
   asArr,
   asStr,
   campaignTypeFor,
@@ -273,5 +274,16 @@ describe("nextCampaignDayLabel", () => {
   });
   test("starts at Day 1", () => {
     expect(nextCampaignDayLabel([])).toBe("Day 1");
+  });
+});
+
+describe("sortedKeys", () => {
+  test("orders keys the way Array.prototype.sort does by default", () => {
+    const obj = { b: 1, B: 2, a: 3, _x: 4, "10": 5, "9": 6, é: 7 };
+    expect(sortedKeys(obj)).toEqual(Object.keys(obj).sort());
+  });
+
+  test("returns an empty list for an empty object", () => {
+    expect(sortedKeys({})).toEqual([]);
   });
 });

@@ -51,7 +51,7 @@ export function pickNum(item: RayaItem, ...keys: string[]): number {
   for (const k of keys) {
     const v = item?.[k];
     if (typeof v === "number" && Number.isFinite(v)) return v;
-    if (typeof v === "string" && v && !isNaN(Number(v))) return Number(v);
+    if (typeof v === "string" && v && !Number.isNaN(Number(v))) return Number(v);
   }
   return 0;
 }

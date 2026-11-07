@@ -285,7 +285,7 @@ export function normalizeMetricsRaw(value: unknown): ProgramMetricsRaw {
         ];
       });
     } else if (typeof v === "number" && Number.isFinite(v)) out[k] = v;
-    else if (typeof v === "string" && v !== "" && !isNaN(Number(v))) out[k] = Number(v);
+    else if (typeof v === "string" && v !== "" && !Number.isNaN(Number(v))) out[k] = Number(v);
   }
   return out;
 }
