@@ -14,6 +14,11 @@ import {
   updateStagingRows,
   writeStagingHeaders,
 } from "../../src/lib/sheets.server";
+import {
+  DEFAULT_SHEETS_RETRIES,
+  DEFAULT_SHEETS_TIMEOUT_MS,
+  readSheetsConfig,
+} from "../../src/lib/sheets-client.server";
 
 const SHEETS = "https://sheets.googleapis.com/v4/spreadsheets/";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -44,10 +49,10 @@ interface Call {
 
 type Route = (url: string, method: string) => Response | undefined;
 
-const json = (body: unknown, status = 200) =>
+const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...headers },
   });
 
 /** Stubs fetch: the token endpoint always answers; other URLs go to `route`. */
@@ -343,5 +348,54 @@ describe("staging writes", () => {
     expect(await deleteSheetTab("s1", "Staging")).toBe(false);
     stubFetch(() => json({}, 500));
     expect(await deleteSheetTab("s1", "Staging")).toBe(false);
+  });
+});
+
+describe("timeouts and retries", () => {
+  test("every request carries a timeout signal", async () => {
+    const signals: unknown[] = [];
+    const stub = async (input: string | URL | Request, init?: RequestInit) => {
+      signals.push(init?.signal);
+      if (String(input) === TOKEN_URL) return json({ access_token: "tok", expires_in: 3600 });
+      return json({ sheets: [] });
+    };
+    globalThis.fetch = Object.assign(stub, { preconnect: realFetch.preconnect });
+    await listSheetTabs("s1");
+    expect(signals.length).toBeGreaterThan(0);
+    for (const s of signals) expect(s).toBeInstanceOf(AbortSignal);
+  });
+
+  test("a read is retried after a 503", async () => {
+    let attempts = 0;
+    stubFetch(() => {
+      attempts += 1;
+      return attempts === 1 ? json({}, 503, { "retry-after": "0" }) : tabsReply(["A"]);
+    });
+    expect(await listSheetTabs("s1")).toEqual(["A"]);
+    expect(attempts).toBe(2);
+  });
+
+  test("a write is sent once", async () => {
+    const calls = stubFetch(() => json({}, 503, { "retry-after": "0" }));
+    await expect(appendStagingRows("s1", "Sheet1", [["a"]])).rejects.toThrow(
+      "Sheets append failed (503)",
+    );
+    expect(calls.length).toBe(1);
+  });
+});
+
+describe("readSheetsConfig", () => {
+  test("uses named defaults", () => {
+    expect(readSheetsConfig({})).toEqual({
+      timeoutMs: DEFAULT_SHEETS_TIMEOUT_MS,
+      retries: DEFAULT_SHEETS_RETRIES,
+    });
+  });
+  test("reads overrides and refuses invalid numbers", () => {
+    expect(readSheetsConfig({ SHEETS_TIMEOUT_MS: "1000", SHEETS_RETRIES: "0" })).toEqual({
+      timeoutMs: 1000,
+      retries: 0,
+    });
+    expect(() => readSheetsConfig({ SHEETS_RETRIES: "-1" })).toThrow("SHEETS_RETRIES");
   });
 });

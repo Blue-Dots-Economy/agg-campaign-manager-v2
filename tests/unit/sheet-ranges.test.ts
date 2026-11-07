@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
   colLetter,
+  columnGroups,
+  joinSegments,
   isRangeParseError,
   normalizeHeader,
   quoteTab,
@@ -44,5 +46,38 @@ describe("isRangeParseError", () => {
   });
   test("does not match other errors", () => {
     expect(isRangeParseError("PERMISSION_DENIED")).toBe(false);
+  });
+});
+
+describe("columnGroups", () => {
+  test("groups kept columns into adjacent runs", () => {
+    const exclude = new Set(["final_summary"]);
+    expect(columnGroups(["a", "b", "Final Summary", "c", "d"], exclude)).toEqual([
+      [0, 1],
+      [3, 4],
+    ]);
+  });
+  test("returns no groups when every column is excluded", () => {
+    expect(columnGroups(["x"], new Set(["x"]))).toEqual([]);
+  });
+});
+
+describe("joinSegments", () => {
+  test("joins segments and pads short rows", () => {
+    expect(
+      joinSegments(
+        [
+          [0, 1],
+          [3, 3],
+        ],
+        [[["a", 1], ["b"]], [[null]]],
+      ),
+    ).toEqual([
+      ["a", "1", ""],
+      ["b", "", ""],
+    ]);
+  });
+  test("returns no rows for empty segments", () => {
+    expect(joinSegments([[0, 0]], [[]])).toEqual([]);
   });
 });
