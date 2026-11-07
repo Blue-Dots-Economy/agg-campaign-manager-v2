@@ -1,6 +1,12 @@
 import { useMemo, useRef, useState, useEffect } from "react";
-import { sankey, sankeyLinkHorizontal, sankeyJustify } from "d3-sankey";
-import type { DropRow } from "./drop-rows";
+import {
+  sankey,
+  sankeyLinkHorizontal,
+  sankeyJustify,
+  type SankeyLink,
+  type SankeyNode,
+} from "d3-sankey";
+import { dropValue, type DropRow } from "./drop-rows";
 import type { KkbMetrics } from "./program-overviews";
 import { reasonColor } from "./reasonColors";
 
@@ -30,6 +36,13 @@ type LinkIn = {
   color: string;
   kind: "trunk" | "leak";
 };
+type LinkExtra = Omit<LinkIn, "source" | "target">;
+type LaidOutNode = SankeyNode<NodeIn, LinkExtra>;
+
+/** Name of a laid-out link end; d3-sankey replaces the index with the node object. */
+function endName(end: SankeyLink<NodeIn, LinkExtra>["source"]): string {
+  return typeof end === "object" ? end.name : "";
+}
 
 export function FunnelSankey({
   m,
@@ -49,7 +62,7 @@ export function FunnelSankey({
   useEffect(() => {
     if (!containerRef.current) return;
     const ro = new ResizeObserver((entries) => {
-      const w = entries[0].contentRect.width;
+      const w = entries[0]?.contentRect.width ?? 0;
       if (w > 0) setWidth(Math.max(360, w));
     });
     ro.observe(containerRef.current);
@@ -57,8 +70,6 @@ export function FunnelSankey({
   }, []);
 
   const { nodes, links, height, unmappedStageCount } = useMemo(() => {
-    const valueOf = (r: DropRow) => (onlyRegion ? (r.byRegion?.[onlyRegion] ?? 0) : r.total);
-
     const calls = m.totalCalls;
     const picked = m.answeredCalls;
     const engaged = m.engagedCalls;
@@ -121,7 +132,7 @@ export function FunnelSankey({
 
     const unmappedStages = new Set<string>();
     for (const r of rows) {
-      const v = valueOf(r);
+      const v = dropValue(r, onlyRegion);
       if (v <= 0) continue;
       const mappedSource = STAGE_SOURCE[r.stage];
       if (!mappedSource) unmappedStages.add(r.stage);
@@ -157,7 +168,7 @@ export function FunnelSankey({
     const sinkCount = nodeArr.filter((n) => n.kind === "sink").length;
     const h = Math.max(420, sinkCount * 36 + 80);
 
-    const sk = sankey<any, any>()
+    const sk = sankey<NodeIn, LinkExtra>()
       .nodeWidth(14)
       .nodePadding(14)
       .nodeAlign(sankeyJustify)
@@ -195,16 +206,17 @@ export function FunnelSankey({
           </style>
         </defs>
         <g>
-          {links.map((l: any, i: number) => {
-            const d = sankeyLinkHorizontal()(l) ?? "";
-            const targetName = (l.target as any).name as string;
-            const sourceName = (l.source as any).name as string;
+          {links.map((l, i) => {
+            const d = sankeyLinkHorizontal<NodeIn, LinkExtra>()(l) ?? "";
+            const targetName = endName(l.target);
+            const sourceName = endName(l.source);
             const baseOp = l.kind === "trunk" ? 0.45 : 0.65;
             const dim = selectedReason && targetName !== selectedReason ? 0.08 : baseOp;
             const clickable = l.kind === "leak" && isSelectable(targetName);
             return (
               <path
-                key={i}
+                // Two leaks can share source and target (one reason at two stages), so the index keeps keys unique.
+                key={`${sourceName}-${targetName}-${i}`}
                 className={`sk-link ${clickable ? "sk-clickable" : ""}`}
                 d={d}
                 fill="none"
@@ -225,11 +237,11 @@ export function FunnelSankey({
           })}
         </g>
         <g>
-          {nodes.map((n: any, i: number) => {
-            const x = n.x0;
-            const y = n.y0;
-            const w = n.x1 - n.x0;
-            const h = Math.max(2, n.y1 - n.y0);
+          {nodes.map((n: LaidOutNode) => {
+            const x = n.x0 ?? 0;
+            const y = n.y0 ?? 0;
+            const w = (n.x1 ?? 0) - x;
+            const h = Math.max(2, (n.y1 ?? 0) - y);
             const isRight = x > width / 2;
             const labelX = isRight ? x - 6 : x + w + 6;
             const anchor = isRight ? "end" : "start";
@@ -238,7 +250,7 @@ export function FunnelSankey({
             const dim = selectedReason && n.kind === "sink" && n.name !== selectedReason ? 0.25 : 1;
             return (
               <g
-                key={i}
+                key={n.name}
                 opacity={dim}
                 className={clickable ? "sk-clickable" : undefined}
                 onClick={

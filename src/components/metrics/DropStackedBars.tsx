@@ -1,4 +1,4 @@
-import type { DropRow } from "./drop-rows";
+import { dropValue, type DropRow } from "./drop-rows";
 import { reasonColor } from "./reasonColors";
 
 const fmt = (n: number) => n.toLocaleString();
@@ -6,13 +6,11 @@ const fmt = (n: number) => n.toLocaleString();
 export function DropStackedBars({ rows, onlyRegion }: { rows: DropRow[]; onlyRegion?: string }) {
   if (!rows || rows.length === 0) return null;
 
-  const valueOf = (r: DropRow) => (onlyRegion ? (r.byRegion?.[onlyRegion] ?? 0) : r.total);
-
   // Group rows by stage with reason→count
   const stageMap = new Map<string, { reason: string; value: number }[]>();
   const reasonTotals = new Map<string, number>();
   for (const r of rows) {
-    const v = valueOf(r);
+    const v = dropValue(r, onlyRegion);
     if (v <= 0) continue;
     reasonTotals.set(r.reason, (reasonTotals.get(r.reason) ?? 0) + v);
     const item = { reason: r.reason, value: v };
