@@ -433,7 +433,8 @@ export function DkbOverviewMetrics({
   const secondaryLabel = dview === "providers" ? "openings" : "providers";
   const funnelStages: VerticalFunnelStage[] = funnelData.map((s, i) => {
     const prevStage = i > 0 ? funnelData[i - 1] : undefined;
-    const base = primaryOf(funnelData[0]);
+    const first = funnelData[0];
+    const base = first ? primaryOf(first) : 0;
     const ofBase = base > 0 ? (primaryOf(s) / base) * 100 : 0;
     const step =
       i === 0 || !prevStage

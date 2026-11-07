@@ -214,7 +214,7 @@ export function getProvidersForCategory(_region: EcosystemRegion, category: stri
   const conn = splitEvenly(row.connections, list.length);
   return list.map((org, i) => ({
     org,
-    email: maskedEmail(org.split(" ")[0], org.split(" ")[1] ?? "org"),
+    email: maskedEmail(org.split(" ")[0] ?? "", org.split(" ")[1] ?? "org"),
     phone: maskedPhone(i + category.length),
     capacity: cap[i] ?? 0,
     matching: match[i] ?? 0,
@@ -234,7 +234,7 @@ export function getAggregatorsForNeed(_region: EcosystemRegion, area: string): A
   const conn = splitEvenly(row.connections, list.length);
   return list.map((org, i) => ({
     org,
-    email: maskedEmail(org.split(" ")[0], org.split(" ")[1] ?? "org"),
+    email: maskedEmail(org.split(" ")[0] ?? "", org.split(" ")[1] ?? "org"),
     phone: maskedPhone(i + area.length),
     reach: reach[i] ?? 0,
     matching: match[i] ?? 0,
