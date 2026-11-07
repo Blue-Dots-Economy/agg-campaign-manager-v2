@@ -64,10 +64,11 @@ function NavLink({
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
-  const hasChildren = (item.children?.length ?? 0) > 0;
+  const children = item.children ?? [];
+  const hasChildren = children.length > 0;
   const groupActive =
     hasChildren &&
-    item.children!.some((c) => (c.to === "/" ? pathname === "/" : pathname.startsWith(c.to)));
+    children.some((c) => (c.to === "/" ? pathname === "/" : pathname.startsWith(c.to)));
 
   return (
     <div>
@@ -103,7 +104,7 @@ function NavLink({
       </div>
       {hasChildren && !collapsed && (
         <div className="ml-4 mt-0.5 space-y-0.5 border-l border-sidebar-border pl-3">
-          {item.children!.map((child) => {
+          {children.map((child) => {
             const childActive = child.to === "/" ? pathname === "/" : pathname.startsWith(child.to);
             const ChildIcon = child.icon;
             return (
@@ -130,7 +131,7 @@ function NavLink({
 }
 
 export function Sidebar() {
-  const { config, programId, setProgramId } = useProgram();
+  const { programId, setProgramId } = useProgram();
   const { session } = useAuth();
   const role = session?.role;
   const groups = GROUPS.map((g) => ({
@@ -142,10 +143,12 @@ export function Sidebar() {
           role === "admin" || role === "jfc"
             ? item
             : { to: "/request-campaign", label: "Request a campaign", icon: Rocket };
-        return [
-          launchItem,
-          { to: "/campaign-requests", label: "Campaign Requests", icon: Inbox } as NavItem,
-        ];
+        const requestsItem: NavItem = {
+          to: "/campaign-requests",
+          label: "Campaign Requests",
+          icon: Inbox,
+        };
+        return [launchItem, requestsItem];
       })
       .map((item) => ({
         ...item,

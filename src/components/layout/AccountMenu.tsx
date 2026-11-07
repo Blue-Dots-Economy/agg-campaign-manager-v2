@@ -14,6 +14,10 @@ export function AccountMenu() {
   const { session, logout } = useAuth();
   const navigate = useNavigate();
   if (!session) return null;
+  const signOut = async () => {
+    await logout();
+    await navigate({ to: "/login" });
+  };
   const local = session.email.split("@")[0] || session.email;
   const initials = local.slice(0, 2).toUpperCase();
   return (
@@ -52,7 +56,7 @@ export function AccountMenu() {
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => {
-            void logout().then(() => navigate({ to: "/login" }));
+            void signOut();
           }}
           className="text-rose-600 focus:text-rose-600"
         >
