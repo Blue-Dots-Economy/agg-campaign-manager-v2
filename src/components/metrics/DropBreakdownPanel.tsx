@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { regionsFromRows, type DropRow } from "./drop-rows";
+import { dropBreakdown, dropValue, regionsFromRows, type DropRow } from "./drop-rows";
 import { reasonColor } from "./reasonColors";
 
 const fmt = (n: number) => n.toLocaleString();
@@ -17,42 +17,10 @@ export function DropBreakdownPanel({
 }) {
   const regions = useMemo(() => regionsFromRows(rows, onlyRegion), [rows, onlyRegion]);
 
-  const valueOf = (r: { byRegion: Record<string, number>; total: number }) =>
-    onlyRegion ? (r.byRegion?.[onlyRegion] ?? 0) : r.total;
-
-  const { reasonTotals, grandTotal, stageBreakdown } = useMemo(() => {
-    type Agg = { key: string; byRegion: Record<string, number>; total: number };
-    const add = (cur: Agg, r: DropRow) => {
-      for (const [k, v] of Object.entries(r.byRegion ?? {})) {
-        cur.byRegion[k] = (cur.byRegion[k] ?? 0) + v;
-      }
-      cur.total += r.total;
-    };
-    const map = new Map<string, Agg>();
-    let grand = 0;
-    for (const r of rows) {
-      const v = valueOf(r);
-      if (v <= 0) continue;
-      grand += v;
-      const cur = map.get(r.reason) ?? { key: r.reason, byRegion: {}, total: 0 };
-      add(cur, r);
-      map.set(r.reason, cur);
-    }
-    const reasonTotals = Array.from(map.values()).sort((a, b) => valueOf(b) - valueOf(a));
-
-    const stageBreakdown: Agg[] = [];
-    if (selectedReason) {
-      const byStage = new Map<string, Agg>();
-      for (const r of rows) {
-        if (r.reason !== selectedReason) continue;
-        const cur = byStage.get(r.stage) ?? { key: r.stage, byRegion: {}, total: 0 };
-        add(cur, r);
-        byStage.set(r.stage, cur);
-      }
-      for (const stage of byStage.values()) stageBreakdown.push(stage);
-    }
-    return { reasonTotals, grandTotal: grand, stageBreakdown };
-  }, [rows, onlyRegion, selectedReason]);
+  const { reasonTotals, grandTotal, stageBreakdown } = useMemo(
+    () => dropBreakdown(rows, onlyRegion, selectedReason),
+    [rows, onlyRegion, selectedReason],
+  );
 
   return (
     <div className="flex h-full flex-col">
@@ -114,7 +82,7 @@ export function DropBreakdownPanel({
                 ))
               : reasonTotals.map((r) => {
                   const color = reasonColor(r.key);
-                  const pct = grandTotal > 0 ? (valueOf(r) / grandTotal) * 100 : 0;
+                  const pct = grandTotal > 0 ? (dropValue(r, onlyRegion) / grandTotal) * 100 : 0;
                   return (
                     <tr
                       key={r.key}
