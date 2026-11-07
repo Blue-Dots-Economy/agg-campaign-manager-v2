@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import {
+  BatchContactsPageSchema,
+  BatchListReplySchema,
+  batchItems,
   buildLiveDetail,
+  pageBatchMeta,
+  pageContacts,
+  pageTotal,
   contactDuration,
   contactStatus,
   extractStatusCounts,
@@ -173,5 +179,30 @@ describe("buildLiveDetail", () => {
       concurrency: 3,
       recent: [],
     });
+  });
+});
+
+describe("reply readers", () => {
+  test("batchItems reads arrays and wrappers", () => {
+    expect(batchItems(BatchListReplySchema.parse([{ id: 1 }]))).toEqual([{ id: 1 }]);
+    expect(batchItems(BatchListReplySchema.parse({ data: [{ id: 2 }] }))).toEqual([{ id: 2 }]);
+    expect(batchItems(BatchListReplySchema.parse({}))).toEqual([]);
+  });
+  test("batch list schema refuses a non-array list", () => {
+    expect(BatchListReplySchema.safeParse({ items: "x" }).success).toBe(false);
+  });
+  test("page readers read contacts, batch details and totals", () => {
+    const page = BatchContactsPageSchema.parse({
+      items: [{ status: "Pending" }],
+      batch_info: { name: "B" },
+      pagination: { total: "12" },
+    });
+    expect(pageContacts(page)).toEqual([{ status: "Pending" }]);
+    expect(pageBatchMeta(page)).toEqual({ name: "B" });
+    expect(pageTotal(page)).toBe(12);
+    const bare = BatchContactsPageSchema.parse([{ status: "x" }]);
+    expect(pageContacts(bare).length).toBe(1);
+    expect(pageBatchMeta(bare)).toBeNull();
+    expect(pageTotal(bare)).toBe(0);
   });
 });

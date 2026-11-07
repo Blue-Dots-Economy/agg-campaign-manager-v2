@@ -1,5 +1,6 @@
 // Pure mapping of Raya batch and contact data into the live-campaign view.
-import type { JsonObject, JsonValue } from "@/lib/json";
+import { z } from "zod";
+import { JsonObjectSchema, type JsonObject, type JsonValue } from "@/lib/json";
 
 /** A Raya object; Raya uses several names for the same field, so most keys may be missing. */
 export type RayaRecord = Readonly<Record<string, JsonValue | undefined>>;
@@ -273,4 +274,59 @@ export function buildLiveDetail(
     startedAt: textOrNull(first(batchMeta, "started_at", "startedAt")),
     recent,
   };
+}
+
+const RayaList = z.array(JsonObjectSchema);
+const Count = z.union([z.number(), z.string()]).nullish();
+
+/** Raya's batch list reply: a bare array or a wrapper object. */
+export const BatchListReplySchema = z.union([
+  RayaList,
+  z.object({
+    items: RayaList.optional(),
+    data: RayaList.optional(),
+    batches: RayaList.optional(),
+  }),
+]);
+
+/** Returns the batches in a batch list reply. */
+export function batchItems(reply: z.infer<typeof BatchListReplySchema>): JsonObject[] {
+  if (Array.isArray(reply)) return reply;
+  return reply.items ?? reply.data ?? reply.batches ?? [];
+}
+
+/** One page of Raya's batch contacts reply: a bare array or a wrapper with batch details. */
+export const BatchContactsPageSchema = z.union([
+  RayaList,
+  z.object({
+    contacts: RayaList.optional(),
+    items: RayaList.optional(),
+    data: RayaList.optional(),
+    batch: JsonObjectSchema.nullish(),
+    batch_info: JsonObjectSchema.nullish(),
+    total: Count,
+    total_count: Count,
+    pagination: z.object({ total: Count }).nullish(),
+  }),
+]);
+
+/** One page of batch contacts. */
+export type BatchContactsPage = z.infer<typeof BatchContactsPageSchema>;
+
+/** Returns the contacts on one page. */
+export function pageContacts(page: BatchContactsPage): JsonObject[] {
+  if (Array.isArray(page)) return page;
+  return page.contacts ?? page.items ?? page.data ?? [];
+}
+
+/** Returns the batch details sent with a page, if any. */
+export function pageBatchMeta(page: BatchContactsPage): JsonObject | null {
+  if (Array.isArray(page)) return null;
+  return page.batch ?? page.batch_info ?? null;
+}
+
+/** Returns the contact total Raya reports on a page, or 0. */
+export function pageTotal(page: BatchContactsPage): number {
+  if (Array.isArray(page)) return 0;
+  return Number(page.total ?? page.total_count ?? page.pagination?.total ?? 0);
 }
