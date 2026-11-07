@@ -220,7 +220,30 @@ if (adminCookie) {
   check("cross-site POST is 403", res.status === 403, `got ${res.status}`);
 }
 
-// 6. A dashboard number matches the database.
+// 6. Malformed input: 400 for a role the function allows, 403 for one it refuses (roles are
+// checked before input).
+const adminOnlyFn = {
+  file: "lib/snapshot.functions.ts",
+  name: "fetchCampaignDayRowsFn",
+  method: "GET",
+} as const;
+const MALFORMED_INPUT = { program: "not-a-program", day: 42 };
+const deniedRole = ROLES.find((role) => !FN_ROLES.admin.includes(role));
+const deniedCookie = deniedRole ? cookies.get(deniedRole) : undefined;
+if (adminCookie) {
+  const res = await callFn(adminOnlyFn, { cookie: adminCookie, data: MALFORMED_INPUT });
+  check("malformed input is 400 for an allowed role", res.status === 400, `got ${res.status}`);
+}
+if (deniedRole && deniedCookie) {
+  const res = await callFn(adminOnlyFn, { cookie: deniedCookie, data: MALFORMED_INPUT });
+  check(
+    `malformed input is 403 for a denied role (${deniedRole})`,
+    res.status === 403,
+    `got ${res.status}`,
+  );
+}
+
+// 7. A dashboard number matches the database.
 if (adminCookie) {
   const db = new pg.Client({ connectionString: DATABASE_URL });
   await db.connect();
