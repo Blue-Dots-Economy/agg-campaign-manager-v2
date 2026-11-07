@@ -12,6 +12,7 @@ import {
   fmtInt,
   fmtPhone,
   jsonStringOrEmptyArray,
+  nextCampaignDayLabel,
   nonEmpty,
   normalize,
   parseSheetId,
@@ -263,5 +264,14 @@ describe("campaignTypeFor", () => {
   test("builds PROGRAM_language_DayN", () => {
     expect(campaignTypeFor("seekers", "Hindi", "Day 4")).toBe("SEEKERS_Hindi_Day4");
     expect(campaignTypeFor("providers", "", "first")).toBe("PROVIDERS__Day1");
+  });
+});
+
+describe("nextCampaignDayLabel", () => {
+  test("returns the day after the highest number", () => {
+    expect(nextCampaignDayLabel(["Day 2", null, "day 10", "x"])).toBe("Day 11");
+  });
+  test("starts at Day 1", () => {
+    expect(nextCampaignDayLabel([])).toBe("Day 1");
   });
 });

@@ -273,3 +273,15 @@ export function mergeCallDetail(call: RayaRecord, detail: RayaValue | undefined)
     },
   };
 }
+
+/** Splits the columns into those with a value in at least one row and those empty in every row. */
+export function columnCoverage(
+  columns: string[],
+  rows: string[][],
+): { populatedColumns: string[]; emptyColumns: string[] } {
+  const filled = (i: number) => rows.some((row) => String(row[i] ?? "").trim() !== "");
+  return {
+    populatedColumns: columns.filter((_, i) => filled(i)),
+    emptyColumns: columns.filter((_, i) => !filled(i)),
+  };
+}

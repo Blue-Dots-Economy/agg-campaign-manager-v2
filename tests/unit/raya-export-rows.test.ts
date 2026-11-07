@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   buildRow,
+  columnCoverage,
   isCompletedCall,
   mergeCallDetail,
   pickCallTime,
@@ -239,5 +240,22 @@ describe("buildRow", () => {
   test("returns null without a last call or a call id", () => {
     expect(buildRow(CONTACT, null, ctx())).toBeNull();
     expect(buildRow(CONTACT, { call_output: {} }, ctx())).toBeNull();
+  });
+});
+
+describe("columnCoverage", () => {
+  test("splits columns by whether any row fills them", () => {
+    expect(
+      columnCoverage(
+        ["a", "b", "c"],
+        [
+          ["x", " ", ""],
+          ["", "", "z"],
+        ],
+      ),
+    ).toEqual({ populatedColumns: ["a", "c"], emptyColumns: ["b"] });
+  });
+  test("treats every column as empty without rows", () => {
+    expect(columnCoverage(["a"], [])).toEqual({ populatedColumns: [], emptyColumns: ["a"] });
   });
 });

@@ -246,3 +246,13 @@ export function campaignDayNumber(campaignDay: string): string {
 export function campaignTypeFor(program: ProgramId, language: string, campaignDay: string): string {
   return `${program.toUpperCase()}_${language || ""}_Day${campaignDayNumber(campaignDay)}`;
 }
+
+/** Returns the label after the highest day number among `days`, for example "Day 4". */
+export function nextCampaignDayLabel(days: ReadonlyArray<string | null>): string {
+  let maxN = 0;
+  for (const d of days) {
+    const m = /(\d+)/.exec(String(d ?? ""));
+    if (m?.[1]) maxN = Math.max(maxN, Number(m[1]));
+  }
+  return `Day ${maxN + 1}`;
+}
