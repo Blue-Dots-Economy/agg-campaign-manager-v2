@@ -1,6 +1,8 @@
 // Input validation for server functions. Loaded by `.functions.ts` modules that the browser
 // also imports, so server-only code is imported inside the failure path.
-import type { z } from "zod";
+import { z } from "zod";
+import { registry, type ProgramId } from "@/programs/registry";
+import type { Json } from "@/server/db/schema";
 
 /** First words of the message sent to the browser when input fails validation. */
 export const INVALID_INPUT_MESSAGE = "Invalid input";
@@ -33,3 +35,43 @@ export function parseInput<S extends z.ZodTypeAny>(
     throw new Error(`${INVALID_INPUT_MESSAGE}: ${paths.slice(0, MAX_PATHS_IN_MESSAGE).join(", ")}`);
   };
 }
+
+/** Narrows an unknown value, such as parsed JSON, to an object with string keys. */
+export function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null;
+}
+
+/** Most rows in a stored seeker CSV, and so most contacts one campaign request or batch may carry. */
+export const MAX_CONTACTS_PER_BATCH = 200_000;
+
+/** A program id from the program registry. */
+export const programIdSchema = z
+  .string()
+  .refine((v): v is ProgramId => Object.hasOwn(registry, v), "Unknown program");
+
+/** Removes keys whose value is undefined, which JSON cannot store. */
+function withoutUndefined(record: Record<string, Json | undefined>): { [key: string]: Json } {
+  const out: { [key: string]: Json } = {};
+  for (const [k, v] of Object.entries(record)) if (v !== undefined) out[k] = v;
+  return out;
+}
+
+/** Any JSON value, for free-form fields stored in jsonb columns. Undefined object values are dropped. */
+export const jsonSchema: z.ZodType<Json, z.ZodTypeDef, unknown> = z.lazy(() => jsonValue);
+
+const jsonValue = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+  z.null(),
+  z.array(jsonSchema),
+  z.record(jsonSchema.optional()).transform(withoutUndefined),
+]);
+
+/** A JSON object, for free-form records such as schedules and cohort filters. */
+export const jsonObjectSchema = z.record(jsonSchema.optional()).transform(withoutUndefined);
+
+/** One uploaded contact: a flat record of CSV cells. Undefined values are dropped. */
+export const contactSchema: z.ZodType<{ [key: string]: Json }, z.ZodTypeDef, unknown> = z
+  .record(z.union([z.string(), z.number(), z.boolean(), z.null()]).optional())
+  .transform(withoutUndefined);
