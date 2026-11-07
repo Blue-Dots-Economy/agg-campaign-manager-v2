@@ -6,13 +6,69 @@ import { isRecord, programIdSchema } from "@/lib/input-schemas";
 /** Maps a missing or empty filter value to "all", the report functions' "no filter" value. */
 export const all = (v: string | undefined) => (v && v !== "all" ? v : "all");
 
-/**
- * Returns `v` when it is an array, otherwise `[]`. The elements are kept as the report SQL
- * function wrote them; their shape is set by that function.
- */
-function sqlArray<T>(v: unknown): T[] {
-  return Array.isArray(v) ? v : [];
+/** Text field of a report row; anything else reads as "". */
+const text = z.string().catch("");
+/** Number field of a report row; anything else reads as 0. */
+const num = z.number().catch(0);
+
+/** Keeps the finite numbers of a JSON object. */
+function finiteNumbers(record: Record<string, unknown>): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(record)) {
+    if (typeof v === "number" && Number.isFinite(v)) out[k] = v;
+  }
+  return out;
 }
+
+/** Map of numbers in a report row; non-numbers are dropped. */
+const numberMap = z.record(z.unknown()).catch({}).transform(finiteNumbers);
+
+/**
+ * Parses each object of a report list with `schema` and drops other entries. Every field of the
+ * schemas below has a fallback, so an object never fails to parse.
+ */
+function sqlList<T>(v: unknown, schema: z.ZodType<T, z.ZodTypeDef, unknown>): T[] {
+  if (!Array.isArray(v)) return [];
+  return v.filter(isRecord).map((x) => schema.parse(x));
+}
+
+/** A report list field: a list of rows of one schema. */
+const listOf = <T>(schema: z.ZodType<T, z.ZodTypeDef, unknown>) =>
+  z.unknown().transform((v) => sqlList(v, schema));
+
+const campaignRollupRow = z.object({
+  day: text,
+  date: text,
+  type: text,
+  language: text,
+  rows: num,
+  answered: num,
+  engaged: num,
+  converted: num,
+  new_jobs: num,
+  answered_pct: num,
+  high_intent: num,
+});
+const reasonCountRow = z.object({ reason: text, count: num });
+const scoreCountRow = z.object({ score: text, count: num });
+const regionCountRow = z.object({ region: text, count: num });
+const phaseCountRow = z.object({ phase: text, count: num });
+const statusCountRow = z.object({ status: text, count: num });
+const outcomeCountRow = z.object({ outcome: text, count: num });
+const stageRow = z.object({ key: text, label: text });
+const bucketRow = z.object({
+  bucket: text,
+  byStage: numberMap,
+  total: num,
+  raw: listOf(reasonCountRow),
+});
+const topCauseRow = z.object({ phase: text, reason: text, count: num, pct: num });
+const phaseShareRow = z.object({
+  phaseKey: text,
+  phaseLabel: text,
+  campaignPct: num,
+  regionPct: num,
+});
 
 /** Returns `v` as a number, or 0 when it is missing or not numeric. */
 function toCount(v: unknown): number {
@@ -83,14 +139,14 @@ export function normalizeAggregates(value: unknown): ProgramAggregates {
   if (kpis.total_rows == null && kpis.total_calls != null) kpis.total_rows = kpis.total_calls;
   return {
     kpis,
-    perDay: sqlArray(raw.perDay),
-    drops: sqlArray(raw.drops),
-    intents: sqlArray(raw.intents),
-    regions: sqlArray(raw.regions),
-    phases: sqlArray(raw.phases),
-    jobStatus: sqlArray(raw.jobStatus),
-    outcomes: sqlArray(raw.outcomes),
-    dkbIntents: sqlArray(raw.dkbIntents),
+    perDay: sqlList(raw.perDay, campaignRollupRow),
+    drops: sqlList(raw.drops, reasonCountRow),
+    intents: sqlList(raw.intents, scoreCountRow),
+    regions: sqlList(raw.regions, regionCountRow),
+    phases: sqlList(raw.phases, phaseCountRow),
+    jobStatus: sqlList(raw.jobStatus, statusCountRow),
+    outcomes: sqlList(raw.outcomes, outcomeCountRow),
+    dkbIntents: sqlList(raw.dkbIntents, scoreCountRow),
     dropAnalysis: Array.isArray(raw.dropAnalysis)
       ? raw.dropAnalysis.flatMap((e: unknown) => {
           if (!isRecord(e)) return [];
@@ -361,8 +417,8 @@ export function normalizeDropAnalysis(out: unknown): KkbDropAnalysisPayload {
   if (!isRecord(out)) return empty;
   const p = out;
   return {
-    stages: sqlArray(p.stages),
-    buckets: sqlArray(p.buckets),
+    stages: sqlList(p.stages, stageRow),
+    buckets: sqlList(p.buckets, bucketRow),
     maxCell: toCount(p.maxCell),
     grandTotal: toCount(p.grandTotal),
     safeguardingFlagged: p.safeguardingFlagged != null ? toCount(p.safeguardingFlagged) : undefined,
@@ -452,8 +508,8 @@ export function normalizeCampaignDropCauses(out: unknown): CampaignDropCausesPay
   return {
     sampleCalls: toCount(out.sampleCalls),
     region: typeof out.region === "string" ? out.region : null,
-    highIntentNonApply: { segment: toCount(hina.segment), top: sqlArray(hina.top) },
-    phaseShare: sqlArray(out.phaseShare),
+    highIntentNonApply: { segment: toCount(hina.segment), top: sqlList(hina.top, topCauseRow) },
+    phaseShare: sqlList(out.phaseShare, phaseShareRow),
   };
 }
 
@@ -476,7 +532,7 @@ export function normalizeDkbCampaignCauses(out: unknown): DkbCampaignCausesPaylo
   return {
     sampleCalls: toCount(out.sampleCalls),
     region: typeof out.region === "string" ? out.region : null,
-    phaseShare: sqlArray(out.phaseShare),
+    phaseShare: sqlList(out.phaseShare, phaseShareRow),
   };
 }
 

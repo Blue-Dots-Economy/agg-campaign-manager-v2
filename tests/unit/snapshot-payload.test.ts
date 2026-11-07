@@ -100,9 +100,33 @@ describe("normalizeAggregates", () => {
   test("keeps arrays and replaces anything else with []", () => {
     const perDay = [{ day: "Day 1", rows: 3 }];
     const out = normalizeAggregates({ perDay, drops: "nope", regions: [{ region: "KA" }] });
-    expect<unknown>(out.perDay).toEqual(perDay);
+    expect(out.perDay).toEqual([
+      {
+        day: "Day 1",
+        date: "",
+        type: "",
+        language: "",
+        rows: 3,
+        answered: 0,
+        engaged: 0,
+        converted: 0,
+        new_jobs: 0,
+        answered_pct: 0,
+        high_intent: 0,
+      },
+    ]);
     expect(out.drops).toEqual([]);
-    expect<unknown>(out.regions).toEqual([{ region: "KA" }]);
+    expect(out.regions).toEqual([{ region: "KA", count: 0 }]);
+  });
+
+  test("drops list entries that are not objects and fills fields of the wrong type", () => {
+    const out = normalizeAggregates({
+      drops: [null, 3, { reason: 7, count: "2" }, { reason: "busy", count: 4 }],
+    });
+    expect(out.drops).toEqual([
+      { reason: "", count: 0 },
+      { reason: "busy", count: 4 },
+    ]);
   });
 
   test("cleans drop analysis entries", () => {
@@ -245,6 +269,23 @@ describe("normalizeDropAnalysis", () => {
       maxCell: 0,
       grandTotal: 0,
     });
+  });
+
+  test("cleans each bucket of the matrix", () => {
+    const out = normalizeDropAnalysis({
+      buckets: [
+        {
+          bucket: "Low",
+          byStage: { intro: 2, jobs: "x" },
+          total: 2,
+          raw: [{ reason: "busy", count: 2 }, null],
+        },
+        "bad",
+      ],
+    });
+    expect(out.buckets).toEqual([
+      { bucket: "Low", byStage: { intro: 2 }, total: 2, raw: [{ reason: "busy", count: 2 }] },
+    ]);
   });
 
   test("keeps arrays, coerces numbers and keeps safeguardingFlagged only when present", () => {
