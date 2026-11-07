@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useProgram } from "@/programs/context";
+import type { ProgramId } from "@/programs/registry";
 import { getOverrides, setOverrides, useProgramOverrides } from "@/lib/program-overrides";
 import { rayaKeyStatus } from "@/lib/raya.functions";
 import { getExportTarget, setExportTarget } from "@/lib/raya-export.functions";
@@ -97,22 +98,33 @@ function GeneralSettings() {
 
   const [agentId, setAgentId] = useState("");
   const [sheetUrl, setSheetUrl] = useState("");
-  const [keyConfigured, setKeyConfigured] = useState<boolean | null>(null);
   const [cap, setCap] = useState<number>(() => getConcurrencyCap());
 
-  const keyStatusFn = useServerFn(rayaKeyStatus);
-
-  useEffect(() => {
+  // Load the stored overrides into the form whenever the program changes, during render.
+  const [formProgram, setFormProgram] = useState<ProgramId | null>(null);
+  if (formProgram !== programId) {
+    setFormProgram(programId);
     const o = getOverrides(programId);
     setAgentId(o.rayaAgentId ?? config.rayaAgentId ?? "");
     setSheetUrl(o.sheetCsvUrl ?? config.sheetCsvUrl ?? "");
-  }, [programId, config]);
+  }
 
-  useEffect(() => {
-    keyStatusFn({ data: undefined as any })
-      .then((r: any) => setKeyConfigured(Boolean(r?.configured)))
-      .catch(() => setKeyConfigured(false));
-  }, [keyStatusFn]);
+  const keyStatusFn = useServerFn(rayaKeyStatus);
+  const keyStatus = useQuery({
+    queryKey: ["raya-key-status"],
+    queryFn: async () => {
+      try {
+        const r = await keyStatusFn();
+        return Boolean(r?.configured);
+      } catch {
+        // A failed check shows the key as missing.
+        return false;
+      }
+    },
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+  const keyConfigured = keyStatus.data ?? null;
 
   const save = () => {
     setOverrides(programId, { rayaAgentId: agentId, sheetCsvUrl: sheetUrl });
@@ -333,6 +345,13 @@ function ReferenceSettings() {
   );
 }
 
+/** Tab the staging export writes to unless the user picks another. */
+const DEFAULT_STAGING_TAB = "Sheet1";
+
+function stagingSheetUrl(target: { sheet_id?: string | null } | null | undefined): string {
+  return target?.sheet_id ? `https://docs.google.com/spreadsheets/d/${target.sheet_id}/edit` : "";
+}
+
 function ExportStagingPanel({ program }: { program: "seekers" | "providers" }) {
   const getFn = useServerFn(getExportTarget);
   const setFn = useServerFn(setExportTarget);
@@ -344,23 +363,18 @@ function ExportStagingPanel({ program }: { program: "seekers" | "providers" }) {
   });
   const target = query.data;
 
-  const [sheetUrl, setSheetUrl] = useState("");
-  const [tabName, setTabName] = useState("Sheet1");
-  const [label, setLabel] = useState("");
+  const [sheetUrl, setSheetUrl] = useState(() => stagingSheetUrl(target));
+  const [tabName, setTabName] = useState(DEFAULT_STAGING_TAB);
+  const [label, setLabel] = useState(target?.label ?? "");
 
-  useEffect(() => {
-    if (target) {
-      setSheetUrl(
-        target.sheet_id ? `https://docs.google.com/spreadsheets/d/${target.sheet_id}/edit` : "",
-      );
-      setTabName("Sheet1");
-      setLabel(target.label ?? "");
-    } else {
-      setSheetUrl("");
-      setTabName("Sheet1");
-      setLabel("");
-    }
-  }, [target]);
+  // Reset the form to the saved target whenever a new one loads, during render.
+  const [formTarget, setFormTarget] = useState(target);
+  if (formTarget !== target) {
+    setFormTarget(target);
+    setSheetUrl(stagingSheetUrl(target));
+    setTabName(DEFAULT_STAGING_TAB);
+    setLabel(target?.label ?? "");
+  }
 
   const save = useMutation({
     mutationFn: () =>
