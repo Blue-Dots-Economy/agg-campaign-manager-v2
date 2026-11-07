@@ -44,12 +44,16 @@ type Fn =
   | "get_campaign_drop_causes"
   | "get_dkb_campaign_causes";
 
+/** The one row a report function query returns; `r` is the function's JSON result. */
+const reportRow = z.object({ r: z.unknown() });
+
 // fn is one of the literals above.
 async function call(fn: Fn, args: SQL[]): Promise<unknown> {
-  const { rows } = await getDb().execute<{ r: unknown }>(
+  const { rows } = await getDb().execute(
     sql`select public.${sql.raw(fn)}(${sql.join(args, sql`, `)}) as r`,
   );
-  return rows[0]?.r ?? null;
+  const first = rows[0];
+  return first === undefined ? null : (reportRow.parse(first).r ?? null);
 }
 
 const scopedArgs = (p: z.output<typeof kkbFilters>) => [
