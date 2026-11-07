@@ -148,7 +148,7 @@ export function findCall<T extends Record<string, string>>(
   );
 }
 
-/** Trimmed id, or null when blank or missing. */
+/** The id, or null when blank or missing. */
 export function nonBlankId(v: string | undefined): string | null {
   return v && String(v).trim() ? String(v) : null;
 }
