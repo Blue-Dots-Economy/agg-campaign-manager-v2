@@ -34,6 +34,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { playSwoosh } from "@/lib/sfx";
+import { normaliseSpeaker, normaliseTranscript } from "@/lib/review/transcript";
 
 export const Route = createFileRoute("/review_/$callId")({
   validateSearch: (s: Record<string, unknown>) => ({
@@ -43,7 +44,6 @@ export const Route = createFileRoute("/review_/$callId")({
 });
 
 type TurnFlag = { turn: number; note: string };
-type Turn = { speaker: string; content: string; no_audio?: boolean };
 
 const ISSUE_OPTIONS = [
   { id: "Latency Issue", color: "bg-red-500", desc: "Bot paused too long between responses" },
@@ -78,39 +78,6 @@ const ISSUE_OPTIONS = [
   { id: "Weak Introduction", color: "bg-violet-500", desc: "Introduction needs to be better" },
   { id: "No Issues", color: "bg-emerald-500", desc: "Everything looked correct" },
 ];
-
-function normaliseTranscript(raw: unknown): Turn[] {
-  if (!raw) return [];
-  if (typeof raw === "string") {
-    const s = raw.trim();
-    if (s.startsWith("[")) {
-      try {
-        return normaliseTranscript(JSON.parse(s));
-      } catch {
-        return [];
-      }
-    }
-    const turns: Turn[] = [];
-    for (const line of s.split(/\r?\n/)) {
-      const m = line.match(/^\s*(Bot|Employer|Assistant|User|Speaker\s*\d+)\s*[:\-]\s*(.*)$/i);
-      if (m) turns.push({ speaker: m[1], content: m[2] });
-      else if (line.trim() && turns.length) turns[turns.length - 1].content += " " + line.trim();
-    }
-    return turns;
-  }
-  if (!Array.isArray(raw)) return [];
-  return (raw as Record<string, unknown>[]).map((t) => ({
-    speaker: String(t.speaker ?? t.role ?? ""),
-    content: String(t.content ?? t.text ?? t.message ?? ""),
-    no_audio: t.no_audio === true || /no audio/i.test(String(t.content ?? "")),
-  }));
-}
-function normaliseSpeaker(s: string): "Bot" | "Employer" {
-  const x = s.toLowerCase();
-  if (x.includes("bot") || x.includes("assistant") || x.includes("speaker 1") || x === "1")
-    return "Bot";
-  return "Employer";
-}
 
 const ENCOURAGERS = [
   "Nice work!",
