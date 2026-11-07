@@ -9,6 +9,7 @@ import { parseInput } from "@/server/validation";
 
 const emailInput = z.object({ email: z.string().max(320) });
 
+/** Lists reviewer emails. */
 export const listReviewers = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.dashboard)])
   .handler(async (): Promise<string[]> => {
@@ -23,6 +24,7 @@ export const listReviewers = createServerFn({ method: "GET" })
     }
   });
 
+/** Adds a reviewer email. */
 export const addReviewer = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator(parseInput(emailInput))
@@ -37,6 +39,7 @@ export const addReviewer = createServerFn({ method: "POST" })
     }
   });
 
+/** Removes a reviewer email. */
 export const removeReviewer = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator(parseInput(emailInput))

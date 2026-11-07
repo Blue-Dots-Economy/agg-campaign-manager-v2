@@ -50,6 +50,7 @@ async function resolveSheet(
   return { sheet_id: pick.sheet_id, tab_name: pick.tab_name ?? null };
 }
 
+/** Lists the calls of a program for the review page. */
 export const fetchReviewCalls = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.dashboard)])
   .inputValidator(parseInput(z.object({ dataset: programIdSchema })))
@@ -107,6 +108,7 @@ export const fetchReviewCalls = createServerFn({ method: "GET" })
     });
   });
 
+/** Returns the transcript and summary of one call from its sheet. */
 export const fetchCallDetail = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.campaigns)])
   .inputValidator(parseInput(z.object({ dataset: programIdSchema, callId: callIdText })))
@@ -124,6 +126,7 @@ export const fetchCallDetail = createServerFn({ method: "GET" })
     );
   });
 
+/** Lists which calls have been reviewed and by whom. */
 export const fetchReviewMap = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.dashboard)])
   .handler(async () => {
@@ -136,6 +139,7 @@ export const fetchReviewMap = createServerFn({ method: "GET" })
       .from(transcriptReviews);
   });
 
+/** Lists the call and job ids one reviewer has reviewed. */
 export const fetchReviewedCallIds = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator(
@@ -192,6 +196,7 @@ export const fetchAllReviewedCallIds = createServerFn({ method: "GET" })
     return Array.from(ids);
   });
 
+/** Lists the reviews of one call or job, newest first. */
 export const fetchExistingReviews = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.dashboard)])
   .inputValidator(
@@ -266,6 +271,7 @@ const FEEDBACK_COLUMNS = [
   "dataset",
 ];
 
+/** Stores the signed-in user's review of a call and appends it to the master sheet. */
 export const submitReview = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.campaigns)])
   .inputValidator(parseInput(z.object({ review: reviewInputSchema })))

@@ -44,6 +44,7 @@ export type LaunchedBatchRow = SqlNamedSelect<typeof launchedBatches>;
 
 const optText = z.string().max(500).optional();
 
+/** Stores the campaign metadata and input rows of a launched Raya batch. */
 export const recordLaunchedBatch = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.launch)])
   .inputValidator(
@@ -133,6 +134,7 @@ export const recordLaunchedBatch = createServerFn({ method: "POST" })
     return row;
   });
 
+/** Suggests the next campaign day label for a program. */
 export const getNextCampaignDay = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.launch)])
   .inputValidator(parseInput(z.object({ program: z.string().min(1).max(100) })))

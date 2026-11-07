@@ -18,6 +18,7 @@ export type { CampaignRequestInput } from "./campaign-request-input";
 
 type CampaignRequestPatch = Partial<SqlNamedInsert<typeof campaignRequests>>;
 
+/** Stores a campaign request for a JFC or admin to review. */
 export const submitCampaignRequest = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.requestCampaign)])
   .inputValidator(parseInput(z.object({ request: campaignRequestSchema })))
@@ -55,6 +56,7 @@ export const submitCampaignRequest = createServerFn({ method: "POST" })
     return { ok: true, id: ins?.id ?? null };
   });
 
+/** Lists campaign requests, newest first, optionally by status and program. */
 export const listCampaignRequests = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.launch)])
   .inputValidator(parseInput(campaignRequestListSchema))
@@ -71,6 +73,7 @@ export const listCampaignRequests = createServerFn({ method: "GET" })
       .orderBy(desc(campaignRequests.createdAt));
   });
 
+/** Changes the editable fields of a pending campaign request. */
 export const updateCampaignRequest = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.launch)])
   .inputValidator(
@@ -85,6 +88,7 @@ export const updateCampaignRequest = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/** Approves or declines a campaign request and records the reviewer. */
 export const setCampaignRequestStatus = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.launch)])
   .inputValidator(parseInput(campaignRequestStatusSchema))

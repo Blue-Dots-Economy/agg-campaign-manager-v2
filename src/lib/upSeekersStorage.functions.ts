@@ -12,6 +12,7 @@ const UPLOAD_ROW_ID = 1;
 
 const dashboard = requireRole(FN_ROLES.dashboard);
 
+/** Returns the stored UP seekers CSV, or null when none is stored. */
 export const fetchStoredCsv = createServerFn({ method: "GET" })
   .middleware([dashboard])
   .handler(
@@ -45,6 +46,7 @@ const csvInput = z.object({
   rows: z.number().int().min(0).max(MAX_CONTACTS_PER_BATCH),
 });
 
+/** Replaces the stored UP seekers CSV. */
 export const uploadStoredCsv = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.editors)])
   .inputValidator(parseInput(csvInput))
@@ -67,6 +69,7 @@ export const uploadStoredCsv = createServerFn({ method: "POST" })
     }
   });
 
+/** Deletes the stored UP seekers CSV. */
 export const clearStoredCsv = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.editors)])
   .handler(async (): Promise<{ ok: boolean }> => {

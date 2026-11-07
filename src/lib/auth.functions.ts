@@ -23,6 +23,7 @@ async function db() {
   return { db: getDb(), appUsers: schema.appUsers, ...orm };
 }
 
+/** The signed-in user, as the browser sees it. */
 export interface MeResult {
   email: string;
   name: string | null;
@@ -75,6 +76,7 @@ async function refuseLogin(): Promise<never> {
   throw new Error(GENERIC_LOGIN_ERROR);
 }
 
+/** Ends the session. */
 export const logout = createServerFn({ method: "POST" })
   .middleware([sessionMiddleware])
   .handler(async () => {
@@ -83,6 +85,7 @@ export const logout = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/** Returns the signed-in user. */
 export const me = createServerFn({ method: "GET" })
   .middleware([sessionMiddleware])
   .handler(async ({ context }): Promise<MeResult> => {
@@ -90,6 +93,7 @@ export const me = createServerFn({ method: "GET" })
     return rest;
   });
 
+/** Changes the signed-in user's password after checking the current one. */
 export const changePassword = createServerFn({ method: "POST" })
   .middleware([sessionMiddleware])
   .inputValidator(
@@ -119,6 +123,7 @@ export const changePassword = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/** A user as the settings page lists it. */
 export interface AppUser {
   email: string;
   name: string | null;
@@ -144,6 +149,7 @@ const profile = z.object({
   node_name: optText,
 });
 
+/** Lists every user for the settings page. */
 export const listAppUsers = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.admin)])
   .handler(async (): Promise<AppUser[]> => {
@@ -167,6 +173,7 @@ export const listAppUsers = createServerFn({ method: "GET" })
     }));
   });
 
+/** Creates a user and returns a one-time temporary password. */
 export const createAppUser = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator(parseInput(profile))
@@ -203,6 +210,7 @@ async function activeAdminCount(): Promise<number> {
   return r?.n ?? 0;
 }
 
+/** Updates a user's profile and role; refuses to demote the last active admin. */
 export const updateAppUser = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator(parseInput(profile))
@@ -233,6 +241,7 @@ export const updateAppUser = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/** Gives a user a new temporary password and unlocks the account. */
 export const resetAppUserPassword = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator(parseInput(z.object({ email })))
@@ -255,6 +264,7 @@ export const resetAppUserPassword = createServerFn({ method: "POST" })
     return { temporaryPassword };
   });
 
+/** Activates or deactivates a user; refuses to deactivate yourself or the last active admin. */
 export const setAppUserActive = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator(parseInput(z.object({ email, active: z.boolean() })))

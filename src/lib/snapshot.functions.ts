@@ -69,6 +69,7 @@ async function callStats(program: string): Promise<{ calls: number; lastCallAt: 
   return { calls: row?.calls ?? 0, lastCallAt: row?.lastCallAt ?? null };
 }
 
+/** Result of one program sync. */
 export interface SyncResult {
   ok: boolean;
   program: ProgramId;
@@ -79,7 +80,7 @@ export interface SyncResult {
   skipped?: boolean;
 }
 
-// call_rows is a view filled by the pipeline: nothing to sync from Sheets.
+/** call_rows is a view filled by the pipeline: nothing to sync from Sheets. */
 export async function performSync(program: ProgramId): Promise<SyncResult> {
   return {
     ok: false,
@@ -98,11 +99,13 @@ export async function performSync(program: ProgramId): Promise<SyncResult> {
   };
 }
 
+/** Runs the program sync from the dashboard. */
 export const syncProgramSnapshot = createServerFn({ method: "POST" })
   .middleware([dashboard])
   .inputValidator(parseInput(z.object({ program: programIdSchema, force: z.boolean().optional() })))
   .handler(async ({ data }) => performSync(data.program));
 
+/** Returns the dashboard payload for a program under the given filters. */
 export const fetchProgramAggregates = createServerFn({ method: "GET" })
   .middleware([dashboard])
   .inputValidator(parseInput(funnelArgsSchema))
@@ -131,6 +134,7 @@ export const fetchProgramAggregates = createServerFn({ method: "GET" })
     }
   });
 
+/** Returns the stored call data of one campaign day. */
 export const fetchCampaignDayRowsFn = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator(parseInput(z.object({ program: programIdSchema, day: z.string().max(40) })))
@@ -148,6 +152,7 @@ export const fetchCampaignDayRowsFn = createServerFn({ method: "GET" })
     return { rows: out.map((r) => r.data) };
   });
 
+/** Returns the KKB drop-analysis matrix. */
 export const fetchKkbDropAnalysis = createServerFn({ method: "GET" })
   .middleware([dashboard])
   .inputValidator(parseInput(dropFiltersSchema))
@@ -159,6 +164,7 @@ export const fetchKkbDropAnalysis = createServerFn({ method: "GET" })
     }
   });
 
+/** Returns the DKB drop-analysis matrix. */
 export const fetchDkbDropAnalysis = createServerFn({ method: "GET" })
   .middleware([dashboard])
   .inputValidator(parseInput(dropFiltersSchema))
@@ -170,6 +176,7 @@ export const fetchDkbDropAnalysis = createServerFn({ method: "GET" })
     }
   });
 
+/** Lists the campaigns of a program with their call counts. */
 export const fetchCampaignList = createServerFn({ method: "GET" })
   .middleware([dashboard])
   .inputValidator(parseInput(campaignListSchema))
@@ -190,6 +197,7 @@ export const fetchCampaignList = createServerFn({ method: "GET" })
     }
   });
 
+/** Returns why calls in one campaign dropped, compared with its region. */
 export const fetchCampaignDropCauses = createServerFn({ method: "GET" })
   .middleware([dashboard])
   .inputValidator(parseInput(campaignArgsSchema))
@@ -203,6 +211,7 @@ export const fetchCampaignDropCauses = createServerFn({ method: "GET" })
     }
   });
 
+/** Returns the phase share of one DKB campaign, compared with its region. */
 export const fetchDkbCampaignCauses = createServerFn({ method: "GET" })
   .middleware([dashboard])
   .inputValidator(parseInput(campaignArgsSchema))
@@ -216,6 +225,7 @@ export const fetchDkbCampaignCauses = createServerFn({ method: "GET" })
     }
   });
 
+/** Lists the call ids that reached one funnel stage. */
 export const fetchFunnelCallIds = createServerFn({ method: "GET" })
   .middleware([dashboard])
   .inputValidator(parseInput(funnelArgsSchema.extend({ stage: z.string().max(200) })))
@@ -229,6 +239,7 @@ export const fetchFunnelCallIds = createServerFn({ method: "GET" })
     }
   });
 
+/** Returns the time spent per funnel stage. */
 export const fetchFunnelDurations = createServerFn({ method: "GET" })
   .middleware([dashboard])
   .inputValidator(parseInput(funnelArgsSchema))
@@ -252,6 +263,7 @@ export const fetchKkbCallOutcomes = createServerFn({ method: "GET" })
     }
   });
 
+/** Returns the values for the dashboard filter menus. */
 export const fetchProgramFilterOptions = createServerFn({ method: "GET" })
   .middleware([dashboard])
   .inputValidator(parseInput(z.object({ program: programIdSchema })))

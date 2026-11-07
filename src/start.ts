@@ -23,6 +23,7 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
   }
 });
 
+/** TanStack Start instance; its request middleware shows the error page on a crash. */
 export const startInstance = createStart(() => ({
   requestMiddleware: [errorMiddleware],
 }));

@@ -17,6 +17,7 @@ export interface NorthStarConfigRow {
   sort: number;
 }
 
+/** Returns a program's North Star metric settings, in display order. */
 export const fetchNorthStar = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.dashboard)])
   .inputValidator(parseInput(z.object({ program: programText })))
@@ -43,6 +44,7 @@ export const fetchNorthStar = createServerFn({ method: "GET" })
     }
   });
 
+/** Stores the threshold of one North Star metric. */
 export const saveNorthStar = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.editors)])
   .inputValidator(

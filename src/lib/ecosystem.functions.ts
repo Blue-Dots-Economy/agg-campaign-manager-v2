@@ -4,6 +4,7 @@ import { requireRole } from "@/auth/middleware";
 import { FN_ROLES } from "@/auth/roles";
 import { parseInput } from "@/server/validation";
 
+/** Loads ecosystem data for one state and district. */
 export const fetchEcosystemData = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator(

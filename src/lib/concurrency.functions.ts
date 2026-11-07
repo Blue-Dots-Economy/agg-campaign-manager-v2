@@ -73,6 +73,7 @@ function pickConcurrency(item: Record<string, unknown>): number {
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
+/** Sums the concurrency of every active Raya batch against the account cap. */
 export const getConcurrencyUsage = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.dashboard)])
   .inputValidator(parseInput(z.object({ cap: z.number().optional() }).optional()))

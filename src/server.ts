@@ -51,6 +51,7 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   });
 }
 
+/** Server entry: wraps the TanStack Start handler and shows the error page on a crash. */
 export default {
   async fetch(request: Request, opts?: FetchOptions) {
     try {

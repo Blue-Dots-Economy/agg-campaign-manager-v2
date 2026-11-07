@@ -63,11 +63,13 @@ async function rayaGetAgent(
 const agentIdSchema = z.string().trim().min(1, "agentId required").max(200);
 const rowIdSchema = z.object({ id: z.string().uuid() });
 
+/** Looks up a Raya agent by id, to preview its name before saving. */
 export const loadAgent = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator(parseInput(z.object({ agentId: agentIdSchema })))
   .handler(async ({ data }) => rayaGetAgent(data.agentId));
 
+/** Lists the registered agents, optionally for one program. */
 export const listProgramAgents = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.requestCampaign)])
   .inputValidator(parseInput(z.object({ program: programIdSchema.optional() })))
@@ -79,6 +81,7 @@ export const listProgramAgents = createServerFn({ method: "GET" })
       .orderBy(asc(programAgents.createdAt));
   });
 
+/** Registers or updates an agent for a program and records whether Raya knows it. */
 export const createProgramAgent = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator(
@@ -113,6 +116,7 @@ export const createProgramAgent = createServerFn({ method: "POST" })
     return { ok: fetched.ok, row: saved, error: fetched.ok ? null : fetched.error };
   });
 
+/** Checks a registered agent against Raya again and stores the result. */
 export const refreshProgramAgent = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator(parseInput(rowIdSchema))
@@ -134,6 +138,7 @@ export const refreshProgramAgent = createServerFn({ method: "POST" })
     return { ok: fetched.ok, row: saved, error: fetched.ok ? null : fetched.error };
   });
 
+/** Removes a registered agent. */
 export const deleteProgramAgent = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
   .inputValidator(parseInput(rowIdSchema))
