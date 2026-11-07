@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   isNotDialled,
+  previousRate,
   previousValue,
   safeDiv,
   series,
@@ -51,5 +52,17 @@ describe("call outcomes", () => {
       skipped: [{ outcome: "Pending", n: 5 }],
     });
     expect(splitOutcomes([])).toEqual({ total: 0, dialled: [], skipped: [] });
+  });
+});
+
+describe("previousRate", () => {
+  test("is the percentage when both values are reported and the base is positive", () => {
+    expect(previousRate({ a: 1, b: 4 }, "a", "b")).toBe(25);
+  });
+
+  test("is null when a value is missing, the base is 0, or there is no previous period", () => {
+    expect(previousRate<{ a?: number; b?: number }>({ b: 4 }, "a", "b")).toBeNull();
+    expect(previousRate({ a: 1, b: 0 }, "a", "b")).toBeNull();
+    expect(previousRate<{ a: number; b: number }>(undefined, "a", "b")).toBeNull();
   });
 });

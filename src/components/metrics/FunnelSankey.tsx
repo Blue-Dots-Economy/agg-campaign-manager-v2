@@ -7,7 +7,7 @@ import {
   type SankeyNode,
 } from "d3-sankey";
 import { dropValue, type DropRow } from "./drop-rows";
-import type { KkbMetrics } from "./program-overviews";
+import type { KkbMetrics } from "./overview-metrics";
 import { reasonColor } from "./reasonColors";
 
 const SINK_GREY = "var(--muted-foreground)";

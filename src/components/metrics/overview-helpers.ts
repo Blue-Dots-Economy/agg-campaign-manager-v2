@@ -15,6 +15,17 @@ export function previousValue<T extends object>(prev: T | undefined, key: keyof 
   return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
 
+/** Previous-period percentage `num / den`, or `null` when either is missing or the base is not positive. */
+export function previousRate<T extends object>(
+  prev: T | undefined,
+  num: keyof T,
+  den: keyof T,
+): number | null {
+  const n = previousValue(prev, num);
+  const d = previousValue(prev, den);
+  return n !== null && d !== null && d > 0 ? (n / d) * 100 : null;
+}
+
 /** Calls per outcome, as the call outcome breakdown shows them. */
 export interface CallOutcomeCount {
   outcome: string;

@@ -6,7 +6,7 @@ import {
   useCampaignList,
   type OverviewFilters,
 } from "@/programs/useProgramAggregates";
-import type { KkbMetrics } from "@/components/metrics/program-overviews";
+import type { KkbMetrics } from "@/components/metrics/overview-metrics";
 import { humanizeCampaignType } from "@/lib/campaign-name";
 import { numericMetrics } from "@/components/metrics/metric-values";
 
@@ -19,7 +19,7 @@ interface Props {
 }
 
 /** KkbMetrics fields as numbers; any of them can be missing from a snapshot. */
-type KkbMetricsValues = Partial<Omit<KkbMetrics, "hasInterviewData">>;
+type KkbMetricsValues = Partial<KkbMetrics>;
 
 /** Application attempts a campaign needs before its applications count as significant. */
 const MIN_SIGNIFICANT_APPLICATIONS = 10;

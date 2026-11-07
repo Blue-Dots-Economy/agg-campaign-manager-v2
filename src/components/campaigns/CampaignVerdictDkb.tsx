@@ -3,7 +3,7 @@ import { CheckCircle2, AlertTriangle } from "lucide-react";
 import { useProgram } from "@/programs/context";
 import { useProgramAggregates, type OverviewFilters } from "@/programs/useProgramAggregates";
 import { useDkbCampaignInsights } from "@/programs/useDkbCampaignInsights";
-import type { DkbMetrics } from "@/components/metrics/program-overviews";
+import type { DkbMetrics } from "@/components/metrics/overview-metrics";
 import { numericMetrics, type MetricValues } from "@/components/metrics/metric-values";
 
 type Metrics = Partial<Omit<DkbMetrics, "providerFunnel">> & MetricValues;
