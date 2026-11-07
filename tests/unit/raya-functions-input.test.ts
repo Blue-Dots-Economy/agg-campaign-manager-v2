@@ -11,6 +11,7 @@ import {
   StopBatchInput,
   UpdateBatchInput,
   ValidateContactsInput,
+  validationErrorList,
 } from "../../src/lib/raya.functions";
 import { MAX_CONTACTS_PER_BATCH } from "../../src/lib/input-schemas";
 
@@ -156,5 +157,18 @@ describe("CreateBatchReply", () => {
   test("keeps validation details", () => {
     const r = CreateBatchReply.parse({ status: "error", invalidRows: 2, errors: [{ row: 2 }] });
     expect(r).toMatchObject({ status: "error", invalidRows: 2, errors: [{ row: 2 }] });
+  });
+});
+
+describe("validationErrorList", () => {
+  test("keeps the entries that are objects and skips the rest", () => {
+    expect(validationErrorList([{ row: 2, field: "phone" }, "oops", null, { row: 3 }])).toEqual([
+      { row: 2, field: "phone" },
+      { row: 3 },
+    ]);
+  });
+  test("returns [] when there is no list", () => {
+    expect(validationErrorList(undefined)).toEqual([]);
+    expect(validationErrorList({ row: 1 })).toEqual([]);
   });
 });

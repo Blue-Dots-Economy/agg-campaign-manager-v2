@@ -6,7 +6,7 @@ import { requireRole } from "@/auth/middleware";
 import { FN_ROLES } from "@/auth/roles";
 import { parseInput } from "@/server/validation";
 import { MAX_CONTACTS_PER_BATCH } from "@/lib/input-schemas";
-import { JsonObjectSchema, JsonValueSchema } from "@/lib/json";
+import { JsonObjectSchema, JsonValueSchema, type JsonObject } from "@/lib/json";
 import { DEFAULT_COUNTRY_CODE, validateContactRows } from "./contact-validation";
 import { delay, rayaFetch, RayaApiError } from "./raya-api.server";
 
@@ -86,11 +86,16 @@ export const CreateBatchReply = z.object({
 });
 type CreateBatchReply = z.infer<typeof CreateBatchReply>;
 
-/** Raya's row-level validation errors, passed to the page. */
-const ValidationErrors = z.array(JsonObjectSchema);
+/** Returns Raya's row-level validation errors for the page; entries that are not objects are skipped. */
+export function validationErrorList(errors: unknown): JsonObject[] {
+  if (!Array.isArray(errors)) return [];
+  return errors.flatMap((entry: unknown) => {
+    const parsed = JsonObjectSchema.safeParse(entry);
+    return parsed.success ? [parsed.data] : [];
+  });
+}
 
 function validationResult(r: CreateBatchReply) {
-  const errors = ValidationErrors.safeParse(r.errors);
   return {
     ok: false as const,
     batchId: null,
@@ -99,7 +104,7 @@ function validationResult(r: CreateBatchReply) {
       totalRows: r.totalRows ?? undefined,
       validRows: r.validRows ?? undefined,
       invalidRows: r.invalidRows ?? undefined,
-      errors: errors.success ? errors.data : [],
+      errors: validationErrorList(r.errors),
     },
   };
 }
