@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -50,7 +50,7 @@ import { registry, type ProgramId } from "@/programs/registry";
 
 function extractSheetId(input: string): string {
   const m = input.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
-  return m ? m[1] : input.trim();
+  return m?.[1] ?? input.trim();
 }
 function maskId(id: string) {
   if (id.length <= 12) return id;
@@ -121,20 +121,20 @@ function ProgramConnections({ program }: { program: ProgramId }) {
     qc.invalidateQueries({ queryKey: ["program-rows", program] });
   };
 
-  useEffect(() => {
-    let cancelled = false;
-    revalidateFn({ data: { program } })
-      .then((res) => {
-        if (!cancelled && res.checked > 0) invalidate();
-      })
-      .catch(() => {
-        /* surfaced per-row */
-      });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [program]);
+  // Re-checks every connection of the program once per visit and refreshes the list when any were checked.
+  useQuery({
+    queryKey: ["connections-revalidate", program],
+    queryFn: async () => {
+      const res = await revalidateFn({ data: { program } });
+      if (res.checked > 0) invalidate();
+      return res;
+    },
+    staleTime: 0,
+    gcTime: 0,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
 
   const toggle = useMutation({
     mutationFn: (vars: { id: string; enabled: boolean }) => updateFn({ data: vars }),
@@ -283,42 +283,32 @@ function TabPicker({
   disabled?: boolean;
 }) {
   const listTabsFn = useServerFn(listSheetTabsFn);
-  const [tabs, setTabs] = useState<string[] | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
   const [manual, setManual] = useState(false);
 
-  useEffect(() => {
-    if (!sheetId) {
-      setTabs(null);
-      setErr(null);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    setErr(null);
-    listTabsFn({ data: { sheet_id: sheetId } })
-      .then((res) => {
-        if (cancelled) return;
-        if (res.ok) {
-          setTabs(res.tabs);
-          if (!value && res.tabs.length > 0) onChange(res.tabs[0]);
-        } else {
-          setTabs([]);
-          setErr(res.error);
-        }
-      })
-      .catch((e) => {
-        if (!cancelled) setErr(e instanceof Error ? e.message : String(e));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sheetId]);
+  const tabsQuery = useQuery({
+    queryKey: ["sheet-tabs", sheetId],
+    queryFn: async () => {
+      const res = await listTabsFn({ data: { sheet_id: sheetId } });
+      // Pick the first tab when none is chosen yet, as soon as the list arrives.
+      const firstTab = res.ok ? res.tabs[0] : undefined;
+      if (!value && firstTab) onChange(firstTab);
+      return res;
+    },
+    enabled: Boolean(sheetId),
+    staleTime: 0,
+    gcTime: 0,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+  const result = tabsQuery.data;
+  const tabs = result ? (result.ok ? result.tabs : []) : null;
+  const err = tabsQuery.error
+    ? tabsQuery.error.message
+    : result && !result.ok
+      ? result.error
+      : null;
+  const loading = tabsQuery.isFetching;
 
   if (!sheetId) {
     return (
@@ -507,12 +497,13 @@ function EditConnectionDialog({
   const updateFn = useServerFn(updateConnection);
   const testFn = useServerFn(testConnection);
 
-  useEffect(() => {
-    if (open) {
+  const onOpenChange = (next: boolean) => {
+    if (next) {
       setName(connection.name);
       setTab(connection.tab_name ?? "");
     }
-  }, [open, connection]);
+    setOpen(next);
+  };
 
   const onSave = async () => {
     setSaving(true);
@@ -533,9 +524,9 @@ function EditConnectionDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm">
+        <Button variant="ghost" size="sm" aria-label="Edit connection">
           <Pencil className="h-4 w-4" />
         </Button>
       </DialogTrigger>
