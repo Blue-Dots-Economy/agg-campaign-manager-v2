@@ -10,7 +10,7 @@ export function isRole(v: unknown): v is Role {
   return ROLES.some((r) => r === v);
 }
 
-// Route prefixes each role may open. "*" = everything.
+/** Route prefixes each role may open. "*" means every page. */
 export const ROLE_ROUTES: Record<Role, string[]> = {
   admin: ["*"],
   jfc: [
@@ -47,7 +47,7 @@ export function landingFor(role: Role | undefined): string {
   return role ? (DEFAULT_LANDING[role] ?? "/user-level-analysis") : "/login";
 }
 
-// "/" must match exactly (it's Campaign Overview), everything else is a prefix match.
+/** True when the role may open the page. "/" (Campaign Overview) matches exactly; other routes match by prefix. */
 export function canAccess(role: Role | undefined, pathname: string): boolean {
   if (!role) return false;
   if (ACCOUNT_ROUTES.includes(pathname)) return true;
@@ -58,7 +58,7 @@ export function canAccess(role: Role | undefined, pathname: string): boolean {
   );
 }
 
-// May change shared data: the UP seekers CSV and North Star targets.
+/** Roles that may change shared data: the UP seekers CSV and North Star targets. */
 export const EDITOR_ROLES: Role[] = ["admin", "jfc"];
 
 /** True when the role may change shared data. */
