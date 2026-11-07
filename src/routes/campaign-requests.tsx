@@ -21,6 +21,12 @@ import {
 import { rayaCreateBatch, rayaStartBatch } from "@/lib/raya.functions";
 import { recordLaunchedBatch } from "@/lib/launched-batches.functions";
 import { cn } from "@/lib/utils";
+import {
+  batchContacts,
+  cohortFiltersLine,
+  scheduleFromJson,
+  selectedStatusesFromJson,
+} from "@/lib/campaign-request-fields";
 
 export const Route = createFileRoute("/campaign-requests")({
   head: () => ({
@@ -42,36 +48,8 @@ export const Route = createFileRoute("/campaign-requests")({
   component: CampaignRequestsPage,
 });
 
-type RequestRow = {
-  id: string;
-  program: string;
-  agent_id: string;
-  agent_name: string | null;
-  batch_name: string;
-  campaign_day: string | null;
-  campaign_date: string | null;
-  campaign_type: string | null;
-  region: string | null;
-  language: string | null;
-  city_campaign: string | null;
-  channel: string | null;
-  source: string | null;
-  cohort_intent: string | null;
-  cohort_filters: Record<string, unknown> | null;
-  contacts: Array<Record<string, unknown>>;
-  contact_count: number;
-  schedule: { timezone?: string; start_time?: string; end_time?: string; days?: number[] } | null;
-  concurrency: number | null;
-  max_retries: number | null;
-  retry_after_hrs: number | null;
-  selected_statuses: string[] | null;
-  requested_by: string | null;
-  status: string;
-  reviewer_email: string | null;
-  decline_reason: string | null;
-  batch_id: string | null;
-  created_at: string;
-};
+/** A campaign request row as the list server function returns it. */
+type RequestRow = Awaited<ReturnType<typeof listCampaignRequests>>[number];
 
 const FILTERS = ["pending", "approved", "declined", "all"] as const;
 type Filter = (typeof FILTERS)[number];
@@ -94,27 +72,9 @@ function statusBadgeClass(status: string) {
   return "bg-muted text-muted-foreground border-border";
 }
 
-function toScheduleState(s: RequestRow["schedule"]): ScheduleState {
-  return {
-    timezone: s?.timezone || "Asia/Kolkata",
-    startTime: s?.start_time || "09:00",
-    endTime: s?.end_time || "18:00",
-    days: Array.isArray(s?.days) && s!.days!.length ? s!.days! : [1, 2, 3, 4, 5],
-  };
-}
-
 function sourceLine(r: RequestRow) {
   if (r.source === "upload") return "Bulk upload";
   return `Cohort · ${r.cohort_intent === "drive" ? "Drive Applications" : "Fill Missing Information"}`;
-}
-
-function filtersLine(r: RequestRow): string | null {
-  const f = r.cohort_filters as { profileStatuses?: string[]; confidenceBand?: string } | null;
-  if (!f) return null;
-  if (Array.isArray(f.profileStatuses) && f.profileStatuses.length)
-    return f.profileStatuses.join(", ");
-  if (f.confidenceBand) return `Confidence: ${f.confidenceBand}`;
-  return null;
 }
 
 function CampaignRequestsPage() {
@@ -123,8 +83,7 @@ function CampaignRequestsPage() {
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["campaign-requests", filter],
-    queryFn: () =>
-      listFn({ data: filter === "all" ? {} : { status: filter } }) as Promise<RequestRow[]>,
+    queryFn: () => listFn({ data: filter === "all" ? {} : { status: filter } }),
   });
 
   const rows = data ?? [];
@@ -182,11 +141,13 @@ function CampaignRequestsPage() {
 
 function RequestCard({ req, onChanged }: { req: RequestRow; onChanged: () => void }) {
   const [open, setOpen] = useState(false);
-  const [schedule, setSchedule] = useState<ScheduleState>(() => toScheduleState(req.schedule));
+  const [schedule, setSchedule] = useState<ScheduleState>(() => scheduleFromJson(req.schedule));
   const [concurrency, setConcurrency] = useState<number>(req.concurrency ?? 5);
   const [maxRetries, setMaxRetries] = useState<number>(req.max_retries ?? 1);
   const [retryAfterHrs, setRetryAfterHrs] = useState<number>(req.retry_after_hrs ?? 4);
-  const [statuses, setStatuses] = useState<string[]>(req.selected_statuses ?? ["Pending"]);
+  const [statuses, setStatuses] = useState<string[]>(() =>
+    selectedStatusesFromJson(req.selected_statuses),
+  );
   const [busy, setBusy] = useState(false);
   const [declining, setDeclining] = useState(false);
   const [reason, setReason] = useState("");
@@ -285,16 +246,21 @@ function RequestCard({ req, onChanged }: { req: RequestRow; onChanged: () => voi
       toast.error(msg);
       return;
     }
+    const contacts = batchContacts(req.contacts);
+    if (!contacts) {
+      const msg = "This request's contacts are not in the expected format.";
+      setError(msg);
+      toast.error(msg);
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
       await persist();
 
-      const created = (await createBatchFn({
-        data: { agentId: req.agent_id, batchName: req.batch_name, contacts: req.contacts as any },
-      })) as
-        | { ok: true; batchId: string }
-        | { ok: false; batchId: null; validation: { message: string } };
+      const created = await createBatchFn({
+        data: { agentId: req.agent_id, batchName: req.batch_name, contacts },
+      });
 
       if (!created.ok) {
         const msg = created.validation?.message ?? "Batch creation failed";
@@ -320,7 +286,7 @@ function RequestCard({ req, onChanged }: { req: RequestRow; onChanged: () => voi
             language: req.language ?? undefined,
             cityCampaign: req.city_campaign ?? undefined,
             region: req.region ?? undefined,
-            inputRows: req.contacts,
+            inputRows: contacts,
           },
         });
       } catch {
@@ -360,7 +326,7 @@ function RequestCard({ req, onChanged }: { req: RequestRow; onChanged: () => voi
   const toggleStatus = (s: string) =>
     setStatuses((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
 
-  const cf = filtersLine(req);
+  const cf = cohortFiltersLine(req.cohort_filters);
 
   return (
     <Panel>
