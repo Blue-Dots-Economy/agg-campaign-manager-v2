@@ -1,5 +1,5 @@
 // Seekers list from the uploaded UP seekers CSV, shared by the launch and request-campaign pages.
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { loadSeekersAsync, type Seeker } from "@/lib/upSeekersCsv";
 
 /** React Query key for the seekers list. Invalidate it after a new CSV upload. */
@@ -26,10 +26,4 @@ export function useSeekers(enabled = true) {
     enabled,
     staleTime: Infinity,
   });
-}
-
-/** Returns a function that makes every page read the seekers list again. */
-export function useInvalidateSeekers() {
-  const qc = useQueryClient();
-  return () => qc.invalidateQueries({ queryKey: SEEKERS_QUERY_KEY });
 }

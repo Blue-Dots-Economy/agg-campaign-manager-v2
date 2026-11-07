@@ -6,7 +6,7 @@ import {
   useCampaignList,
   type OverviewFilters,
 } from "@/programs/useProgramAggregates";
-import type { DkbMetrics } from "@/components/metrics/program-overviews";
+import type { DkbMetrics } from "@/components/metrics/overview-metrics";
 import { humanizeCampaignType } from "@/lib/campaign-name";
 import { numericMetrics } from "@/components/metrics/metric-values";
 

@@ -26,12 +26,7 @@ import {
 } from "@/programs/useProgramAggregates";
 import type { ProgramConfig } from "@/programs/registry";
 import { KpiCard } from "@/components/KpiCard";
-import {
-  KkbOverviewMetrics,
-  DkbOverviewMetrics,
-  type KkbMetrics,
-  type DkbMetrics,
-} from "@/components/metrics/program-overviews";
+import { KkbOverviewMetrics, DkbOverviewMetrics } from "@/components/metrics/program-overviews";
 import { Panel } from "@/components/Panel";
 import { NoDataState, LoadingState } from "@/components/EmptyState";
 import { DropAnalysisHeatmap } from "@/components/metrics/DropAnalysisHeatmap";
@@ -186,10 +181,8 @@ export function ProgramAnalytics({
       ? prevQuery.data?.aggregates?.kpis
       : undefined;
 
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- the snapshot metrics record holds the overview fields by name; the overview reads absent ones as missing
-  const overviewMetrics = metrics as unknown as KkbMetrics & DkbMetrics;
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- same record shape as overviewMetrics, for the comparison period
-  const overviewPrevious = prevMetrics as unknown as (KkbMetrics & DkbMetrics) | undefined;
+  const overviewMetrics = numericMetrics(metrics);
+  const overviewPrevious = prevMetrics ? numericMetrics(prevMetrics) : undefined;
   const comparisonLabel = comparison ? `vs ${comparison.label} avg` : undefined;
 
   const handleStageClick = async (stage: string, action: "copy" | "review") => {
@@ -285,6 +278,7 @@ export function ProgramAnalytics({
         isDkb ? (
           <DkbOverviewMetrics
             m={overviewMetrics}
+            providerFunnel={metrics.providerFunnel}
             previous={overviewPrevious}
             perDay={perDayRollup}
             comparisonLabel={comparisonLabel}

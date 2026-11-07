@@ -24,7 +24,6 @@ import { MetricCard } from "@/components/metrics/MetricCard";
 import { RegionSelector, type RegionValue } from "@/components/ecosystem/RegionSelector";
 import { OnboardingTab } from "@/components/ecosystem/OnboardingTab";
 import { Actions, GapNumber, LevelBadge } from "@/components/ecosystem/GapCells";
-import { fmtCount as fmt } from "@/components/ecosystem/ecosystemHelpers";
 import { ProviderDrilldown, SeekerDrilldown } from "@/components/ecosystem/GapDrilldowns";
 import { REGION_TREE } from "@/lib/ecosystem-config";
 import {
@@ -36,7 +35,7 @@ import {
   seekerGapRows,
   type GapLevelLabel,
 } from "@/lib/ecosystem-data";
-import { syncedAgo } from "@/components/ecosystem/ecosystemHelpers";
+import { fmtCount as fmt, syncedAgo } from "@/components/ecosystem/ecosystemHelpers";
 
 export const Route = createFileRoute("/ecosystem-view")({
   component: EcosystemView,

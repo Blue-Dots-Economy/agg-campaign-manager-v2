@@ -7,9 +7,16 @@ import {
   type VerticalFunnelStage,
   type FunnelColor,
 } from "@/components/metrics/VerticalFunnel";
+import {
+  dkbMetricsFrom,
+  kkbMetricsFrom,
+  type DkbProviderFunnelStage,
+} from "@/components/metrics/overview-metrics";
+import type { MetricValues } from "@/components/metrics/metric-values";
 import { CallOutcomeBreakdown } from "@/components/metrics/CallOutcomeBreakdown";
 import {
   isNotDialled,
+  previousRate,
   previousValue,
   safeDiv,
   series,
@@ -26,71 +33,8 @@ export interface DailyPoint {
   high_intent: number;
 }
 
-export interface KkbMetrics {
-  totalCalls: number;
-  answeredCalls: number;
-  unansweredCalls: number;
-  productiveCalls: number;
-  avgDuration: number;
-  engagedCalls: number;
-  jobsShownCalls: number;
-  highIntentCalls: number;
-  applicationsSubmitted: number;
-  applicationsBlocked: number;
-  applicationsTotal: number;
-  hasInterviewData: boolean;
-  interviewCount: number;
-  seekers: number;
-  answeredSeekers: number;
-  triedSeekers: number;
-  appliedSeekers: number;
-  failedSeekers: number;
-  didNotApply: number;
-  totalApplications: number;
-  engagedSeekers: number;
-  jobsShownSeekers: number;
-  highIntentSeekers: number;
-  applicationsSeekers: number;
-  profileCapturedCalls: number;
-  profileCapturedSeekers: number;
-  needsCapturedCalls: number;
-  needsCapturedSeekers: number;
-  providersFoundCalls: number;
-  providersFoundSeekers: number;
-  providersConnectedCalls: number;
-  providersConnectedSeekers: number;
-}
-
-export interface DkbProviderFunnelStage {
-  key: string;
-  label: string;
-  providers: number;
-  openings: number;
-  calls: number;
-}
-
-export interface DkbMetrics {
-  totalCalls: number;
-  answeredCalls: number;
-  unansweredCalls: number;
-  productiveCalls: number;
-  avgDuration: number;
-  totalOpenings: number;
-  activeOpenings: number;
-  closedOpenings: number;
-  unresolvedOpenings: number;
-  newOpenings: number;
-  companiesCalled: number;
-  jobsActive: number;
-  jobsClosed: number;
-  companiesUnresolved: number;
-  newJobsDiscussed: number;
-  newJobsPosted: number;
-  providerFunnel?: DkbProviderFunnelStage[];
-}
-
 export function KkbOverviewMetrics({
-  m,
+  m: values,
   previous,
   perDay,
   comparisonLabel,
@@ -98,24 +42,19 @@ export function KkbOverviewMetrics({
   stageDurations,
   callOutcomes,
 }: {
-  m: KkbMetrics;
-  previous?: KkbMetrics;
+  m: MetricValues;
+  previous?: MetricValues;
   perDay?: DailyPoint[];
   comparisonLabel?: string;
   onFunnelStageClick?: (key: string, action: "copy" | "review") => void;
   stageDurations?: Record<string, number>;
   callOutcomes?: CallOutcomeCount[];
 }) {
+  const m = kkbMetricsFrom(values);
   const appRate = m.answeredSeekers > 0 ? (m.appliedSeekers / m.answeredSeekers) * 100 : 0;
   const productivePct = m.totalCalls > 0 ? (m.productiveCalls / m.totalCalls) * 100 : 0;
-  const prevAppRate =
-    previous && previous.answeredSeekers > 0
-      ? (previous.appliedSeekers / previous.answeredSeekers) * 100
-      : null;
-  const prevProductivePct =
-    previous && previous.totalCalls > 0
-      ? (previous.productiveCalls / previous.totalCalls) * 100
-      : null;
+  const prevAppRate = previousRate(previous, "appliedSeekers", "answeredSeekers");
+  const prevProductivePct = previousRate(previous, "productiveCalls", "totalCalls");
 
   const [view, setView] = useState<"hybrid" | "calls" | "seekers">("hybrid");
   const callsByStage: Record<string, number> = {
@@ -305,27 +244,27 @@ export function KkbOverviewMetrics({
 }
 
 export function DkbOverviewMetrics({
-  m,
+  m: values,
+  providerFunnel,
   previous,
   perDay,
   comparisonLabel,
   onFunnelStageClick,
   stageDurations,
 }: {
-  m: DkbMetrics;
-  previous?: DkbMetrics;
+  m: MetricValues;
+  providerFunnel?: DkbProviderFunnelStage[];
+  previous?: MetricValues;
   perDay?: DailyPoint[];
   comparisonLabel?: string;
   onFunnelStageClick?: (key: string, action: "copy" | "review") => void;
   stageDurations?: Record<string, number>;
 }) {
+  const m = dkbMetricsFrom(values, providerFunnel);
   const pickupPct = m.totalCalls > 0 ? (m.answeredCalls / m.totalCalls) * 100 : 0;
   const productiveDenom = m.totalCalls;
   const productivePct = productiveDenom > 0 ? (m.productiveCalls / productiveDenom) * 100 : 0;
-  const prevProductivePct =
-    previous && previous.totalCalls > 0
-      ? (previous.productiveCalls / previous.totalCalls) * 100
-      : null;
+  const prevProductivePct = previousRate(previous, "productiveCalls", "totalCalls");
   const highIntentTotal = (perDay ?? []).reduce((sum, p) => sum + (p.high_intent ?? 0), 0);
   const prevHighIntent: number | null = null;
 

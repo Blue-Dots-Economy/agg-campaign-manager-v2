@@ -1,6 +1,7 @@
 // Pure helpers behind the program analytics view: comparison period, per-day rollup, intent buckets.
 import type { CampaignRollup } from "@/lib/snapshot.functions";
 import type { OverviewFilterValue } from "./OverviewFilters";
+import { MAX_INTENT_SCORE } from "@/programs/metrics";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -76,8 +77,6 @@ export function rollupPerDay(perDay: CampaignRollup[]): DayRollup[] {
 const LOW_INTENT_MAX = 4;
 /** Highest intent score in the "Medium" bucket. */
 const MEDIUM_INTENT_MAX = 7;
-/** Highest intent score counted at all. */
-const HIGH_INTENT_MAX = 10;
 
 /** Call counts in the low, medium and high intent bands; scores of 0 or below are left out. */
 export function intentBuckets(
@@ -91,7 +90,7 @@ export function intentBuckets(
     if (!Number.isFinite(s) || s <= 0) continue;
     if (s <= LOW_INTENT_MAX) low += r.count;
     else if (s <= MEDIUM_INTENT_MAX) medium += r.count;
-    else if (s <= HIGH_INTENT_MAX) high += r.count;
+    else if (s <= MAX_INTENT_SCORE) high += r.count;
   }
   return [
     { range: "Low (1–4)", count: low },
