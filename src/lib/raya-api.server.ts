@@ -1,3 +1,5 @@
+import { logEvent } from "@/server/log.server";
+
 const BASE_URL = "https://v1.getraya.app/api";
 
 export class RayaApiError extends Error {
@@ -87,15 +89,26 @@ export async function rayaFetch(
     const waitMs =
       retryAfterMs(res.headers.get("retry-after")) ??
       Math.min(12_000, baseDelayMs * 2 ** attempt) + Math.floor(Math.random() * 250);
-    console.warn(
-      `[raya] 429 on ${path}, retrying in ${waitMs}ms (attempt ${attempt + 1}/${maxAttempts})`,
-    );
+    logEvent("warn", {
+      operation: "raya.request",
+      status: "skipped",
+      path,
+      http_status: res.status,
+      retry_in_ms: waitMs,
+      attempt: attempt + 1,
+    });
     await delay(waitMs);
   }
 
   const parsed = parseBody(await res.text());
   if (!res.ok) {
-    console.error("[raya] non-OK response", { path, status: res.status, body: parsed });
+    logEvent("error", {
+      operation: "raya.request",
+      status: "failure",
+      path,
+      http_status: res.status,
+      error: `Raya API ${res.status}`,
+    });
     throw new RayaApiError(res.status, parsed, errorMessage(res.status, parsed));
   }
 
