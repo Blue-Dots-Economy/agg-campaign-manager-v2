@@ -185,6 +185,22 @@ describe("react", () => {
     ).toEqual([]);
   });
 
+  test("a route file may export Route next to its local components", async () => {
+    const code =
+      'import { createFileRoute } from "@tanstack/react-router";\nexport const Route = createFileRoute("/probe")({ component: Page });\nfunction Page() {\n  return <div />;\n}\n';
+    expect(
+      await severities(code, "src/routes/probe.tsx", "react-refresh/only-export-components"),
+    ).toEqual([]);
+  });
+
+  test("a component file that also exports a non-component is reported", async () => {
+    const code =
+      "export function makeThing() {\n  return 1;\n}\nfunction Page() {\n  return <div />;\n}\nexport default Page;\n";
+    expect(
+      await severities(code, "src/components/probe.tsx", "react-refresh/only-export-components"),
+    ).toEqual([WARN]);
+  });
+
   test("formatting is not an ESLint finding", async () => {
     const code = "export const x   =  1\n";
     expect(await severities(code, "src/lib/probe.ts", "prettier/prettier")).toEqual([]);

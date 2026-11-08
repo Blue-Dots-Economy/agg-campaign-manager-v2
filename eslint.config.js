@@ -97,6 +97,12 @@ export default tseslint.config(
     },
   },
   {
+    // Route files export only `Route`; TanStack's router plugin splits out their components and
+    // handles hot reload, so the react-refresh check does not apply.
+    files: ["src/routes/**/*.tsx"],
+    rules: { "react-refresh/only-export-components": "off" },
+  },
+  {
     files: TEST_FILES,
     rules: {
       "@typescript-eslint/consistent-type-assertions": "off",
