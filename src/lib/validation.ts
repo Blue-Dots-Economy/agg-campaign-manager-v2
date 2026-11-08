@@ -1,5 +1,7 @@
-// Input validation for server functions. Used only inside `.inputValidator(...)`, which the
-// client build strips; server-only code is still imported inside the failure path.
+// Input validation for server functions. Used only inside `.validator(...)`. It lives outside
+// src/server because .functions.ts files load in the client build; the server-only status setter
+// is wrapped in createServerOnlyFn so the client build drops it.
+import { createServerOnlyFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 /** First words of the message sent to the browser when input fails validation. */
@@ -34,7 +36,7 @@ export function createParseInput(setStatus: SetStatus) {
    * The message names each bad field with the schema's message; it never repeats rejected values.
    *
    * @param schema - Schema for the input; unknown keys are dropped (Zod's default `strip`).
-   * @returns A validator for `.inputValidator(...)` that resolves to the parsed input.
+   * @returns A validator for `.validator(...)` that resolves to the parsed input.
    * @throws {Error} From the validator, after setting HTTP status 400, when the input does not match.
    */
   return function parseInput<S extends z.ZodTypeAny>(
@@ -53,7 +55,9 @@ export function createParseInput(setStatus: SetStatus) {
 }
 
 /** Server-function input validator: parses with a Zod schema and answers 400 on bad input. */
-export const parseInput = createParseInput(async (status) => {
-  const { setResponseStatus } = await import("@tanstack/react-start/server");
-  setResponseStatus(status);
-});
+export const parseInput = createParseInput(
+  createServerOnlyFn(async (status: number) => {
+    const { setResponseStatus } = await import("@tanstack/react-start/server");
+    setResponseStatus(status);
+  }),
+);

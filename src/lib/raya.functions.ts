@@ -4,7 +4,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireRole } from "@/auth/middleware";
 import { FN_ROLES } from "@/auth/roles";
-import { parseInput } from "@/server/validation";
+import { parseInput } from "@/lib/validation";
 import { MAX_CONTACTS_PER_BATCH } from "@/lib/input-schemas";
 import { JsonObjectSchema, JsonValueSchema, type JsonObject } from "@/lib/json";
 import { DEFAULT_COUNTRY_CODE, validateContactRows } from "./contact-validation";
@@ -122,7 +122,7 @@ export const CreateBatchInput = z.object({
 /** Creates a Raya batch with the contacts; returns the batch id or Raya's row-level validation errors. */
 export const rayaCreateBatch = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.launch)])
-  .inputValidator(parseInput(CreateBatchInput))
+  .validator(parseInput(CreateBatchInput))
   .handler(async ({ data }) => {
     const body = {
       agent_id: data.agentId,
@@ -192,7 +192,7 @@ export const StartBatchInput = z.object({
 /** Starts a created batch with its schedule and retry settings. */
 export const rayaStartBatch = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.launch)])
-  .inputValidator(parseInput(StartBatchInput))
+  .validator(parseInput(StartBatchInput))
   .handler(async ({ data }) => {
     await delay(START_AFTER_CREATE_DELAY_MS);
     // Raya requires selected_statuses. Adding "Unanswered" or "Failed" re-calls those contacts.
@@ -261,7 +261,7 @@ function pageQuery(page?: number, pageSize?: number, extra: Record<string, strin
 /** Lists Raya agents as id and name. */
 export const rayaListAgents = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator(parseInput(ListAgentsInput))
+  .validator(parseInput(ListAgentsInput))
   .handler(async ({ data }) => {
     const res = await rayaFetch(
       `/agents${pageQuery(data.page, data.pageSize)}`,
@@ -288,7 +288,7 @@ export const ValidateContactsInput = z.object({
 /** Checks an uploaded contact list before launch, without calling Raya. */
 export const validateContacts = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.launch)])
-  .inputValidator(parseInput(ValidateContactsInput))
+  .validator(parseInput(ValidateContactsInput))
   .handler(async ({ data }) => validateContactRows(data.headers, data.rows));
 
 /** Input of `rayaUpdateBatch`. */
@@ -304,7 +304,7 @@ export const UpdateBatchInput = z.object({
 /** Changes a batch's name, schedule or retry settings. */
 export const rayaUpdateBatch = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator(parseInput(UpdateBatchInput))
+  .validator(parseInput(UpdateBatchInput))
   .handler(async ({ data }) => {
     const body = { ...(data.name ? { name: data.name } : {}), ...batchSettings(data) };
     return rayaFetch(
@@ -320,7 +320,7 @@ export const StopBatchInput = z.object({ batchId: requiredId("Missing batch id."
 /** Stops a running batch. */
 export const rayaStopBatch = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.campaigns)])
-  .inputValidator(parseInput(StopBatchInput))
+  .validator(parseInput(StopBatchInput))
   .handler(async ({ data }) =>
     rayaFetch(
       `/batch/${encodeURIComponent(data.batchId)}/stop`,
@@ -342,7 +342,7 @@ export const ListBatchesInput = z
 /** Lists Raya batches, optionally for one agent. */
 export const rayaListBatches = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator(parseInput(ListBatchesInput))
+  .validator(parseInput(ListBatchesInput))
   .handler(async ({ data }) => {
     const agent: Record<string, string> = data.agentId ? { agent_id: data.agentId } : {};
     return rayaFetch(
@@ -362,7 +362,7 @@ export const GetBatchContactsInput = z.object({
 /** Returns one page of a batch's contacts as Raya sends them. */
 export const rayaGetBatchContacts = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator(parseInput(GetBatchContactsInput))
+  .validator(parseInput(GetBatchContactsInput))
   .handler(async ({ data }) =>
     rayaFetch(
       `/batch/${encodeURIComponent(data.batchId)}/contacts${pageQuery(data.page, data.pageSize)}`,
@@ -382,7 +382,7 @@ export const InitiateCallInput = z.object({
 /** Places one test call from an agent to a phone number. */
 export const rayaInitiateCall = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator(parseInput(InitiateCallInput))
+  .validator(parseInput(InitiateCallInput))
   .handler(async ({ data }) => {
     const body = {
       agent_id: data.agentId,

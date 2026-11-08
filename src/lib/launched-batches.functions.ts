@@ -9,7 +9,7 @@ import { FN_ROLES } from "@/auth/roles";
 import { getDb } from "@/server/db/client.server";
 import { sqlNamed, type SqlNamedSelect } from "@/server/db/columns";
 import { launchedBatches, launchedBatchInputs } from "@/server/db/schema";
-import { parseInput } from "@/server/validation";
+import { parseInput } from "@/lib/validation";
 import { contactSchema, MAX_CONTACTS_PER_BATCH } from "@/lib/input-schemas";
 
 /** Digits in an Indian mobile number without the country code. */
@@ -48,7 +48,7 @@ const optText = z.string().max(500).optional();
 /** Stores the campaign metadata and input rows of a launched Raya batch. */
 export const recordLaunchedBatch = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.launch)])
-  .inputValidator(
+  .validator(
     parseInput(
       z.object({
         batchId: z.string().min(1).max(200),
@@ -138,7 +138,7 @@ export const recordLaunchedBatch = createServerFn({ method: "POST" })
 /** Suggests the next campaign day label for a program. */
 export const getNextCampaignDay = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.launch)])
-  .inputValidator(parseInput(z.object({ program: z.string().min(1).max(100) })))
+  .validator(parseInput(z.object({ program: z.string().min(1).max(100) })))
   .handler(async ({ data }) => {
     const rows = await getDb()
       .select({ campaign_day: launchedBatches.campaignDay })

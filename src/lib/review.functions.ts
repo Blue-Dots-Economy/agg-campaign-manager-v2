@@ -8,7 +8,7 @@ import { getDb } from "@/server/db/client.server";
 import { fromSqlNames } from "@/server/db/columns";
 import { callRows, sheetConnections, transcriptReviews } from "@/server/db/schema";
 import type { LogFields } from "@/server/log.server";
-import { parseInput } from "@/server/validation";
+import { parseInput } from "@/lib/validation";
 import { UpstreamError } from "@/lib/errors";
 import { isRecord, programIdSchema } from "@/lib/input-schemas";
 import {
@@ -56,7 +56,7 @@ async function resolveSheet(
 /** Lists the calls of a program for the review page. */
 export const fetchReviewCalls = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.dashboard)])
-  .inputValidator(parseInput(z.object({ dataset: programIdSchema })))
+  .validator(parseInput(z.object({ dataset: programIdSchema })))
   .handler(async ({ data }): Promise<Array<Record<string, string>>> => {
     const rows = await getDb()
       .select({
@@ -114,7 +114,7 @@ export const fetchReviewCalls = createServerFn({ method: "GET" })
 /** Returns the transcript and summary of one call from its sheet. */
 export const fetchCallDetail = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.campaigns)])
-  .inputValidator(parseInput(z.object({ dataset: programIdSchema, callId: callIdText })))
+  .validator(parseInput(z.object({ dataset: programIdSchema, callId: callIdText })))
   .handler(async ({ data }) => {
     const [row] = await getDb()
       .select({ channel: callRows.channel })
@@ -145,7 +145,7 @@ export const fetchReviewMap = createServerFn({ method: "GET" })
 /** Lists the call and job ids one reviewer has reviewed. */
 export const fetchReviewedCallIds = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator(
+  .validator(
     parseInput(z.object({ email: z.string().max(320), program: programIdSchema.optional() })),
   )
   .handler(async ({ data }): Promise<string[]> => {
@@ -176,7 +176,7 @@ export const fetchReviewedCallIds = createServerFn({ method: "GET" })
 /** Every call_id/job_id reviewed by ANY reviewer for a program (DB ∪ sheet). */
 export const fetchAllReviewedCallIds = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.dashboard)])
-  .inputValidator(parseInput(z.object({ program: programIdSchema })))
+  .validator(parseInput(z.object({ program: programIdSchema })))
   .handler(async ({ data }): Promise<string[]> => {
     const ids = new Set<string>();
     // 1) transcript_reviews for this program (+ legacy null-dataset rows)
@@ -202,9 +202,7 @@ export const fetchAllReviewedCallIds = createServerFn({ method: "GET" })
 /** Lists the reviews of one call or job, newest first. */
 export const fetchExistingReviews = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.dashboard)])
-  .inputValidator(
-    parseInput(z.object({ callId: callIdText.nullish(), jobId: callIdText.nullish() })),
-  )
+  .validator(parseInput(z.object({ callId: callIdText.nullish(), jobId: callIdText.nullish() })))
   .handler(async ({ data }) => {
     const callId = (data.callId ?? "").trim();
     const jobId = (data.jobId ?? "").trim();
@@ -290,7 +288,7 @@ export function sheetAppendFailure(e: unknown): LogFields {
 /** Stores the signed-in user's review of a call and appends it to the master sheet. */
 export const submitReview = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.campaigns)])
-  .inputValidator(parseInput(z.object({ review: reviewInputSchema })))
+  .validator(parseInput(z.object({ review: reviewInputSchema })))
   .handler(async ({ data, context }) => {
     // The reviewer is the signed-in user, never what the browser sends.
     const review = {

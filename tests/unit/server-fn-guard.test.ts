@@ -20,7 +20,7 @@ interface ServerFn {
   file: string;
   name: string;
   middleware: string[];
-  /** Source of the argument passed to `.inputValidator(...)`, when there is one. */
+  /** Source of the argument passed to `.validator(...)`, when there is one. */
   validator: string | null;
 }
 
@@ -59,7 +59,7 @@ function serverFns(): ServerFn[] {
       const middleware = listed.map((x) =>
         roleConsts.has(x) || x.startsWith("requireRole(") ? "requireRole" : x,
       );
-      const validator = callArgument(chain, ".inputValidator(");
+      const validator = callArgument(chain, ".validator(");
       out.push({ file: relative(SRC, path), name, middleware, validator });
     }
   }

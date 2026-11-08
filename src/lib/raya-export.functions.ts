@@ -4,7 +4,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireRole } from "@/auth/middleware";
 import { FN_ROLES } from "@/auth/roles";
-import { parseInput } from "@/server/validation";
+import { parseInput } from "@/lib/validation";
 import { programIdSchema } from "@/lib/input-schemas";
 
 /** A program's staging-sheet target. */
@@ -16,7 +16,7 @@ export const GetExportTargetInput = z.object({ program: programIdSchema });
 /** Returns the program's staging-sheet target, or null when none is set. */
 export const getExportTarget = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator(parseInput(GetExportTargetInput))
+  .validator(parseInput(GetExportTargetInput))
   .handler(async ({ data }) => {
     const { exportTarget } = await import("./raya-export.server");
     return exportTarget(data.program);
@@ -33,7 +33,7 @@ export const SetExportTargetInput = z.object({
 /** Saves the program's staging sheet; refuses a master sheet. */
 export const setExportTarget = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator(parseInput(SetExportTargetInput))
+  .validator(parseInput(SetExportTargetInput))
   .handler(async ({ data }) => {
     const { saveExportTarget } = await import("./raya-export.server");
     return saveExportTarget(data);
@@ -50,7 +50,7 @@ export const ExportBatchToStagingInput = z.object({
 /** Exports a Raya batch to the program's staging sheet. */
 export const exportBatchToStaging = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.campaigns)])
-  .inputValidator(parseInput(ExportBatchToStagingInput))
+  .validator(parseInput(ExportBatchToStagingInput))
   .handler(async ({ data }) => {
     const { exportBatch } = await import("./raya-export.server");
     return exportBatch(data);

@@ -6,7 +6,7 @@ import { FN_ROLES } from "@/auth/roles";
 import { getDb } from "@/server/db/client.server";
 import { fromSqlNames, sqlNamed, type SqlNamedInsert } from "@/server/db/columns";
 import { campaignRequests } from "@/server/db/schema";
-import { parseInput } from "@/server/validation";
+import { parseInput } from "@/lib/validation";
 import {
   campaignRequestListSchema,
   campaignRequestPatchSchema,
@@ -21,7 +21,7 @@ type CampaignRequestPatch = Partial<SqlNamedInsert<typeof campaignRequests>>;
 /** Stores a campaign request for a JFC or admin to review. */
 export const submitCampaignRequest = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.requestCampaign)])
-  .inputValidator(parseInput(z.object({ request: campaignRequestSchema })))
+  .validator(parseInput(z.object({ request: campaignRequestSchema })))
   .handler(async ({ data, context }): Promise<{ ok: boolean; id: string | null }> => {
     const r = data.request;
     const [ins] = await getDb()
@@ -59,7 +59,7 @@ export const submitCampaignRequest = createServerFn({ method: "POST" })
 /** Lists campaign requests, newest first, optionally by status and program. */
 export const listCampaignRequests = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.launch)])
-  .inputValidator(parseInput(campaignRequestListSchema))
+  .validator(parseInput(campaignRequestListSchema))
   .handler(async ({ data }) => {
     return getDb()
       .select(sqlNamed(campaignRequests))
@@ -76,9 +76,7 @@ export const listCampaignRequests = createServerFn({ method: "GET" })
 /** Changes the editable fields of a pending campaign request. */
 export const updateCampaignRequest = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.launch)])
-  .inputValidator(
-    parseInput(z.object({ id: z.string().uuid(), patch: campaignRequestPatchSchema })),
-  )
+  .validator(parseInput(z.object({ id: z.string().uuid(), patch: campaignRequestPatchSchema })))
   .handler(async ({ data }): Promise<{ ok: boolean }> => {
     const patch: CampaignRequestPatch = { ...data.patch, updated_at: new Date().toISOString() };
     await getDb()
@@ -91,7 +89,7 @@ export const updateCampaignRequest = createServerFn({ method: "POST" })
 /** Approves or declines a campaign request and records the reviewer. */
 export const setCampaignRequestStatus = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.launch)])
-  .inputValidator(parseInput(campaignRequestStatusSchema))
+  .validator(parseInput(campaignRequestStatusSchema))
   .handler(async ({ data, context }): Promise<{ ok: boolean }> => {
     const patch: CampaignRequestPatch = {
       status: data.status,

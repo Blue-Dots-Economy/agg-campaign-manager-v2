@@ -7,7 +7,7 @@ import { getDb } from "@/server/db/client.server";
 import type { SqlNamedSelect } from "@/server/db/columns";
 import { programAgents } from "@/server/db/schema";
 import { errorMessage } from "./errors";
-import { parseInput } from "@/server/validation";
+import { parseInput } from "@/lib/validation";
 import { programIdSchema } from "@/lib/input-schemas";
 import { rayaFetch, RayaApiError } from "./raya-api.server";
 
@@ -62,13 +62,13 @@ const rowIdSchema = z.object({ id: z.string().uuid() });
 /** Looks up a Raya agent by id, to preview its name before saving. */
 export const loadAgent = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator(parseInput(z.object({ agentId: agentIdSchema })))
+  .validator(parseInput(z.object({ agentId: agentIdSchema })))
   .handler(async ({ data }) => rayaGetAgent(data.agentId));
 
 /** Lists the registered agents, optionally for one program. */
 export const listProgramAgents = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.requestCampaign)])
-  .inputValidator(parseInput(z.object({ program: programIdSchema.optional() })))
+  .validator(parseInput(z.object({ program: programIdSchema.optional() })))
   .handler(async ({ data }): Promise<ProgramAgent[]> => {
     return getDb()
       .select(columns)
@@ -80,7 +80,7 @@ export const listProgramAgents = createServerFn({ method: "GET" })
 /** Registers or updates an agent for a program and records whether Raya knows it. */
 export const createProgramAgent = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator(
+  .validator(
     parseInput(
       z.object({
         program: programIdSchema,
@@ -115,7 +115,7 @@ export const createProgramAgent = createServerFn({ method: "POST" })
 /** Checks a registered agent against Raya again and stores the result. */
 export const refreshProgramAgent = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator(parseInput(rowIdSchema))
+  .validator(parseInput(rowIdSchema))
   .handler(async ({ data }) => {
     const db = getDb();
     const [row] = await db.select(columns).from(programAgents).where(eq(programAgents.id, data.id));
@@ -137,7 +137,7 @@ export const refreshProgramAgent = createServerFn({ method: "POST" })
 /** Removes a registered agent. */
 export const deleteProgramAgent = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator(parseInput(rowIdSchema))
+  .validator(parseInput(rowIdSchema))
   .handler(async ({ data }) => {
     await getDb().delete(programAgents).where(eq(programAgents.id, data.id));
     return { ok: true };
