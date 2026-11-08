@@ -338,7 +338,7 @@ export function ProgramAnalytics({
 
                     <YAxis tick={{ fontSize: 11 }} stroke="var(--color-muted-foreground)" />
                     <Tooltip {...tooltipStyle} />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    <Legend wrapperStyle={{ fontSize: 12 }} itemSorter={null} />
                     <Line
                       type="monotone"
                       dataKey="rows"
@@ -433,7 +433,7 @@ export function ProgramAnalytics({
                       ))}
                     </Pie>
                     <Tooltip {...tooltipStyle} />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    <Legend wrapperStyle={{ fontSize: 11 }} itemSorter={null} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -522,7 +522,7 @@ export function ProgramAnalytics({
                       unit="%"
                     />
                     <Tooltip {...tooltipStyle} formatter={(value) => [`${String(value)}%`, ""]} />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    <Legend wrapperStyle={{ fontSize: 12 }} itemSorter={null} />
                     <Line
                       type="monotone"
                       dataKey="answered"

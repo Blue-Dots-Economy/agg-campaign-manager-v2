@@ -74,7 +74,7 @@ export function NorthStarTrend({
               tickFormatter={(v) => `${v}%`}
             />
             <Tooltip {...tooltipStyle} formatter={(v) => `${String(v)}%`} />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Legend wrapperStyle={{ fontSize: 12 }} itemSorter={null} />
             {SERIES.map((s) => {
               const t = targets.get(s.key);
               return t == null ? null : (
