@@ -521,7 +521,7 @@ export function ProgramAnalytics({
                       stroke="var(--color-muted-foreground)"
                       unit="%"
                     />
-                    <Tooltip {...tooltipStyle} formatter={(value: number) => [`${value}%`, ""]} />
+                    <Tooltip {...tooltipStyle} formatter={(value) => [`${String(value)}%`, ""]} />
                     <Legend wrapperStyle={{ fontSize: 12 }} />
                     <Line
                       type="monotone"
