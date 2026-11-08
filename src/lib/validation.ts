@@ -1,6 +1,6 @@
-// Input validation for server functions. Used only inside `.validator(...)`. It lives outside
-// src/server because .functions.ts files load in the client build; the server-only status setter
-// is wrapped in createServerOnlyFn so the client build drops it.
+// Input validation for server functions, used inside `.validator(...)`. .functions.ts files import
+// it statically and Start's import protection checks them in the client graph, so it lives outside
+// src/server; the status setter is wrapped in createServerOnlyFn so the client build drops it.
 import { createServerOnlyFn } from "@tanstack/react-start";
 import type { z } from "zod";
 

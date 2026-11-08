@@ -79,6 +79,8 @@ const PIE_COLORS = [
 ];
 
 const tooltipStyle = {
+  // Keeps tooltip rows in series order; recharts sorts them by name by default.
+  itemSorter: () => 0,
   contentStyle: {
     background: "var(--color-card)",
     border: "1px solid var(--color-border)",
