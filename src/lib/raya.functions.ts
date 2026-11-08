@@ -82,7 +82,7 @@ export const CreateBatchReply = z.object({
   validRows: lenient(z.number()),
   invalidRows: lenient(z.number()),
   contactsInserted: lenient(z.number()),
-  errors: z.unknown(),
+  errors: z.unknown().optional(),
 });
 type CreateBatchReply = z.infer<typeof CreateBatchReply>;
 

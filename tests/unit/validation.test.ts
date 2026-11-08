@@ -33,7 +33,7 @@ describe("parseInput", () => {
   });
 
   test("applies schema defaults when the caller sends undefined", async () => {
-    const optional = z.object({ program: z.string().default("seekers") }).default({});
+    const optional = z.object({ program: z.string().default("seekers") }).prefault({});
     expect(await parseInput(optional)(undefined)).toEqual({ program: "seekers" });
   });
 
@@ -70,6 +70,7 @@ describe("parseInput", () => {
     const message = err instanceof Error ? err.message : "";
     expect(message).toContain("program");
     expect(message).not.toContain("secret-value");
+    expect(message).toContain("program: Invalid value");
   });
 
   test("refuses a missing body for a schema that needs one", async () => {

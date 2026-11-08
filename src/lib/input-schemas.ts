@@ -18,6 +18,6 @@ export const programIdSchema = z
   .refine((v): v is ProgramId => Object.hasOwn(registry, v), "Unknown program");
 
 /** One uploaded contact: a flat record of CSV cells. Undefined values are dropped. */
-export const contactSchema: z.ZodType<JsonObject, z.ZodTypeDef, unknown> = z
-  .record(z.union([z.string(), z.number(), z.boolean(), z.null()]).optional())
+export const contactSchema: z.ZodType<JsonObject, unknown> = z
+  .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]).optional())
   .transform(withoutUndefined);

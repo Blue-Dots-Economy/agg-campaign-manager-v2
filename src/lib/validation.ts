@@ -2,7 +2,7 @@
 // src/server because .functions.ts files load in the client build; the server-only status setter
 // is wrapped in createServerOnlyFn so the client build drops it.
 import { createServerOnlyFn } from "@tanstack/react-start";
-import { z } from "zod";
+import type { z } from "zod";
 
 /** First words of the message sent to the browser when input fails validation. */
 export const INVALID_INPUT_MESSAGE = "Invalid input";
@@ -11,16 +11,17 @@ export const INVALID_INPUT_MESSAGE = "Invalid input";
 const MAX_ISSUES_IN_MESSAGE = 5;
 
 /**
- * Replaces Zod default messages that repeat the rejected value. Messages a schema sets itself
- * take precedence over this map and reach the browser as written.
+ * Replaces Zod's message for a value outside a fixed set, which lists every accepted value.
+ * Other issues keep Zod's default message. Messages a schema sets itself take precedence and
+ * reach the browser as written.
  */
-const noEchoErrorMap: z.ZodErrorMap = (issue, ctx) =>
-  issue.code === z.ZodIssueCode.invalid_enum_value
-    ? { message: "Invalid value" }
-    : { message: ctx.defaultError };
+const shortErrorMap: z.core.$ZodErrorMap = (issue) =>
+  issue.code === "invalid_value" ? "Invalid value" : undefined;
 
-function describeIssue(issue: z.ZodIssue): string {
-  return issue.path.length ? `${issue.path.join(".")}: ${issue.message}` : issue.message;
+function describeIssue(issue: z.core.$ZodIssue): string {
+  return issue.path.length
+    ? `${issue.path.map(String).join(".")}: ${issue.message}`
+    : issue.message;
 }
 
 /** Sets the HTTP status of the current server-function response. */
@@ -43,7 +44,7 @@ export function createParseInput(setStatus: SetStatus) {
     schema: S,
   ): (input: z.input<S>) => Promise<z.output<S>> {
     return async (input) => {
-      const result = await schema.safeParseAsync(input, { errorMap: noEchoErrorMap });
+      const result = await schema.safeParseAsync(input, { error: shortErrorMap });
       if (result.success) return result.data;
       const problems = [...new Set(result.error.issues.map(describeIssue))];
       await setStatus(400);
