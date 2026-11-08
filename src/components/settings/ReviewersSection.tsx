@@ -72,7 +72,7 @@ export function ReviewersSection() {
         <form
           onSubmit={(ev) => {
             ev.preventDefault();
-            add();
+            void add();
           }}
           className="flex gap-2"
         >
