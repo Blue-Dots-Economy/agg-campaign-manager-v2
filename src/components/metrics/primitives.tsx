@@ -1,15 +1,15 @@
 import * as React from "react";
 import {
-  IconPhone,
-  IconPhoneOff,
-  IconPhoneCall,
-  IconClock,
-  IconFileCheck,
-  IconUserOff,
-  IconAlertTriangle,
-  IconSparkles,
-  IconBriefcase,
-} from "@tabler/icons-react";
+  Briefcase,
+  Clock,
+  FileCheck,
+  Phone,
+  PhoneCall,
+  PhoneOff,
+  Sparkles,
+  TriangleAlert,
+  UserX,
+} from "lucide-react";
 
 export type Accent = "green" | "amber" | "red" | "blue";
 
@@ -36,15 +36,15 @@ const fmtNum = (n: number) => Math.round(n).toLocaleString();
 const fmtPct = (n: number) => `${n.toFixed(1)}%`;
 
 const ICONS = {
-  IconPhone,
-  IconPhoneOff,
-  IconPhoneCall,
-  IconClock,
-  IconFileCheck,
-  IconUserOff,
-  IconAlertTriangle,
-  IconSparkles,
-  IconBriefcase,
+  IconPhone: Phone,
+  IconPhoneOff: PhoneOff,
+  IconPhoneCall: PhoneCall,
+  IconClock: Clock,
+  IconFileCheck: FileCheck,
+  IconUserOff: UserX,
+  IconAlertTriangle: TriangleAlert,
+  IconSparkles: Sparkles,
+  IconBriefcase: Briefcase,
 } as const;
 export type IconName = keyof typeof ICONS;
 
@@ -70,7 +70,7 @@ export function StatTile({
         <div
           className={`flex h-9 w-9 items-center justify-center rounded-lg ${ACCENT_SOFT[accent]}`}
         >
-          <Icon className={`h-4 w-4 ${ACCENT_TEXT[accent]}`} stroke={2} />
+          <Icon className={`h-4 w-4 ${ACCENT_TEXT[accent]}`} />
         </div>
         <p className="text-xs font-medium text-muted-foreground">{label}</p>
       </div>

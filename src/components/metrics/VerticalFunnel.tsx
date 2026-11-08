@@ -1,6 +1,5 @@
 import * as React from "react";
-import { IconArrowNarrowDown } from "@tabler/icons-react";
-import { Copy, Phone, Headphones } from "lucide-react";
+import { ArrowDown, Copy, Phone, Headphones } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -208,7 +207,7 @@ export function VerticalFunnel({
                       `−${fmtPct(dropPct)} drop · ${fmtNum(dropAbs)} ${s.unit ?? ""} lost`.trim();
                     return (
                       <div className="flex items-center justify-center gap-2 py-2 text-[11px] font-medium text-muted-foreground">
-                        <IconArrowNarrowDown className="h-3.5 w-3.5" stroke={2} />
+                        <ArrowDown className="h-3.5 w-3.5" />
                         <span>{annotation}</span>
                       </div>
                     );
