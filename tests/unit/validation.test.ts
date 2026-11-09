@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { z } from "zod";
-import { createParseInput, INVALID_INPUT_MESSAGE } from "../../src/server/validation";
+import { createParseInput, INVALID_INPUT_MESSAGE } from "../../src/lib/validation";
 
 // Inputs the schema type does not allow are cast with `as never`: the browser can send anything.
 
@@ -33,7 +33,7 @@ describe("parseInput", () => {
   });
 
   test("applies schema defaults when the caller sends undefined", async () => {
-    const optional = z.object({ program: z.string().default("seekers") }).default({});
+    const optional = z.object({ program: z.string().default("seekers") }).prefault({});
     expect(await parseInput(optional)(undefined)).toEqual({ program: "seekers" });
   });
 
@@ -70,6 +70,7 @@ describe("parseInput", () => {
     const message = err instanceof Error ? err.message : "";
     expect(message).toContain("program");
     expect(message).not.toContain("secret-value");
+    expect(message).toContain("program: Invalid value");
   });
 
   test("refuses a missing body for a schema that needs one", async () => {

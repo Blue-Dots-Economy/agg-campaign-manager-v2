@@ -7,7 +7,7 @@ import { requireRole } from "@/auth/middleware";
 import { FN_ROLES } from "@/auth/roles";
 import { getDb } from "@/server/db/client.server";
 import { programAgents } from "@/server/db/schema";
-import { parseInput } from "@/server/validation";
+import { parseInput } from "@/lib/validation";
 import { isRecord } from "@/lib/input-schemas";
 import { CONCURRENCY_CAP_DEFAULT } from "./concurrency-cap";
 import type { JsonObject } from "./json";
@@ -83,7 +83,7 @@ function pickConcurrency(item: JsonObject): number {
 /** Sums the concurrency of every active Raya batch against the account cap. */
 export const getConcurrencyUsage = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.dashboard)])
-  .inputValidator(parseInput(z.object({ cap: z.number().optional() }).optional()))
+  .validator(parseInput(z.object({ cap: z.number().optional() }).optional()))
   .handler(async ({ data }) => {
     const requested = data?.cap;
     const cap =

@@ -195,7 +195,6 @@ export function OverviewFilters({
                   dateTo: to,
                 });
               }}
-              initialFocus
               className={cn("p-3 pointer-events-auto")}
             />
           </div>

@@ -5,7 +5,7 @@ import { requireRole } from "@/auth/middleware";
 import { FN_ROLES } from "@/auth/roles";
 import { getDb } from "@/server/db/client.server";
 import { upSeekersUpload } from "@/server/db/schema";
-import { parseInput } from "@/server/validation";
+import { parseInput } from "@/lib/validation";
 
 /** Id of the only row in `up_seekers_upload`; the table holds one CSV at a time. */
 const UPLOAD_ROW_ID = 1;
@@ -52,7 +52,7 @@ const csvInput = z.object({
 /** Replaces the stored UP seekers CSV. */
 export const uploadStoredCsv = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.editors)])
-  .inputValidator(parseInput(csvInput))
+  .validator(parseInput(csvInput))
   .handler(async ({ data }): Promise<{ ok: boolean }> => {
     try {
       const values = {

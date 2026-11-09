@@ -21,19 +21,19 @@ function finiteNumbers(record: Record<string, unknown>): Record<string, number> 
 }
 
 /** Map of numbers in a report row; non-numbers are dropped. */
-const numberMap = z.record(z.unknown()).catch({}).transform(finiteNumbers);
+const numberMap = z.record(z.string(), z.unknown()).catch({}).transform(finiteNumbers);
 
 /**
  * Parses each object of a report list with `schema` and drops other entries. Every field of the
  * schemas below has a fallback, so an object never fails to parse.
  */
-function sqlList<T>(v: unknown, schema: z.ZodType<T, z.ZodTypeDef, unknown>): T[] {
+function sqlList<T>(v: unknown, schema: z.ZodType<T, unknown>): T[] {
   if (!Array.isArray(v)) return [];
   return v.filter(isRecord).map((x) => schema.parse(x));
 }
 
 /** A report list field: a list of rows of one schema. */
-const listOf = <T>(schema: z.ZodType<T, z.ZodTypeDef, unknown>) =>
+const listOf = <T>(schema: z.ZodType<T, unknown>) =>
   z.unknown().transform((v) => sqlList(v, schema));
 
 const campaignRollupRow = z.object({

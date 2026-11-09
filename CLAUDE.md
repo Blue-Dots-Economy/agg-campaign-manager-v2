@@ -75,7 +75,8 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## Toolchain
 
-- **Bun is required.** The lockfile is `bun.lock`. Do not use npm, pnpm or yarn, and do not commit another lockfile. `bunfig.toml` holds a 24-hour supply-chain guard (`minimumReleaseAge`); ask the user before adding a package to its exclude list.
+- **Bun is required**, version 1.4 or newer (`packageManager` in `package.json`; CI and the Dockerfile use the same version). The lockfile is `bun.lock`. Do not use npm, pnpm or yarn, and do not commit another lockfile. `bunfig.toml` holds a 24-hour supply-chain guard (`minimumReleaseAge`); ask the user before adding a package to its exclude list.
+- `overrides` in `package.json` pins patched versions for two development-only dependencies with known advisories: `esbuild` under drizzle-kit's `@esbuild-kit/core-utils`, and `minimatch` under typescript-eslint and `eslint-plugin-import-x`. Remove an entry once that package ships a fixed range. Nested overrides need Bun 1.4 or newer. Run `bun audit` after any dependency change; it must report no vulnerabilities.
 - `vite.config.ts` uses `@lovable.dev/vite-tanstack-config`, which already adds the TanStack Start, React, Tailwind, path-alias and Nitro plugins. Do not add them again.
 - `src/routeTree.gen.ts` is generated. Do not edit it by hand.
 - Prettier settings are in `.prettierrc` (double quotes, semicolons, 100 columns). The repository is formatted and CI fails on unformatted files; run `bun run format` before committing. The formatting commit is listed in `.git-blame-ignore-revs` (`git config blame.ignoreRevsFile .git-blame-ignore-revs`).

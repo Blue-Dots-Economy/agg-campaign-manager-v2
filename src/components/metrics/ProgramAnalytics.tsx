@@ -79,6 +79,8 @@ const PIE_COLORS = [
 ];
 
 const tooltipStyle = {
+  // Keeps tooltip rows in series order; recharts sorts them by name by default.
+  itemSorter: () => 0,
   contentStyle: {
     background: "var(--color-card)",
     border: "1px solid var(--color-border)",
@@ -338,7 +340,7 @@ export function ProgramAnalytics({
 
                     <YAxis tick={{ fontSize: 11 }} stroke="var(--color-muted-foreground)" />
                     <Tooltip {...tooltipStyle} />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    <Legend wrapperStyle={{ fontSize: 12 }} itemSorter={null} />
                     <Line
                       type="monotone"
                       dataKey="rows"
@@ -433,7 +435,7 @@ export function ProgramAnalytics({
                       ))}
                     </Pie>
                     <Tooltip {...tooltipStyle} />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    <Legend wrapperStyle={{ fontSize: 11 }} itemSorter={null} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -521,8 +523,8 @@ export function ProgramAnalytics({
                       stroke="var(--color-muted-foreground)"
                       unit="%"
                     />
-                    <Tooltip {...tooltipStyle} formatter={(value: number) => [`${value}%`, ""]} />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
+                    <Tooltip {...tooltipStyle} formatter={(value) => [`${String(value)}%`, ""]} />
+                    <Legend wrapperStyle={{ fontSize: 12 }} itemSorter={null} />
                     <Line
                       type="monotone"
                       dataKey="answered"

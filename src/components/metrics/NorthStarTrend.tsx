@@ -17,6 +17,8 @@ import { fetchNorthStar } from "@/lib/north-star.functions";
 import { campaignRuns, pooledRate, type NorthStarTrendPoint } from "./north-star-trend";
 
 const tooltipStyle = {
+  // Keeps tooltip rows in series order; recharts sorts them by name by default.
+  itemSorter: () => 0,
   contentStyle: {
     background: "var(--color-card)",
     border: "1px solid var(--color-border)",
@@ -73,8 +75,8 @@ export function NorthStarTrend({
               stroke="var(--color-muted-foreground)"
               tickFormatter={(v) => `${v}%`}
             />
-            <Tooltip {...tooltipStyle} formatter={(v: number) => `${v}%`} />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Tooltip {...tooltipStyle} formatter={(v) => `${String(v)}%`} />
+            <Legend wrapperStyle={{ fontSize: 12 }} itemSorter={null} />
             {SERIES.map((s) => {
               const t = targets.get(s.key);
               return t == null ? null : (

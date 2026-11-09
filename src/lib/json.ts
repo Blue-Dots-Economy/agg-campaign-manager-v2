@@ -16,7 +16,7 @@ export function withoutUndefined(record: Record<string, JsonValue | undefined>):
 }
 
 /** Matches any JSON value. Object keys whose value is undefined are dropped. */
-export const JsonValueSchema: z.ZodType<JsonValue, z.ZodTypeDef, unknown> = z.lazy(() => jsonValue);
+export const JsonValueSchema: z.ZodType<JsonValue, unknown> = z.lazy(() => jsonValue);
 
 // Built once: a union created inside z.lazy would be rebuilt on every nested value.
 const jsonValue = z.union([
@@ -25,10 +25,10 @@ const jsonValue = z.union([
   z.boolean(),
   z.null(),
   z.array(JsonValueSchema),
-  z.record(JsonValueSchema.optional()).transform(withoutUndefined),
+  z.record(z.string(), JsonValueSchema.optional()).transform(withoutUndefined),
 ]);
 
 /** Matches a JSON object. Keys whose value is undefined are dropped. */
-export const JsonObjectSchema: z.ZodType<JsonObject, z.ZodTypeDef, unknown> = z
-  .record(JsonValueSchema.optional())
+export const JsonObjectSchema: z.ZodType<JsonObject, unknown> = z
+  .record(z.string(), JsonValueSchema.optional())
   .transform(withoutUndefined);

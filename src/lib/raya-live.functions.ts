@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { requireRole } from "@/auth/middleware";
 import { FN_ROLES } from "@/auth/roles";
-import { parseInput } from "@/server/validation";
+import { parseInput } from "@/lib/validation";
 import { programIdSchema } from "@/lib/input-schemas";
 import type { JsonObject } from "@/lib/json";
 import { getDb } from "@/server/db/client.server";
@@ -46,7 +46,7 @@ export const ListProgramLiveBatchesInput = z.object({ program: programIdSchema }
 /** Lists the program's Raya batches across its agents, running batches first. */
 export const listProgramLiveBatches = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.campaigns)])
-  .inputValidator(parseInput(ListProgramLiveBatchesInput))
+  .validator(parseInput(ListProgramLiveBatchesInput))
   .handler(async ({ data }) => {
     if (!process.env.RAYA_API_KEY) {
       return { ok: false as const, batches: [], error: "RAYA_API_KEY not set" };
@@ -99,7 +99,7 @@ export const GetBatchLiveDetailInput = z.object({
 /** Returns a batch's live progress, counted from up to 1,000 of its contacts. */
 export const getBatchLiveDetail = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.campaigns)])
-  .inputValidator(parseInput(GetBatchLiveDetailInput))
+  .validator(parseInput(GetBatchLiveDetailInput))
   .handler(async ({ data }) => {
     if (!process.env.RAYA_API_KEY) {
       throw new Error("RAYA_API_KEY not set");

@@ -5,7 +5,7 @@ import { requireRole } from "@/auth/middleware";
 import { FN_ROLES } from "@/auth/roles";
 import { getDb } from "@/server/db/client.server";
 import { northStarConfig } from "@/server/db/schema";
-import { parseInput } from "@/server/validation";
+import { parseInput } from "@/lib/validation";
 
 const programText = z.string().max(100);
 
@@ -20,7 +20,7 @@ export interface NorthStarConfigRow {
 /** Returns a program's North Star metric settings, in display order. */
 export const fetchNorthStar = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.dashboard)])
-  .inputValidator(parseInput(z.object({ program: programText })))
+  .validator(parseInput(z.object({ program: programText })))
   .handler(async ({ data }): Promise<NorthStarConfigRow[]> => {
     try {
       const rows = await getDb()
@@ -47,7 +47,7 @@ export const fetchNorthStar = createServerFn({ method: "GET" })
 /** Stores the threshold of one North Star metric. */
 export const saveNorthStar = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.editors)])
-  .inputValidator(
+  .validator(
     parseInput(
       z.object({
         program: programText,

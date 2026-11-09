@@ -13,7 +13,7 @@ import {
   type SqlNamedSelect,
 } from "@/server/db/columns";
 import { sheetConnections } from "@/server/db/schema";
-import { parseInput } from "@/server/validation";
+import { parseInput } from "@/lib/validation";
 import { programIdSchema } from "@/lib/input-schemas";
 import { errorMessage } from "./errors";
 
@@ -51,7 +51,7 @@ async function patchConnection(id: string, patch: ConnectionPatch) {
 /** Lists a program's sheet connections, oldest first. */
 export const listConnections = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.dashboard)])
-  .inputValidator(parseInput(programInput))
+  .validator(parseInput(programInput))
   .handler(async ({ data }): Promise<SheetConnection[]> => {
     return getDb()
       .select(sqlNamed(sheetConnections))
@@ -63,7 +63,7 @@ export const listConnections = createServerFn({ method: "GET" })
 /** Adds a sheet connection to a program. */
 export const createConnection = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator(
+  .validator(
     parseInput(
       z.object({
         program: programIdSchema,
@@ -92,7 +92,7 @@ export const createConnection = createServerFn({ method: "POST" })
 /** Changes a sheet connection and returns the stored row. */
 export const updateConnection = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator(
+  .validator(
     parseInput(
       z.object({
         id: z.string().uuid(),
@@ -120,7 +120,7 @@ export const updateConnection = createServerFn({ method: "POST" })
 /** Removes a sheet connection. */
 export const deleteConnection = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator(parseInput(idInput))
+  .validator(parseInput(idInput))
   .handler(async ({ data }) => {
     await getDb().delete(sheetConnections).where(eq(sheetConnections.id, data.id));
     return { ok: true };
@@ -129,7 +129,7 @@ export const deleteConnection = createServerFn({ method: "POST" })
 /** Lists the tabs of a Google Sheet. */
 export const listSheetTabsFn = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator(parseInput(z.object({ sheet_id: sheetId })))
+  .validator(parseInput(z.object({ sheet_id: sheetId })))
   .handler(async ({ data }) => {
     const { listSheetTabs } = await import("./sheets.server");
     try {
@@ -143,7 +143,7 @@ export const listSheetTabsFn = createServerFn({ method: "POST" })
 /** Reads a sheet to check access, and stores the result when the connection exists. */
 export const testConnection = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator(
+  .validator(
     parseInput(
       z.object({
         id: z.string().uuid().optional(),
@@ -190,7 +190,7 @@ export const testConnection = createServerFn({ method: "POST" })
 /** Re-validate every enabled connection for a program and refresh stored status. */
 export const revalidateConnections = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator(parseInput(programInput))
+  .validator(parseInput(programInput))
   .handler(async ({ data }) => {
     const list = await enabledConnections(data.program);
     if (list.length === 0 || !process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
@@ -318,7 +318,7 @@ function mapRow(headers: string[], values: string[]): CallRow {
 /** Finds one call's detail in the program's enabled sheets. */
 export const getCallDetailFn = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator(parseInput(z.object({ program: programIdSchema, call_id: z.string().max(200) })))
+  .validator(parseInput(z.object({ program: programIdSchema, call_id: z.string().max(200) })))
   .handler(async ({ data }) => {
     const list = await enabledConnections(data.program);
     if (!process.env.GOOGLE_SERVICE_ACCOUNT_JSON || list.length === 0) {
@@ -339,7 +339,7 @@ export const getCallDetailFn = createServerFn({ method: "POST" })
 /** Reads every call row from the program's enabled sheets and stores each sheet's status. */
 export const fetchProgramRows = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.dashboard)])
-  .inputValidator(parseInput(programInput))
+  .validator(parseInput(programInput))
   .handler(async ({ data }) => {
     const list = await enabledConnections(data.program);
 

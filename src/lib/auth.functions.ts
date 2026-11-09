@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { FN_ROLES, isRole, type Role } from "@/auth/roles";
 import { requireRole, sessionMiddleware } from "@/auth/middleware";
-import { parseInput } from "@/server/validation";
+import { parseInput } from "@/lib/validation";
 
 const GENERIC_LOGIN_ERROR = "Email or password is incorrect";
 
@@ -37,7 +37,7 @@ export interface MeResult {
 
 // The only public server function.
 export const login = createServerFn({ method: "POST" })
-  .inputValidator(parseInput(z.object({ email, password: z.string().max(200) })))
+  .validator(parseInput(z.object({ email, password: z.string().max(200) })))
   .handler(async ({ data }): Promise<{ role: Role; mustChangePassword: boolean }> => {
     const { db: d, appUsers, eq } = await db();
     const pw = await import("@/server/auth/password.server");
@@ -96,7 +96,7 @@ export const me = createServerFn({ method: "GET" })
 /** Changes the signed-in user's password after checking the current one. */
 export const changePassword = createServerFn({ method: "POST" })
   .middleware([sessionMiddleware])
-  .inputValidator(
+  .validator(
     parseInput(
       z.object({ currentPassword: z.string().max(200), newPassword: z.string().max(200) }),
     ),
@@ -176,7 +176,7 @@ export const listAppUsers = createServerFn({ method: "GET" })
 /** Creates a user and returns a one-time temporary password. */
 export const createAppUser = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator(parseInput(profile))
+  .validator(parseInput(profile))
   .handler(async ({ data }): Promise<{ temporaryPassword: string }> => {
     const { db: d, appUsers, eq } = await db();
     const pw = await import("@/server/auth/password.server");
@@ -213,7 +213,7 @@ async function activeAdminCount(): Promise<number> {
 /** Updates a user's profile and role; refuses to demote the last active admin. */
 export const updateAppUser = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator(parseInput(profile))
+  .validator(parseInput(profile))
   .handler(async ({ data }) => {
     const { db: d, appUsers, eq } = await db();
     const [u] = await d.select().from(appUsers).where(eq(appUsers.email, data.email)).limit(1);
@@ -244,7 +244,7 @@ export const updateAppUser = createServerFn({ method: "POST" })
 /** Gives a user a new temporary password and unlocks the account. */
 export const resetAppUserPassword = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator(parseInput(z.object({ email })))
+  .validator(parseInput(z.object({ email })))
   .handler(async ({ data }): Promise<{ temporaryPassword: string }> => {
     const { db: d, appUsers, eq } = await db();
     const pw = await import("@/server/auth/password.server");
@@ -267,7 +267,7 @@ export const resetAppUserPassword = createServerFn({ method: "POST" })
 /** Activates or deactivates a user; refuses to deactivate yourself or the last active admin. */
 export const setAppUserActive = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator(parseInput(z.object({ email, active: z.boolean() })))
+  .validator(parseInput(z.object({ email, active: z.boolean() })))
   .handler(async ({ data, context }) => {
     const { db: d, appUsers, eq } = await db();
     if (!data.active) {

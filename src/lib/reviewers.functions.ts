@@ -5,7 +5,7 @@ import { requireRole } from "@/auth/middleware";
 import { FN_ROLES } from "@/auth/roles";
 import { getDb } from "@/server/db/client.server";
 import { reviewers } from "@/server/db/schema";
-import { parseInput } from "@/server/validation";
+import { parseInput } from "@/lib/validation";
 
 const emailInput = z.object({ email: z.string().max(320) });
 
@@ -27,7 +27,7 @@ export const listReviewers = createServerFn({ method: "GET" })
 /** Adds a reviewer email. */
 export const addReviewer = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator(parseInput(emailInput))
+  .validator(parseInput(emailInput))
   .handler(async ({ data }): Promise<{ ok: boolean }> => {
     const email = (data.email || "").trim().toLowerCase();
     if (!email) return { ok: false };
@@ -42,7 +42,7 @@ export const addReviewer = createServerFn({ method: "POST" })
 /** Removes a reviewer email. */
 export const removeReviewer = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator(parseInput(emailInput))
+  .validator(parseInput(emailInput))
   .handler(async ({ data }): Promise<{ ok: boolean }> => {
     const email = (data.email || "").trim().toLowerCase();
     try {
