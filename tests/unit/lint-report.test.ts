@@ -6,7 +6,7 @@ describe("blockOf", () => {
     for (const p of [
       "src/lib/raya.functions.ts",
       "src/lib/sheets.server.ts",
-      "src/lib/raya-api.ts",
+      "src/lib/raya-api.server.ts",
       "src/server/db/schema.ts",
       "src/auth/roles.ts",
       "src/routes/api/public/hooks/sync-snapshots.ts",

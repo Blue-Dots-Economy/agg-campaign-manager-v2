@@ -34,6 +34,31 @@ bun x vite dev --port "$PORT" --strictPort --host 127.0.0.1   # run in the backg
 
 Pick a free port first (`lsof -nP -iTCP:$PORT -sTCP:LISTEN`); other local stacks often hold 3000, 5432 and 8080. Wait until `curl -s -o /dev/null -w '%{http_code}' "$E2E_BASE_URL/login"` prints `200`.
 
+### Optional — mock Raya and Google Sheets
+
+`scripts/e2e/mock-upstreams.ts` stands in for Raya, Google's token endpoint and the Sheets API, with in-memory state that resets on restart. Start it before the dev server, in the same shell as the env file:
+
+```bash
+export E2E_MOCK_PORT=4010                     # default 4010
+bun scripts/e2e/mock-upstreams.ts service-account /path/outside/repo/mock-sa.json
+bun scripts/e2e/mock-upstreams.ts             # run in the background; prints the seeded ids
+export RAYA_API_KEY=any
+export RAYA_BASE_URL="http://127.0.0.1:${E2E_MOCK_PORT}/raya"
+export SHEETS_API_BASE_URL="http://127.0.0.1:${E2E_MOCK_PORT}/sheets/v4/spreadsheets/"
+export GOOGLE_SERVICE_ACCOUNT_JSON="$(cat /path/outside/repo/mock-sa.json)"
+```
+
+Then start the dev server as above. Seeded data (also printed at start):
+
+- Agents `mock-agent-seekers` (with one running batch that already has calls) and `mock-agent-providers`.
+- Spreadsheet `mock-call-log-sheet-000000000000` with tabs `Seeker Calls` and `Provider Calls` (program columns, 12 rows each).
+- Spreadsheet `mock-staging-sheet-0000000000000` with an empty `Sheet1`, for the export.
+- The ecosystem workbooks from `src/lib/ecosystem-config.ts`, with a few rows each.
+
+Browser flows this unlocks: add and refresh an agent in Settings; launch with the Raya push, and approve & launch a request (the mock dials every contact at start); live batches and the batch dialog on Campaigns; stop a batch; export a batch to the staging sheet; connect the call-log sheet in Connections and sync the dashboard; submit a review, which appends to a new `Feedback Responses` tab; the Ecosystem View.
+
+Not covered: Raya's row-level validation errors, rate limits (429) and slow replies; Google permission errors; real phone calls (the test call only returns a call id).
+
 ## Step 3 — HTTP smoke
 
 ```bash

@@ -25,3 +25,5 @@ export E2E_PASSWORD="change-me-e2e"
 # Optional integrations. Raya launches and Sheets sync fail while these are unset.
 # export RAYA_API_KEY=...
 # export GOOGLE_SERVICE_ACCOUNT_JSON='{...}'
+# Optional: Sheets spreadsheets URL (ends with a slash). Defaults to Google's.
+# export SHEETS_API_BASE_URL="https://sheets.googleapis.com/v4/spreadsheets/"

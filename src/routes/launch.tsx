@@ -1267,7 +1267,7 @@ function dayLabels(days: number[]) {
   return (
     days
       .slice()
-      .sort()
+      .sort((a, b) => a - b)
       .map((d) => DAY_NAMES[d])
       .join(", ") || "—"
   );

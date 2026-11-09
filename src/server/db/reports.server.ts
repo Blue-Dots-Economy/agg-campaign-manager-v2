@@ -23,10 +23,15 @@ const kkbFilters = z.object(scoped);
 const campaignListFilters = z.object({ program: text, ...base });
 const campaignFilters = z.object({ campaign: text, ...base });
 
+/** Filters of the per-program reports. */
 export type ProgramFilters = z.input<typeof programFilters>;
+/** Filters of the funnel call-id report. */
 export type FunnelFilters = z.input<typeof funnelFilters>;
+/** Filters of the KKB and DKB reports. */
 export type KkbFilters = z.input<typeof kkbFilters>;
+/** Filters of the campaign list report. */
 export type CampaignListFilters = z.input<typeof campaignListFilters>;
+/** Filters of the per-campaign reports. */
 export type CampaignFilters = z.input<typeof campaignFilters>;
 
 type Fn =
@@ -44,12 +49,16 @@ type Fn =
   | "get_campaign_drop_causes"
   | "get_dkb_campaign_causes";
 
+/** The one row a report function query returns; `r` is the function's JSON result. */
+const reportRow = z.object({ r: z.unknown() });
+
 // fn is one of the literals above.
 async function call(fn: Fn, args: SQL[]): Promise<unknown> {
-  const { rows } = await getDb().execute<{ r: unknown }>(
+  const { rows } = await getDb().execute(
     sql`select public.${sql.raw(fn)}(${sql.join(args, sql`, `)}) as r`,
   );
-  return rows[0]?.r ?? null;
+  const first = rows[0];
+  return first === undefined ? null : (reportRow.parse(first).r ?? null);
 }
 
 const scopedArgs = (p: z.output<typeof kkbFilters>) => [
@@ -83,17 +92,28 @@ function campaign(fn: Fn) {
   };
 }
 
+/** Runs `get_program_aggregate_payload`. */
 export const programAggregatePayload = program("get_program_aggregate_payload");
+/** Runs `get_program_aggregates`. */
 export const programAggregates = program("get_program_aggregates");
+/** Runs `get_program_metric_groups`. */
 export const programMetricGroups = program("get_program_metric_groups");
+/** Runs `get_program_metrics_raw`. */
 export const programMetricsRaw = program("get_program_metrics_raw");
+/** Runs `get_funnel_durations`. */
 export const funnelDurations = program("get_funnel_durations");
+/** Runs `get_kkb_drop_analysis`. */
 export const kkbDropAnalysis = kkb("get_kkb_drop_analysis");
+/** Runs `get_kkb_call_outcomes`. */
 export const kkbCallOutcomes = kkb("get_kkb_call_outcomes");
+/** Runs `get_dkb_drop_analysis`. */
 export const dkbDropAnalysis = kkb("get_dkb_drop_analysis");
+/** Runs `get_campaign_drop_causes`. */
 export const campaignDropCauses = campaign("get_campaign_drop_causes");
+/** Runs `get_dkb_campaign_causes`. */
 export const dkbCampaignCauses = campaign("get_dkb_campaign_causes");
 
+/** Runs `get_funnel_call_ids`. */
 export function funnelCallIds(input: FunnelFilters) {
   const p = funnelFilters.parse(input);
   return call("get_funnel_call_ids", [
@@ -103,11 +123,13 @@ export function funnelCallIds(input: FunnelFilters) {
   ]);
 }
 
+/** Runs `get_campaign_list`. */
 export function campaignList(input: CampaignListFilters) {
   const p = campaignListFilters.parse(input);
   return call("get_campaign_list", [sql`_program => ${p.program}`, ...baseArgs(p)]);
 }
 
+/** Runs `get_program_filter_options`. */
 export function programFilterOptions(input: { program: string }) {
   const p = z.object({ program: text }).parse(input);
   return call("get_program_filter_options", [sql`_program => ${p.program}`]);
