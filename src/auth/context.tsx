@@ -1,7 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { login as loginFn, logout as logoutFn, me as meFn, type MeResult } from "@/lib/auth.functions";
+import {
+  login as loginFn,
+  logout as logoutFn,
+  me as meFn,
+  type MeResult,
+} from "@/lib/auth.functions";
 import type { Role } from "@/auth/roles";
 
 export type { Role };
@@ -66,7 +71,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ session, isAuthenticated: !!session, isAdmin: session?.role === "admin", hydrated, login, logout, refresh }}
+      value={{
+        session,
+        isAuthenticated: !!session,
+        isAdmin: session?.role === "admin",
+        hydrated,
+        login,
+        logout,
+        refresh,
+      }}
     >
       {children}
     </AuthContext.Provider>

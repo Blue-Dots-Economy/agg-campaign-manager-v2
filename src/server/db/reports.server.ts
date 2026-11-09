@@ -30,10 +30,18 @@ export type CampaignListFilters = z.input<typeof campaignListFilters>;
 export type CampaignFilters = z.input<typeof campaignFilters>;
 
 type Fn =
-  | "get_program_aggregate_payload" | "get_program_aggregates" | "get_program_metric_groups"
-  | "get_program_metrics_raw" | "get_program_filter_options" | "get_funnel_call_ids"
-  | "get_funnel_durations" | "get_kkb_drop_analysis" | "get_kkb_call_outcomes"
-  | "get_dkb_drop_analysis" | "get_campaign_list" | "get_campaign_drop_causes"
+  | "get_program_aggregate_payload"
+  | "get_program_aggregates"
+  | "get_program_metric_groups"
+  | "get_program_metrics_raw"
+  | "get_program_filter_options"
+  | "get_funnel_call_ids"
+  | "get_funnel_durations"
+  | "get_kkb_drop_analysis"
+  | "get_kkb_call_outcomes"
+  | "get_dkb_drop_analysis"
+  | "get_campaign_list"
+  | "get_campaign_drop_causes"
   | "get_dkb_campaign_causes";
 
 // fn is one of the literals above.
@@ -88,7 +96,11 @@ export const dkbCampaignCauses = campaign("get_dkb_campaign_causes");
 
 export function funnelCallIds(input: FunnelFilters) {
   const p = funnelFilters.parse(input);
-  return call("get_funnel_call_ids", [sql`_program => ${p.program}`, ...scopedArgs(p), sql`_stage => ${p.stage}`]);
+  return call("get_funnel_call_ids", [
+    sql`_program => ${p.program}`,
+    ...scopedArgs(p),
+    sql`_stage => ${p.stage}`,
+  ]);
 }
 
 export function campaignList(input: CampaignListFilters) {

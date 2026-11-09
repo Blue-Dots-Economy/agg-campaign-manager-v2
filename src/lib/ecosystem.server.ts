@@ -65,11 +65,7 @@ function indexHeaders(headers: string[]): Record<string, number> {
   return idx;
 }
 
-function pick(
-  idx: Record<string, number>,
-  row: string[],
-  aliases: string[],
-): string {
+function pick(idx: Record<string, number>, row: string[], aliases: string[]): string {
   for (const a of aliases) {
     const k = normKey(a);
     if (k in idx) {
@@ -93,7 +89,13 @@ const ci = (s: string) => s.trim().toLowerCase();
 function detectStatus(raw: string): "open" | "closed" {
   const s = ci(raw);
   if (!s) return "open";
-  if (s.includes("closed") || s.includes("archived") || s.includes("filled") || s.includes("cancel")) return "closed";
+  if (
+    s.includes("closed") ||
+    s.includes("archived") ||
+    s.includes("filled") ||
+    s.includes("cancel")
+  )
+    return "closed";
   return "open";
 }
 
@@ -109,7 +111,11 @@ async function resolveTabs(
   return hit ?? tabs[0] ?? preferred;
 }
 
-async function readJobs(cfg: RegionConfig, district: string, unmapped: Set<string>): Promise<EcoJob[]> {
+async function readJobs(
+  cfg: RegionConfig,
+  district: string,
+  unmapped: Set<string>,
+): Promise<EcoJob[]> {
   const tab = await resolveTabs(cfg.jobsSheet, cfg.jobsTab, (t) =>
     /open_?roles|jobs?_post|job_posts?/i.test(t),
   );
@@ -121,22 +127,35 @@ async function readJobs(cfg: RegionConfig, district: string, unmapped: Set<strin
 
   const districtCi = ci(district);
   const mapped: EcoJob[] = rows.map((row, i) => {
-    const openings =
-      asNum(pick(idx, row, ["current_openings", "openings", "number_of_openings", "no_of_openings", "vacancies"]));
-    const applications = asNum(pick(idx, row, ["applications", "no_of_applications", "total_applications"]));
-    const partial = asNum(pick(idx, row, [
-      "partial_fit_seeker_count",
-      "partial_fit_seekers_count",
-      "partial_fit_seekers",
-      "partial_fit",
-    ]));
-    const right = asNum(pick(idx, row, [
-      "right_fit_seekers_count",
-      "right_fit_seeker_count",
-      "right_fit_seekers",
-      "right_fit",
-      "direct_fit",
-    ]));
+    const openings = asNum(
+      pick(idx, row, [
+        "current_openings",
+        "openings",
+        "number_of_openings",
+        "no_of_openings",
+        "vacancies",
+      ]),
+    );
+    const applications = asNum(
+      pick(idx, row, ["applications", "no_of_applications", "total_applications"]),
+    );
+    const partial = asNum(
+      pick(idx, row, [
+        "partial_fit_seeker_count",
+        "partial_fit_seekers_count",
+        "partial_fit_seekers",
+        "partial_fit",
+      ]),
+    );
+    const right = asNum(
+      pick(idx, row, [
+        "right_fit_seekers_count",
+        "right_fit_seeker_count",
+        "right_fit_seekers",
+        "right_fit",
+        "direct_fit",
+      ]),
+    );
     const title = pick(idx, row, ["role", "title", "normalised_role", "normalised_title"]) || "—";
     const area = pick(idx, row, ["location", "area", "city"]);
     return {
@@ -151,7 +170,13 @@ async function readJobs(cfg: RegionConfig, district: string, unmapped: Set<strin
       applications,
       status: detectStatus(pick(idx, row, ["status"])),
       posted_date: pick(idx, row, ["job_post_date", "posted_date", "created_at"]),
-      posted_by: pick(idx, row, ["organization_name", "organisation_name", "company", "company_name", "posted_by"]),
+      posted_by: pick(idx, row, [
+        "organization_name",
+        "organisation_name",
+        "company",
+        "company_name",
+        "posted_by",
+      ]),
       salary_offered: asNum(pick(idx, row, ["salary", "salary_offered"])),
       shortlisted: asNum(pick(idx, row, ["shortlisted"])),
       application_pending_from: pick(idx, row, ["application_pending_from", "pending_from"]),
@@ -164,7 +189,11 @@ async function readJobs(cfg: RegionConfig, district: string, unmapped: Set<strin
         "recommended_action_seeker",
       ]),
       contact_name: pick(idx, row, ["contact_name_of_created_by_id", "contact_name"]),
-      contact_phone: pick(idx, row, ["contact_number_of_created_by_id", "contact_number", "contact_phone"]),
+      contact_phone: pick(idx, row, [
+        "contact_number_of_created_by_id",
+        "contact_number",
+        "contact_phone",
+      ]),
       contact_email: pick(idx, row, ["contact_email_id", "contact_email"]),
       location_district: pick(idx, row, ["location_district", "district"]) || district,
       location_state: pick(idx, row, ["location_state", "state"]) || cfg.state,
@@ -181,12 +210,15 @@ async function readApplications(
   jobIds: Set<string>,
   unmapped: Set<string>,
 ): Promise<EcoApplication[]> {
-  const tab = await resolveTabs(cfg.jobsSheet, cfg.applicationsTab, (t) =>
-    /application/i.test(t),
-  );
+  const tab = await resolveTabs(cfg.jobsSheet, cfg.applicationsTab, (t) => /application/i.test(t));
   const { headers, rows } = await readSheet(cfg.jobsSheet, tab);
   const idx = indexHeaders(headers);
-  if (!("applied_at" in idx) && !("applied_date" in idx) && !("created_at" in idx) && !("timestamp" in idx)) {
+  if (
+    !("applied_at" in idx) &&
+    !("applied_date" in idx) &&
+    !("created_at" in idx) &&
+    !("timestamp" in idx)
+  ) {
     unmapped.add("applications:applied_date");
   }
 
@@ -196,7 +228,13 @@ async function readApplications(
     seeker_role: pick(idx, row, ["seeker_role", "job_role", "role", "title"]) || "—",
     location: pick(idx, row, ["location", "user_district", "llm_location_district", "area"]),
     job_id: pick(idx, row, ["job_id"]),
-    applied_date: pick(idx, row, ["applied_at", "applied_date", "application_date", "created_at", "timestamp"]),
+    applied_date: pick(idx, row, [
+      "applied_at",
+      "applied_date",
+      "application_date",
+      "created_at",
+      "timestamp",
+    ]),
   }));
 
   // Filter by district column if present; else by job_id membership.
@@ -224,7 +262,8 @@ async function readSeekerCounts(
   if (!("user_id" in idx)) unmapped.add("seekers:user_id");
 
   const districtCi = ci(district);
-  const districtColKey = "location_district" in idx ? "location_district" : "district" in idx ? "district" : null;
+  const districtColKey =
+    "location_district" in idx ? "location_district" : "district" in idx ? "district" : null;
 
   const profiles = new Set<string>();
   const accounts = new Set<string>();
@@ -241,7 +280,15 @@ async function readSeekerCounts(
     profiles.add(id);
     const uid = pick(idx, row, ["user_id"]);
     if (uid) accounts.add(uid);
-    const org = pick(idx, row, ["org_name", "organization_name", "organisation", "organization", "institution_name", "institution", "institute"]);
+    const org = pick(idx, row, [
+      "org_name",
+      "organization_name",
+      "organisation",
+      "organization",
+      "institution_name",
+      "institution",
+      "institute",
+    ]);
     if (org) orgs.add(org.trim());
   }
   // If district filter yielded nothing, fall back to region-wide row count.
@@ -271,7 +318,10 @@ export async function loadEcosystem(state: string, district: string): Promise<Ec
   const buckets = { week: 0, month: 0, older: 0 };
   for (const a of apps) {
     const t = new Date(a.applied_date).getTime();
-    if (!Number.isFinite(t)) { buckets.older++; continue; }
+    if (!Number.isFinite(t)) {
+      buckets.older++;
+      continue;
+    }
     const days = (now - t) / (1000 * 60 * 60 * 24);
     if (days < 7) buckets.week++;
     else if (days <= 30) buckets.month++;

@@ -8,10 +8,15 @@ export type SqlNamed<T extends PgTable> = {
 };
 
 export function sqlNamed<T extends PgTable>(table: T): SqlNamed<T> {
-  return Object.fromEntries(Object.values(getTableColumns(table)).map((c) => [c.name, c])) as SqlNamed<T>;
+  return Object.fromEntries(
+    Object.values(getTableColumns(table)).map((c) => [c.name, c]),
+  ) as SqlNamed<T>;
 }
 
-export function fromSqlNames<T extends PgTable>(table: T, patch: Record<string, unknown>): Partial<T["$inferInsert"]> {
+export function fromSqlNames<T extends PgTable>(
+  table: T,
+  patch: Record<string, unknown>,
+): Partial<T["$inferInsert"]> {
   const out: Record<string, unknown> = {};
   for (const [key, col] of Object.entries(getTableColumns(table))) {
     if (col.name in patch) out[key] = patch[col.name];

@@ -9,7 +9,10 @@ export function hashPassword(plain: string): Promise<string> {
   return bcrypt.hash(plain, COST);
 }
 
-export async function verifyPassword(plain: string, hash: string | null | undefined): Promise<boolean> {
+export async function verifyPassword(
+  plain: string,
+  hash: string | null | undefined,
+): Promise<boolean> {
   if (!hash) return false;
   try {
     return await bcrypt.compare(plain, hash);
@@ -35,7 +38,9 @@ export async function equaliseRefusal(plain: string, checkedHash: string | null)
 }
 
 export function passwordProblem(plain: string): string | null {
-  return plain.length < MIN_PASSWORD_LENGTH ? `Password must be at least ${MIN_PASSWORD_LENGTH} characters.` : null;
+  return plain.length < MIN_PASSWORD_LENGTH
+    ? `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`
+    : null;
 }
 
 // No 0/O/1/l/I.
@@ -49,7 +54,10 @@ export function temporaryPassword(length = 14): string {
 export const MAX_FAILED_LOGINS = 5;
 export const LOCK_MINUTES = 15;
 
-export function afterFailedLogin(failedCount: number, now: Date): { failedLoginCount: number; lockedUntil: Date | null } {
+export function afterFailedLogin(
+  failedCount: number,
+  now: Date,
+): { failedLoginCount: number; lockedUntil: Date | null } {
   const next = failedCount + 1;
   return next >= MAX_FAILED_LOGINS
     ? { failedLoginCount: 0, lockedUntil: new Date(now.getTime() + LOCK_MINUTES * 60_000) }

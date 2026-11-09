@@ -2,7 +2,11 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { MetricSection, SplitBar } from "@/components/metrics/primitives";
 import { MetricCard } from "@/components/metrics/MetricCard";
-import { VerticalFunnel, type VerticalFunnelStage, type FunnelColor } from "@/components/metrics/VerticalFunnel";
+import {
+  VerticalFunnel,
+  type VerticalFunnelStage,
+  type FunnelColor,
+} from "@/components/metrics/VerticalFunnel";
 
 export interface DailyPoint {
   day: string;
@@ -100,7 +104,17 @@ const isNotDialled = (outcome: string) => {
 
 const nfIN = new Intl.NumberFormat("en-IN");
 
-function OutcomeCard({ outcome, n, pct, muted }: { outcome: string; n: number; pct: number; muted?: boolean }) {
+function OutcomeCard({
+  outcome,
+  n,
+  pct,
+  muted,
+}: {
+  outcome: string;
+  n: number;
+  pct: number;
+  muted?: boolean;
+}) {
   return (
     <div
       className={cn(
@@ -111,10 +125,17 @@ function OutcomeCard({ outcome, n, pct, muted }: { outcome: string; n: number; p
       <p className="truncate text-[11px] font-medium text-muted-foreground" title={outcome}>
         {outcome}
       </p>
-      <p className={cn("mt-1 text-lg font-semibold tabular-nums", muted ? "text-amber-600 dark:text-amber-400" : "text-foreground")}>
+      <p
+        className={cn(
+          "mt-1 text-lg font-semibold tabular-nums",
+          muted ? "text-amber-600 dark:text-amber-400" : "text-foreground",
+        )}
+      >
         {nfIN.format(n)}
       </p>
-      <p className="text-[11px] text-muted-foreground tabular-nums">{pct.toFixed(1)}% of all rows</p>
+      <p className="text-[11px] text-muted-foreground tabular-nums">
+        {pct.toFixed(1)}% of all rows
+      </p>
     </div>
   );
 }
@@ -187,42 +208,94 @@ export function KkbOverviewMetrics({
 
   const [view, setView] = useState<"hybrid" | "calls" | "seekers">("hybrid");
   const callsByStage: Record<string, number> = {
-    calls: m.totalCalls, picked: m.answeredCalls, engaged: m.engagedCalls,
-    profile: (m.profileCapturedCalls ?? 0), needs: (m.needsCapturedCalls ?? 0),
-    found: (m.providersFoundCalls ?? 0), connected: (m.providersConnectedCalls ?? 0),
+    calls: m.totalCalls,
+    picked: m.answeredCalls,
+    engaged: m.engagedCalls,
+    profile: m.profileCapturedCalls ?? 0,
+    needs: m.needsCapturedCalls ?? 0,
+    found: m.providersFoundCalls ?? 0,
+    connected: m.providersConnectedCalls ?? 0,
   };
   const seekersByStage: Record<string, number> = {
-    calls: m.seekers, picked: m.answeredSeekers, engaged: m.engagedSeekers,
-    profile: (m.profileCapturedSeekers ?? 0), needs: (m.needsCapturedSeekers ?? 0),
-    found: (m.providersFoundSeekers ?? 0), connected: (m.providersConnectedSeekers ?? 0),
+    calls: m.seekers,
+    picked: m.answeredSeekers,
+    engaged: m.engagedSeekers,
+    profile: m.profileCapturedSeekers ?? 0,
+    needs: m.needsCapturedSeekers ?? 0,
+    found: m.providersFoundSeekers ?? 0,
+    connected: m.providersConnectedSeekers ?? 0,
   };
   const seekerStageKeys = new Set(["engaged", "profile", "needs", "found", "connected"]);
   const dimOf = (key: string): "calls" | "seekers" =>
-    view === "calls" ? "calls" : view === "seekers" ? "seekers" : seekerStageKeys.has(key) ? "seekers" : "calls";
+    view === "calls"
+      ? "calls"
+      : view === "seekers"
+        ? "seekers"
+        : seekerStageKeys.has(key)
+          ? "seekers"
+          : "calls";
   const valOf = (key: string): number =>
     (dimOf(key) === "seekers" ? seekersByStage[key] : callsByStage[key]) ?? 0;
   const dropLabels: Record<string, string> = {
-    calls: "no pickup", picked: "drop after pickup", engaged: "no profile captured",
-    profile: "no needs captured", needs: "no providers found", found: "not connected",
+    calls: "no pickup",
+    picked: "drop after pickup",
+    engaged: "no profile captured",
+    profile: "no needs captured",
+    needs: "no providers found",
+    found: "not connected",
   };
   const uploaded = (callOutcomes ?? []).reduce((s, o) => s + o.n, 0);
-  const notDialled = (callOutcomes ?? []).filter((o) => {
-    const x = o.outcome.trim().toLowerCase();
-    return x === "pending" || x.startsWith("not dialled");
-  }).reduce((s, o) => s + o.n, 0);
+  const notDialled = (callOutcomes ?? [])
+    .filter((o) => {
+      const x = o.outcome.trim().toLowerCase();
+      return x === "pending" || x.startsWith("not dialled");
+    })
+    .reduce((s, o) => s + o.n, 0);
   const topExtraSub =
     uploaded > 0 && notDialled > 0
       ? `of ${uploaded.toLocaleString("en-IN")} uploaded · ${notDialled.toLocaleString("en-IN")} not dialled`
       : undefined;
 
-  const stageDefs: Array<{ key: string; label: string; description: string; color: FunnelColor; extraSub?: string }> = [
-    { key: "calls", label: "Calls made", description: "All dialled attempts", color: "blue", extraSub: topExtraSub },
+  const stageDefs: Array<{
+    key: string;
+    label: string;
+    description: string;
+    color: FunnelColor;
+    extraSub?: string;
+  }> = [
+    {
+      key: "calls",
+      label: "Calls made",
+      description: "All dialled attempts",
+      color: "blue",
+      extraSub: topExtraSub,
+    },
     { key: "picked", label: "Picked up", description: "Seeker answered", color: "green" },
     { key: "engaged", label: "Engaged", description: "Real conversation", color: "green" },
-    { key: "profile", label: "Profile captured", description: "Profile details recorded", color: "amber" },
-    { key: "needs", label: "Needs captured", description: "Needs and challenges shared", color: "amber" },
-    { key: "found", label: "Providers found", description: "Matching providers identified", color: "coral" },
-    { key: "connected", label: "Providers connected", description: "Seeker connected to a provider", color: "purple" },
+    {
+      key: "profile",
+      label: "Profile captured",
+      description: "Profile details recorded",
+      color: "amber",
+    },
+    {
+      key: "needs",
+      label: "Needs captured",
+      description: "Needs and challenges shared",
+      color: "amber",
+    },
+    {
+      key: "found",
+      label: "Providers found",
+      description: "Matching providers identified",
+      color: "coral",
+    },
+    {
+      key: "connected",
+      label: "Providers connected",
+      description: "Seeker connected to a provider",
+      color: "purple",
+    },
   ];
   const stages: VerticalFunnelStage[] = stageDefs.map((s, i) => {
     const value = valOf(s.key);
@@ -233,7 +306,11 @@ export function KkbOverviewMetrics({
         ? `-${Math.max(0, (1 - nextVal / value) * 100).toFixed(1)}% ${dropLabels[s.key] ?? "drop"}`
         : undefined;
     return {
-      key: s.key, label: s.label, description: s.description, value, color: s.color,
+      key: s.key,
+      label: s.label,
+      description: s.description,
+      value,
+      color: s.color,
       unit: dimOf(s.key) === "seekers" ? "seekers" : undefined,
       nextAnnotation: dropAnn,
       avgDurationSec: stageDurations?.[s.key],
@@ -245,18 +322,37 @@ export function KkbOverviewMetrics({
     <div className="space-y-8">
       <MetricSection title="Outcome metrics" subtitle="Funnel from calls made to applications">
         <div className="mb-4 inline-flex rounded-md border border-border bg-card p-0.5 text-xs">
-          {([["hybrid", "Calls → Seekers"], ["calls", "Total calls"], ["seekers", "Unique seekers"]] as const).map(([v, label]) => (
-            <button key={v} type="button" onClick={() => setView(v)}
-              className={cn("px-3 py-1.5 rounded transition-colors", view === v ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
+          {(
+            [
+              ["hybrid", "Calls → Seekers"],
+              ["calls", "Total calls"],
+              ["seekers", "Unique seekers"],
+            ] as const
+          ).map(([v, label]) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setView(v)}
+              className={cn(
+                "px-3 py-1.5 rounded transition-colors",
+                view === v
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
               {label}
             </button>
           ))}
         </div>
         <div className="grid items-stretch gap-4 lg:grid-cols-5">
           <div className="lg:col-span-3">
-            <VerticalFunnel stages={stages} fill pickedUpKey="picked" onStageClick={onFunnelStageClick} />
+            <VerticalFunnel
+              stages={stages}
+              fill
+              pickedUpKey="picked"
+              onStageClick={onFunnelStageClick}
+            />
           </div>
-
 
           <div className="grid gap-3 lg:col-span-2 lg:grid-cols-1">
             <SplitBar answered={m.answeredCalls} unanswered={m.unansweredCalls} />
@@ -265,7 +361,11 @@ export function KkbOverviewMetrics({
                 label="Productive conversations"
                 value={productivePct}
                 format="percent"
-                sub={previous ? undefined : `${m.productiveCalls.toLocaleString()} calls — answered + > 30s`}
+                sub={
+                  previous
+                    ? undefined
+                    : `${m.productiveCalls.toLocaleString()} calls — answered + > 30s`
+                }
                 previous={prevProductivePct}
                 comparisonLabel={comparisonLabel}
                 trend={series(perDay, (p) => safeDiv(p.engaged, p.rows) * 100)}
@@ -287,7 +387,6 @@ export function KkbOverviewMetrics({
                 comparisonLabel={comparisonLabel}
                 trend={series(perDay, (p) => safeDiv(p.converted, p.answered) * 100)}
               />
-
             </div>
           </div>
         </div>
@@ -326,20 +425,32 @@ export function DkbOverviewMetrics({
   const funnelData = m.providerFunnel ?? [];
   const colors: FunnelColor[] = ["blue", "green", "green", "coral", "purple"];
 
-  const primaryOf = (s: DkbProviderFunnelStage) => dview === "openings" ? s.openings : dview === "calls" ? s.calls : s.providers;
-  const secondaryOf = (s: DkbProviderFunnelStage) => dview === "providers" ? s.openings : s.providers;
+  const primaryOf = (s: DkbProviderFunnelStage) =>
+    dview === "openings" ? s.openings : dview === "calls" ? s.calls : s.providers;
+  const secondaryOf = (s: DkbProviderFunnelStage) =>
+    dview === "providers" ? s.openings : s.providers;
   const unitLabel = dview === "openings" ? "openings" : dview === "calls" ? "calls" : "providers";
   const secondaryLabel = dview === "providers" ? "openings" : "providers";
   const funnelStages: VerticalFunnelStage[] = funnelData.map((s, i) => {
     const prevStage = i > 0 ? funnelData[i - 1] : undefined;
     const base = primaryOf(funnelData[0]);
     const ofBase = base > 0 ? (primaryOf(s) / base) * 100 : 0;
-    const step = i === 0 || !prevStage ? 0 : Math.max(0, (1 - primaryOf(s) / (primaryOf(prevStage) || 1)) * 100);
+    const step =
+      i === 0 || !prevStage
+        ? 0
+        : Math.max(0, (1 - primaryOf(s) / (primaryOf(prevStage) || 1)) * 100);
     return {
-      key: s.key, label: s.label, value: primaryOf(s), unit: unitLabel,
-      secondaryValue: secondaryOf(s), secondaryLabel,
+      key: s.key,
+      label: s.label,
+      value: primaryOf(s),
+      unit: unitLabel,
+      secondaryValue: secondaryOf(s),
+      secondaryLabel,
       color: colors[i] ?? "blue",
-      sub: i === 0 ? `100% of called` : `${ofBase.toFixed(1)}% of called  ·  −${step.toFixed(1)}% step`,
+      sub:
+        i === 0
+          ? `100% of called`
+          : `${ofBase.toFixed(1)}% of called  ·  −${step.toFixed(1)}% step`,
       avgDurationSec: stageDurations?.[s.key],
     };
   });
@@ -351,9 +462,24 @@ export function DkbOverviewMetrics({
         subtitle="Provider funnel — Called → Picked up → Engaged → Actively hiring"
       >
         <div className="mb-4 inline-flex rounded-md border border-border bg-card p-0.5 text-xs">
-          {([["providers", "Providers"], ["openings", "Openings"], ["calls", "Calls"]] as const).map(([v, label]) => (
-            <button key={v} type="button" onClick={() => setDview(v)}
-              className={cn("px-3 py-1.5 rounded transition-colors", dview === v ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
+          {(
+            [
+              ["providers", "Providers"],
+              ["openings", "Openings"],
+              ["calls", "Calls"],
+            ] as const
+          ).map(([v, label]) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setDview(v)}
+              className={cn(
+                "px-3 py-1.5 rounded transition-colors",
+                dview === v
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
               {label}
             </button>
           ))}
@@ -361,7 +487,12 @@ export function DkbOverviewMetrics({
         <div className="grid items-stretch gap-4 lg:grid-cols-5">
           <div className="lg:col-span-3">
             {funnelStages.length > 0 ? (
-              <VerticalFunnel stages={funnelStages} fill pickedUpKey="picked" onStageClick={onFunnelStageClick} />
+              <VerticalFunnel
+                stages={funnelStages}
+                fill
+                pickedUpKey="picked"
+                onStageClick={onFunnelStageClick}
+              />
             ) : (
               <div className="rounded-xl border bg-card p-5 text-sm text-muted-foreground">
                 No provider data available for the current filters.
@@ -376,7 +507,11 @@ export function DkbOverviewMetrics({
                 label="Productive conversations"
                 value={productivePct}
                 format="percent"
-                sub={previous ? undefined : `${m.productiveCalls.toLocaleString()} calls — answered + > 30s`}
+                sub={
+                  previous
+                    ? undefined
+                    : `${m.productiveCalls.toLocaleString()} calls — answered + > 30s`
+                }
                 previous={prevProductivePct}
                 comparisonLabel={comparisonLabel}
                 trend={series(perDay, (p) => safeDiv(p.engaged, p.rows) * 100)}
@@ -389,16 +524,12 @@ export function DkbOverviewMetrics({
                 comparisonLabel={comparisonLabel}
                 trend={series(perDay, (p) => p.high_intent)}
               />
-
             </div>
           </div>
         </div>
       </MetricSection>
 
-      <MetricSection
-        title="Active hiring"
-        subtitle="Vacancy-weighted (sum of num_vacancies_input)"
-      >
+      <MetricSection title="Active hiring" subtitle="Vacancy-weighted (sum of num_vacancies_input)">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <MetricCard
             label="Active Openings"
@@ -428,10 +559,8 @@ export function DkbOverviewMetrics({
             previous={prev(previous, "newOpenings")}
             comparisonLabel={comparisonLabel}
           />
-
         </div>
       </MetricSection>
-
 
       <MetricSection title="Call metrics" subtitle="Per call (raw rows)">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
@@ -446,7 +575,9 @@ export function DkbOverviewMetrics({
           <MetricCard
             label="Answered"
             value={m.answeredCalls}
-            sub={previous ? `${pickupPct.toFixed(1)}% pickup` : `${pickupPct.toFixed(1)}% pickup rate`}
+            sub={
+              previous ? `${pickupPct.toFixed(1)}% pickup` : `${pickupPct.toFixed(1)}% pickup rate`
+            }
             previous={prev(previous, "answeredCalls")}
             comparisonLabel={comparisonLabel}
             trend={series(perDay, (p) => p.answered)}
@@ -462,7 +593,11 @@ export function DkbOverviewMetrics({
             label="Productive conversations"
             value={productivePct}
             format="percent"
-            sub={previous ? undefined : `${m.productiveCalls.toLocaleString()} calls — answered + > 30s`}
+            sub={
+              previous
+                ? undefined
+                : `${m.productiveCalls.toLocaleString()} calls — answered + > 30s`
+            }
             previous={prevProductivePct}
             comparisonLabel={comparisonLabel}
             trend={series(perDay, (p) => safeDiv(p.engaged, p.rows) * 100)}

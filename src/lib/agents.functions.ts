@@ -27,14 +27,19 @@ const columns = {
   created_at: programAgents.createdAt,
 };
 
-async function rayaGetAgent(agentId: string): Promise<{ ok: true; name: string; raw: any } | { ok: false; error: string }> {
+async function rayaGetAgent(
+  agentId: string,
+): Promise<{ ok: true; name: string; raw: any } | { ok: false; error: string }> {
   try {
-    const parsed = await rayaFetch(`/agent/${encodeURIComponent(agentId)}`, { method: "GET" }) as any;
+    const parsed = (await rayaFetch(`/agent/${encodeURIComponent(agentId)}`, {
+      method: "GET",
+    })) as any;
     const a = (parsed?.agent ?? parsed?.data ?? parsed) as any;
     const name = String(a?.name ?? a?.agent_name ?? a?.title ?? "Unnamed agent");
     return { ok: true, name, raw: a };
   } catch (e) {
-    if (e instanceof RayaApiError && e.status === 404) return { ok: false, error: `Agent not found (404): ${agentId}` };
+    if (e instanceof RayaApiError && e.status === 404)
+      return { ok: false, error: `Agent not found (404): ${agentId}` };
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
 }
@@ -70,9 +75,15 @@ export const createProgramAgent = createServerFn({ method: "POST" })
     const fetched = await rayaGetAgent(data.agentId.trim());
     const status = fetched.ok ? "loaded" : "error";
     const last_error = fetched.ok ? null : fetched.error;
-    const name = (data.name?.trim()) || (fetched.ok ? fetched.name : data.agentId.trim());
+    const name = data.name?.trim() || (fetched.ok ? fetched.name : data.agentId.trim());
 
-    const values = { program: data.program, agentId: data.agentId.trim(), name, status, lastError: last_error };
+    const values = {
+      program: data.program,
+      agentId: data.agentId.trim(),
+      name,
+      status,
+      lastError: last_error,
+    };
     const [row] = await getDb()
       .insert(programAgents)
       .values(values)
@@ -97,7 +108,11 @@ export const refreshProgramAgent = createServerFn({ method: "POST" })
       .set(patch)
       .where(eq(programAgents.id, data.id))
       .returning(columns);
-    return { ok: fetched.ok, row: updated as ProgramAgent, error: fetched.ok ? null : fetched.error };
+    return {
+      ok: fetched.ok,
+      row: updated as ProgramAgent,
+      error: fetched.ok ? null : fetched.error,
+    };
   });
 
 export const deleteProgramAgent = createServerFn({ method: "POST" })

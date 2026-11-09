@@ -26,13 +26,24 @@ export function AccountMenu() {
           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand text-brand-foreground text-xs font-semibold">
             {initials}
           </span>
-          <span className="hidden max-w-[12rem] truncate text-muted-foreground sm:inline">{session.email}</span>
+          <span className="hidden max-w-[12rem] truncate text-muted-foreground sm:inline">
+            {session.email}
+          </span>
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel className="flex flex-col gap-0.5">
           <span className="truncate text-sm font-medium text-foreground">{session.email}</span>
-          <span className="text-xs font-normal text-muted-foreground">{{ admin: "Admin", jfc: "JFC", owner: "Owner", coordinator: "Coordinator", ecosystem: "Ecosystem", user: "Reviewer" }[session.role] ?? session.role}</span>
+          <span className="text-xs font-normal text-muted-foreground">
+            {{
+              admin: "Admin",
+              jfc: "JFC",
+              owner: "Owner",
+              coordinator: "Coordinator",
+              ecosystem: "Ecosystem",
+              user: "Reviewer",
+            }[session.role] ?? session.role}
+          </span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => navigate({ to: "/change-password" })}>
@@ -40,7 +51,9 @@ export function AccountMenu() {
           Change password
         </DropdownMenuItem>
         <DropdownMenuItem
-          onClick={() => { void logout().then(() => navigate({ to: "/login" })); }}
+          onClick={() => {
+            void logout().then(() => navigate({ to: "/login" }));
+          }}
           className="text-rose-600 focus:text-rose-600"
         >
           <LogOut className="h-4 w-4" />

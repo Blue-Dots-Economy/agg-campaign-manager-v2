@@ -81,7 +81,9 @@ export function JobsTab({
                 </div>
               ))}
             </div>
-            <p className="mt-3 text-xs text-muted-foreground">Click card to see all applications.</p>
+            <p className="mt-3 text-xs text-muted-foreground">
+              Click card to see all applications.
+            </p>
           </HoverCardContent>
         </HoverCard>
 

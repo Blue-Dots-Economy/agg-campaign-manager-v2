@@ -3,10 +3,7 @@ import { useState } from "react";
 import { useProgram } from "@/programs/context";
 import { useProgramAggregates } from "@/programs/useProgramAggregates";
 import { ProgramAnalytics } from "@/components/metrics/ProgramAnalytics";
-import {
-  OverviewFilters,
-  type OverviewFilterValue,
-} from "@/components/metrics/OverviewFilters";
+import { OverviewFilters, type OverviewFilterValue } from "@/components/metrics/OverviewFilters";
 
 export const Route = createFileRoute("/")({
   component: Overview,
@@ -28,9 +25,7 @@ function Overview() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <OverviewFilters value={filters} onChange={setFilters} showChannel={!isDkb} />
-        {query.isFetching && (
-          <span className="text-xs text-muted-foreground">Updating…</span>
-        )}
+        {query.isFetching && <span className="text-xs text-muted-foreground">Updating…</span>}
       </div>
       <ProgramAnalytics
         config={config}

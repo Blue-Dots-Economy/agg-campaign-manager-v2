@@ -65,7 +65,7 @@ const daysAgo = (n: number) => {
   return d.toISOString();
 };
 
-const pick = <T,>(arr: T[], i: number) => arr[i % arr.length];
+const pick = <T>(arr: T[], i: number) => arr[i % arr.length];
 
 const ROLES = [
   "Welder",
@@ -81,26 +81,19 @@ const ROLES = [
 ];
 
 const ROLE_FIT: Record<string, { partial: number[]; right: number[] }> = {
-  Welder:              { partial: [14, 11, 17, 9],   right: [6, 4, 8, 5] },
-  Electrician:         { partial: [22, 18, 25, 20],  right: [11, 9, 13, 10] },
+  Welder: { partial: [14, 11, 17, 9], right: [6, 4, 8, 5] },
+  Electrician: { partial: [22, 18, 25, 20], right: [11, 9, 13, 10] },
   "Data Entry Operator": { partial: [31, 28, 35, 26], right: [15, 12, 18, 14] },
   "Delivery Associate": { partial: [42, 38, 47, 35], right: [21, 19, 24, 17] },
-  "Sales Executive":   { partial: [27, 23, 30, 25],  right: [12, 10, 14, 11] },
-  "Machine Operator":  { partial: [9, 7, 12, 8],    right: [3, 5, 4, 6] },
-  Tailor:              { partial: [16, 13, 19, 15],  right: [7, 5, 9, 6] },
-  "Security Guard":    { partial: [38, 33, 44, 30],  right: [19, 16, 22, 14] },
-  Fitter:              { partial: [12, 10, 15, 8],   right: [5, 4, 7, 3] },
+  "Sales Executive": { partial: [27, 23, 30, 25], right: [12, 10, 14, 11] },
+  "Machine Operator": { partial: [9, 7, 12, 8], right: [3, 5, 4, 6] },
+  Tailor: { partial: [16, 13, 19, 15], right: [7, 5, 9, 6] },
+  "Security Guard": { partial: [38, 33, 44, 30], right: [19, 16, 22, 14] },
+  Fitter: { partial: [12, 10, 15, 8], right: [5, 4, 7, 3] },
   "Warehouse Associate": { partial: [24, 20, 28, 22], right: [10, 8, 12, 9] },
 };
 
-const CATEGORIES = [
-  "Manufacturing",
-  "Logistics",
-  "Retail",
-  "Textile",
-  "Services",
-  "Construction",
-];
+const CATEGORIES = ["Manufacturing", "Logistics", "Retail", "Textile", "Services", "Construction"];
 
 const SECTORS = ["Blue-Collar", "Grey-Collar", "White-Collar"];
 
@@ -187,7 +180,7 @@ function buildRegion(
   companies: string[],
   areas: string[],
   institutions: string[],
-  seedOffset: number
+  seedOffset: number,
 ): { jobs: JobPost[]; applications: Application[]; seekers: Seeker[] } {
   const jobs: JobPost[] = [];
   const jobCount = 24;
@@ -224,7 +217,9 @@ function buildRegion(
       recommended_action_seeker: pick(ACTIONS_SEEKER, i + seedOffset),
       contact_name: `Contact ${i + 1}`,
       contact_phone: `9${(800000000 + i * 137 + seedOffset).toString().slice(0, 9)}`,
-      contact_email: `hr${i + 1}@${pick(companies, i + seedOffset).toLowerCase().replace(/[^a-z]/g, "")}.co.in`,
+      contact_email: `hr${i + 1}@${pick(companies, i + seedOffset)
+        .toLowerCase()
+        .replace(/[^a-z]/g, "")}.co.in`,
       location_district: district,
       location_state: state,
     });
@@ -262,8 +257,30 @@ function buildRegion(
 
   const seekers: Seeker[] = [];
   const seekerCount = 72;
-  const firstNames = ["Amit", "Priya", "Rahul", "Sunita", "Vikas", "Anjali", "Rakesh", "Meena", "Suresh", "Kavita"];
-  const lastNames = ["Sharma", "Kumar", "Patel", "Verma", "Singh", "Gupta", "Yadav", "Naik", "Rao", "Reddy"];
+  const firstNames = [
+    "Amit",
+    "Priya",
+    "Rahul",
+    "Sunita",
+    "Vikas",
+    "Anjali",
+    "Rakesh",
+    "Meena",
+    "Suresh",
+    "Kavita",
+  ];
+  const lastNames = [
+    "Sharma",
+    "Kumar",
+    "Patel",
+    "Verma",
+    "Singh",
+    "Gupta",
+    "Yadav",
+    "Naik",
+    "Rao",
+    "Reddy",
+  ];
   for (let i = 0; i < seekerCount; i++) {
     seekers.push({
       id: `${state}-SEK-${i + 1}`,

@@ -198,7 +198,9 @@ function emptyPayload(
   connectionCount: number,
   state: { last_synced_at: string | null; status: string } | null,
   error?: string,
-  emptyReason: AggregatePayload["emptyReason"] = connectionCount === 0 ? "no_connections" : "no_snapshot",
+  emptyReason: AggregatePayload["emptyReason"] = connectionCount === 0
+    ? "no_connections"
+    : "no_snapshot",
 ): AggregatePayload {
   return {
     source: "empty",
@@ -236,21 +238,21 @@ function normalizeMetricsRaw(value: unknown): ProgramMetricsRaw {
       out.providerFunnel = v.flatMap((it) => {
         if (!it || typeof it !== "object") return [];
         const o = it as Record<string, unknown>;
-        return [{
-          key: String(o.key ?? ""),
-          label: String(o.label ?? ""),
-          providers: Number(o.providers ?? 0) || 0,
-          openings: Number(o.openings ?? 0) || 0,
-          calls: Number(o.calls ?? 0) || 0,
-        }];
+        return [
+          {
+            key: String(o.key ?? ""),
+            label: String(o.label ?? ""),
+            providers: Number(o.providers ?? 0) || 0,
+            openings: Number(o.openings ?? 0) || 0,
+            calls: Number(o.calls ?? 0) || 0,
+          },
+        ];
       });
-    }
-    else if (typeof v === "number" && Number.isFinite(v)) out[k] = v;
+    } else if (typeof v === "number" && Number.isFinite(v)) out[k] = v;
     else if (typeof v === "string" && v !== "" && !isNaN(Number(v))) out[k] = Number(v);
   }
   return out;
 }
-
 
 function normalizeMetricGroups(value: unknown): MetricGroup[] {
   if (!Array.isArray(value)) return [];
@@ -262,33 +264,51 @@ function normalizeMetricGroups(value: unknown): MetricGroup[] {
       ? o.cards.flatMap((c): MetricCardDef[] => {
           if (!c || typeof c !== "object") return [];
           const x = c as Record<string, unknown>;
-          const accent = allowed.includes(x.accent as MetricAccent) ? (x.accent as MetricAccent) : "blue";
-          return [{
-            key: String(x.key ?? ""),
-            label: String(x.label ?? ""),
-            value: String(x.value ?? ""),
-            sub: String(x.sub ?? ""),
-            accent,
-          }];
+          const accent = allowed.includes(x.accent as MetricAccent)
+            ? (x.accent as MetricAccent)
+            : "blue";
+          return [
+            {
+              key: String(x.key ?? ""),
+              label: String(x.label ?? ""),
+              value: String(x.value ?? ""),
+              sub: String(x.sub ?? ""),
+              accent,
+            },
+          ];
         })
       : [];
-    return [{
-      key: String(o.key ?? ""),
-      title: String(o.title ?? ""),
-      subtitle: o.subtitle ? String(o.subtitle) : undefined,
-      cards,
-    }];
+    return [
+      {
+        key: String(o.key ?? ""),
+        title: String(o.title ?? ""),
+        subtitle: o.subtitle ? String(o.subtitle) : undefined,
+        cards,
+      },
+    ];
   });
 }
 
 export const fetchProgramAggregates = createServerFn({ method: "GET" })
   .middleware([dashboard])
-  .inputValidator((d: { program: ProgramId; state?: string; dateFrom?: string | null; dateTo?: string | null; campaignType?: string; campaign?: string | null; channel?: string }) => d)
+  .inputValidator(
+    (d: {
+      program: ProgramId;
+      state?: string;
+      dateFrom?: string | null;
+      dateTo?: string | null;
+      campaignType?: string;
+      campaign?: string | null;
+      channel?: string;
+    }) => d,
+  )
   .handler(async ({ data }): Promise<AggregatePayload> => {
     try {
       let payload: AggregateRpcPayload;
       try {
-        const out = await (await reports()).programAggregatePayload({
+        const out = await (
+          await reports()
+        ).programAggregatePayload({
           program: data.program,
           state: all(data.state),
           dateFrom: data.dateFrom,
@@ -372,7 +392,14 @@ export interface KkbDropAnalysisPayload {
   safeguardingFlagged?: number;
 }
 
-type DropFilters = { state?: string; dateFrom?: string | null; dateTo?: string | null; campaignType?: string; campaign?: string | null; channel?: string };
+type DropFilters = {
+  state?: string;
+  dateFrom?: string | null;
+  dateTo?: string | null;
+  campaignType?: string;
+  campaign?: string | null;
+  channel?: string;
+};
 
 function dropArgs(d: DropFilters) {
   return {
@@ -394,7 +421,8 @@ function normalizeDropAnalysis(out: unknown): KkbDropAnalysisPayload {
     buckets: Array.isArray(p.buckets) ? p.buckets : [],
     maxCell: Number(p.maxCell ?? 0) || 0,
     grandTotal: Number(p.grandTotal ?? 0) || 0,
-    safeguardingFlagged: p.safeguardingFlagged != null ? Number(p.safeguardingFlagged) || 0 : undefined,
+    safeguardingFlagged:
+      p.safeguardingFlagged != null ? Number(p.safeguardingFlagged) || 0 : undefined,
   };
 }
 
@@ -435,11 +463,19 @@ export interface CampaignListItem {
 export const fetchCampaignList = createServerFn({ method: "GET" })
   .middleware([dashboard])
   .inputValidator(
-    (d: { program: ProgramId; state?: string; dateFrom?: string | null; dateTo?: string | null; channel?: string }) => d,
+    (d: {
+      program: ProgramId;
+      state?: string;
+      dateFrom?: string | null;
+      dateTo?: string | null;
+      channel?: string;
+    }) => d,
   )
   .handler(async ({ data }): Promise<CampaignListItem[]> => {
     try {
-      const out = await (await reports()).campaignList({
+      const out = await (
+        await reports()
+      ).campaignList({
         program: data.program,
         state: all(data.state),
         dateFrom: data.dateFrom,
@@ -450,17 +486,19 @@ export const fetchCampaignList = createServerFn({ method: "GET" })
       return out.flatMap((it): CampaignListItem[] => {
         if (!it || typeof it !== "object") return [];
         const o = it as Record<string, unknown>;
-        return [{
-          campaignType: String(o.campaignType ?? ""),
-          campaignDate: o.campaignDate ? String(o.campaignDate) : null,
-          language: o.language ? String(o.language) : null,
-          region: o.region ? String(o.region) : null,
-          totalCalls: Number(o.totalCalls ?? 0) || 0,
-          answered: Number(o.answered ?? 0) || 0,
-          engaged: Number(o.engaged ?? 0) || 0,
-          highIntent: Number(o.highIntent ?? 0) || 0,
-          converted: Number(o.converted ?? 0) || 0,
-        }];
+        return [
+          {
+            campaignType: String(o.campaignType ?? ""),
+            campaignDate: o.campaignDate ? String(o.campaignDate) : null,
+            language: o.language ? String(o.language) : null,
+            region: o.region ? String(o.region) : null,
+            totalCalls: Number(o.totalCalls ?? 0) || 0,
+            answered: Number(o.answered ?? 0) || 0,
+            engaged: Number(o.engaged ?? 0) || 0,
+            highIntent: Number(o.highIntent ?? 0) || 0,
+            converted: Number(o.converted ?? 0) || 0,
+          },
+        ];
       });
     } catch {
       return [];
@@ -482,10 +520,22 @@ export interface CampaignDropCausesPayload {
   }>;
 }
 
-type CampaignArgs = { campaign: string; state?: string; dateFrom?: string | null; dateTo?: string | null; channel?: string };
+type CampaignArgs = {
+  campaign: string;
+  state?: string;
+  dateFrom?: string | null;
+  dateTo?: string | null;
+  channel?: string;
+};
 
 function campaignArgs(d: CampaignArgs) {
-  return { campaign: d.campaign, state: all(d.state), dateFrom: d.dateFrom, dateTo: d.dateTo, channel: d.channel ?? "all" };
+  return {
+    campaign: d.campaign,
+    state: all(d.state),
+    dateFrom: d.dateFrom,
+    dateTo: d.dateTo,
+    channel: d.channel ?? "all",
+  };
 }
 
 export const fetchCampaignDropCauses = createServerFn({ method: "GET" })
@@ -584,7 +634,10 @@ export const fetchFunnelDurations = createServerFn({ method: "GET" })
     }
   });
 
-export interface CallOutcomeCount { outcome: string; n: number }
+export interface CallOutcomeCount {
+  outcome: string;
+  n: number;
+}
 
 /** KKB-only: call_outcome breakdown honouring the same filters as the funnel. */
 export const fetchKkbCallOutcomes = createServerFn({ method: "GET" })
@@ -609,9 +662,7 @@ export interface ProgramFilterOptions {
 }
 
 const toStringArray = (v: unknown): string[] =>
-  Array.isArray(v)
-    ? v.flatMap((x) => (typeof x === "string" && x.trim() ? [x] : []))
-    : [];
+  Array.isArray(v) ? v.flatMap((x) => (typeof x === "string" && x.trim() ? [x] : [])) : [];
 
 export const fetchProgramFilterOptions = createServerFn({ method: "GET" })
   .middleware([dashboard])

@@ -112,7 +112,6 @@ export function CampaignVerdict({ campaign, region, filters }: Props) {
   });
   const causes = useCampaignInsights(campaign, { dateFrom, dateTo });
 
-
   const { worked, didnt, phaseShare, hiTop, sampleCalls } = useMemo(() => {
     const cm = (campaignAgg.data?.metrics ?? {}) as Metrics;
     const rm = (regionAgg.data?.metrics ?? {}) as Metrics;
@@ -217,7 +216,9 @@ function VerdictCard({
   const tone = isGood
     ? "border-emerald-500/30 bg-emerald-500/5"
     : "border-rose-500/30 bg-rose-500/5";
-  const iconColor = isGood ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400";
+  const iconColor = isGood
+    ? "text-emerald-600 dark:text-emerald-400"
+    : "text-rose-600 dark:text-rose-400";
   const chipTone = isGood
     ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
     : "bg-rose-500/15 text-rose-700 dark:text-rose-300";
@@ -242,7 +243,8 @@ function VerdictCard({
                     <div className="text-sm font-medium text-foreground">
                       {f.spec.label}: {f.spec.format(f.campaignVal)}
                       <span className="text-muted-foreground font-normal">
-                        {" "}vs {f.spec.format(f.regionVal)}
+                        {" "}
+                        vs {f.spec.format(f.regionVal)}
                       </span>
                     </div>
                   </div>
@@ -252,9 +254,7 @@ function VerdictCard({
                     {fmtDelta(f.deltaPct)}
                   </span>
                 </div>
-                {why && (
-                  <div className="mt-0.5 text-xs text-muted-foreground">Why: {why}</div>
-                )}
+                {why && <div className="mt-0.5 text-xs text-muted-foreground">Why: {why}</div>}
               </li>
             );
           })}

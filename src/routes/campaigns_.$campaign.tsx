@@ -31,7 +31,6 @@ export const Route = createFileRoute("/campaigns_/$campaign")({
   component: CampaignReviewDetail,
 });
 
-
 function parseDate(s: string | null): Date | null {
   if (!s) return null;
   const [y, m, d] = s.split("-").map(Number);
@@ -47,7 +46,6 @@ function CampaignReviewDetail() {
   const { config } = useProgram();
   const { data: campaigns, isLoading } = useCampaignList(config, { channel: channelFilter });
 
-
   const sorted = useMemo(
     () =>
       (campaigns ?? [])
@@ -56,9 +54,8 @@ function CampaignReviewDetail() {
     [campaigns],
   );
   const current =
-    sorted.find(
-      (c) => c.campaignType === rawCampaign && (date ? c.campaignDate === date : true),
-    ) ?? sorted.find((c) => c.campaignType === rawCampaign);
+    sorted.find((c) => c.campaignType === rawCampaign && (date ? c.campaignDate === date : true)) ??
+    sorted.find((c) => c.campaignType === rawCampaign);
 
   if (isLoading && !campaigns) return <LoadingState />;
 
@@ -116,7 +113,6 @@ function CampaignReviewDetail() {
                 params: { campaign: type },
                 search: { date: d || undefined, channel: channel ?? undefined },
               });
-
             }}
           >
             <SelectTrigger className="h-9">
@@ -172,14 +168,18 @@ function CampaignReviewDetail() {
         </>
       )}
 
-
       <ProgramAnalytics
         config={config}
-        filters={{ state: "all", dateFrom: scopeDate, dateTo: scopeDate, campaignType: "all", channel: channelFilter }}
+        filters={{
+          state: "all",
+          dateFrom: scopeDate,
+          dateTo: scopeDate,
+          campaignType: "all",
+          channel: channelFilter,
+        }}
         campaign={current.campaignType}
         comparison={{ mode: "state-average", region, label }}
       />
-
     </div>
   );
 }

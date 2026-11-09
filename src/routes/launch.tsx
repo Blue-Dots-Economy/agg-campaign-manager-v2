@@ -4,11 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { useProgram } from "@/programs/context";
 import { useProgramOverrides } from "@/lib/program-overrides";
-import {
-  rayaCreateBatch,
-  rayaStartBatch,
-  validateContacts,
-} from "@/lib/raya.functions";
+import { rayaCreateBatch, rayaStartBatch, validateContacts } from "@/lib/raya.functions";
 import { listProgramAgents } from "@/lib/agents.functions";
 import { recordLaunchedBatch, getNextCampaignDay } from "@/lib/launched-batches.functions";
 import { useAuth } from "@/auth/context";
@@ -49,7 +45,11 @@ import {
   Gauge,
 } from "lucide-react";
 import { toast } from "sonner";
-import { ScheduleEditor, type ScheduleState, makeDefaultSchedule } from "@/components/ScheduleEditor";
+import {
+  ScheduleEditor,
+  type ScheduleState,
+  makeDefaultSchedule,
+} from "@/components/ScheduleEditor";
 import { appendLaunchLog } from "@/lib/launch-log";
 import { cn } from "@/lib/utils";
 import { loadSeekersAsync, type Seeker } from "@/lib/upSeekersCsv";
@@ -75,10 +75,19 @@ interface ValidationReport {
   invalid: number;
   missingCols: string[];
   problems: { row: number; reason: string; phone?: string; name?: string }[];
-  validRows: { name: string; phone: string; cc: string; extras: Record<string, string>; rowIndex: number }[];
+  validRows: {
+    name: string;
+    phone: string;
+    cc: string;
+    extras: Record<string, string>;
+    rowIndex: number;
+  }[];
 }
 
-interface ParsedCsv { headers: string[]; rows: string[][] }
+interface ParsedCsv {
+  headers: string[];
+  rows: string[][];
+}
 
 function parseCsv(text: string): ParsedCsv {
   const lines = text.trim().split(/\r?\n/);
@@ -129,7 +138,9 @@ function LaunchWizard() {
 
   const [batchName, setBatchName] = useState("");
   const [campaignDay, setCampaignDay] = useState<string>("Day 1");
-  const [campaignDate, setCampaignDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [campaignDate, setCampaignDate] = useState<string>(() =>
+    new Date().toISOString().slice(0, 10),
+  );
   const [launching, setLaunching] = useState(false);
   const [batchId, setBatchId] = useState<string | null>(null);
   const [startStatus, setStartStatus] = useState<string | null>(null);
@@ -160,7 +171,8 @@ function LaunchWizard() {
   const campaignType = useMemo(() => {
     const lang = regionInfo.language || region || "";
     const dayNum = (campaignDay.match(/\d+/) || ["1"])[0];
-    const intentTag = source === "cohort" ? (cohortIntent === "drive" ? "DriveApplications" : "FillInfo") : "";
+    const intentTag =
+      source === "cohort" ? (cohortIntent === "drive" ? "DriveApplications" : "FillInfo") : "";
     return `${program.toUpperCase()}_${lang}_${intentTag ? intentTag + "_" : ""}Day${dayNum}`;
   }, [program, regionInfo.language, region, campaignDay, source, cohortIntent]);
 
@@ -179,17 +191,24 @@ function LaunchWizard() {
   }, [source, region]);
 
   const cohortContacts = useMemo(
-    () => (seekers ? buildCohort(seekers, { intent: cohortIntent, profileStatuses, confidenceBand }) : []),
+    () =>
+      seekers
+        ? buildCohort(seekers, { intent: cohortIntent, profileStatuses, confidenceBand })
+        : [],
     [seekers, cohortIntent, profileStatuses, confidenceBand],
   );
 
   // Fetch next campaign day suggestion when program changes.
   useEffect(() => {
     let cancelled = false;
-    nextDayFn({ data: { program } }).then((r) => {
-      if (!cancelled) setCampaignDay(r.next);
-    }).catch(() => {});
-    return () => { cancelled = true; };
+    nextDayFn({ data: { program } })
+      .then((r) => {
+        if (!cancelled) setCampaignDay(r.next);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [program, nextDayFn]);
 
   // Auto-fill batchName to the computed campaign_type so they line up.
@@ -197,9 +216,10 @@ function LaunchWizard() {
     if (campaignType) setBatchName(campaignType);
   }, [campaignType]);
 
-
   // Sync chosen program back to global context so the rest of the dashboard follows.
-  useEffect(() => { if (program !== ctxProgram) setProgramId(program); }, [program, ctxProgram, setProgramId]);
+  useEffect(() => {
+    if (program !== ctxProgram) setProgramId(program);
+  }, [program, ctxProgram, setProgramId]);
 
   const agentsQuery = useQuery({
     queryKey: ["program-agents", program],
@@ -235,27 +255,43 @@ function LaunchWizard() {
       return true;
     }
     return true;
-  }, [step, program, agentId, report, proceedInvalid, schedule, concurrency, maxRetries, retryAfterHrs, available, source, cohortContacts.length]);
+  }, [
+    step,
+    program,
+    agentId,
+    report,
+    proceedInvalid,
+    schedule,
+    concurrency,
+    maxRetries,
+    retryAfterHrs,
+    available,
+    source,
+    cohortContacts.length,
+  ]);
 
-  const onFile = useCallback(async (f: File) => {
-    setFile(f);
-    setReport(null);
-    setProceedInvalid(false);
-    setRegion(detectRegion(f.name).region);
-    // batchName auto-derives from campaignType (program + language + Day N).
-    const text = await f.text();
-    const p = parseCsv(text);
-    setParsed(p);
-    setValidating(true);
-    try {
-      const res = await validateFn({ data: { headers: p.headers, rows: p.rows } });
-      setReport(res as ValidationReport);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Validation failed");
-    } finally {
-      setValidating(false);
-    }
-  }, [validateFn]);
+  const onFile = useCallback(
+    async (f: File) => {
+      setFile(f);
+      setReport(null);
+      setProceedInvalid(false);
+      setRegion(detectRegion(f.name).region);
+      // batchName auto-derives from campaignType (program + language + Day N).
+      const text = await f.text();
+      const p = parseCsv(text);
+      setParsed(p);
+      setValidating(true);
+      try {
+        const res = await validateFn({ data: { headers: p.headers, rows: p.rows } });
+        setReport(res as ValidationReport);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Validation failed");
+      } finally {
+        setValidating(false);
+      }
+    },
+    [validateFn],
+  );
 
   const startCreatedBatch = async (id: string, logRows?: number) => {
     setLaunching(true);
@@ -291,7 +327,9 @@ function LaunchWizard() {
       refreshUsage();
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Start failed";
-      setLaunchError(`${msg}\nBatch ${id} was created but not started. Use Retry start to resume without creating a duplicate batch.`);
+      setLaunchError(
+        `${msg}\nBatch ${id} was created but not started. Use Retry start to resume without creating a duplicate batch.`,
+      );
       setStartPending(true);
       toast.error(msg.split("\n")[0]);
     } finally {
@@ -354,7 +392,9 @@ function LaunchWizard() {
         },
       });
       setRequested(true);
-      toast.success("Request submitted — it'll appear in Campaign Requests for a JFC/admin to review and launch.");
+      toast.success(
+        "Request submitted — it'll appear in Campaign Requests for a JFC/admin to review and launch.",
+      );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Request failed");
     }
@@ -367,7 +407,10 @@ function LaunchWizard() {
       toast.error(msg);
       return;
     }
-    setLaunching(true); setLaunchError(null); setStartPending(false); setStartStatus(null);
+    setLaunching(true);
+    setLaunchError(null);
+    setStartPending(false);
+    setStartStatus(null);
     try {
       const contacts =
         source === "cohort"
@@ -384,14 +427,34 @@ function LaunchWizard() {
         setLaunching(false);
         return;
       }
-      const created = await createBatchFn({ data: { agentId, batchName, contacts } }) as
-        | { ok: true; batchId: string; contactsInserted?: number; totalRows?: number; message?: string }
-        | { ok: false; batchId: null; validation: { message: string; totalRows?: number; validRows?: number; invalidRows?: number; errors: Array<{ row?: number; field?: string; message?: string; value?: any }> } };
+      const created = (await createBatchFn({ data: { agentId, batchName, contacts } })) as
+        | {
+            ok: true;
+            batchId: string;
+            contactsInserted?: number;
+            totalRows?: number;
+            message?: string;
+          }
+        | {
+            ok: false;
+            batchId: null;
+            validation: {
+              message: string;
+              totalRows?: number;
+              validRows?: number;
+              invalidRows?: number;
+              errors: Array<{ row?: number; field?: string; message?: string; value?: any }>;
+            };
+          };
 
       if (!created.ok) {
         const v = created.validation;
-        const sample = (v.errors ?? []).slice(0, 5)
-          .map((er) => `row ${er.row ?? "?"}${er.field ? ` · ${er.field}` : ""}${er.message ? `: ${er.message}` : ""}`)
+        const sample = (v.errors ?? [])
+          .slice(0, 5)
+          .map(
+            (er) =>
+              `row ${er.row ?? "?"}${er.field ? ` · ${er.field}` : ""}${er.message ? `: ${er.message}` : ""}`,
+          )
           .join("\n");
         const more = (v.errors?.length ?? 0) > 5 ? `\n…and ${v.errors!.length - 5} more` : "";
         throw new Error(
@@ -439,7 +502,6 @@ function LaunchWizard() {
     }
   };
 
-
   return (
     <div className="space-y-6">
       <Stepper step={step} />
@@ -453,7 +515,9 @@ function LaunchWizard() {
                 onClick={() => setProgram(p)}
                 className={cn(
                   "rounded-xl border-2 p-5 text-left transition-colors",
-                  program === p ? "border-brand bg-brand-soft" : "border-border bg-card hover:bg-muted/40",
+                  program === p
+                    ? "border-brand bg-brand-soft"
+                    : "border-border bg-card hover:bg-muted/40",
                 )}
               >
                 <div className="text-lg font-semibold">{registry[p].label}</div>
@@ -465,9 +529,14 @@ function LaunchWizard() {
       )}
 
       {step === 1 && (
-        <Panel title="Step 2 · Agent" description={`Choose which saved ${program.toUpperCase()} agent will place the calls`}>
+        <Panel
+          title="Step 2 · Agent"
+          description={`Choose which saved ${program.toUpperCase()} agent will place the calls`}
+        >
           {agentsQuery.isLoading && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading agents…</div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading agents…
+            </div>
           )}
           {agentsQuery.error && (
             <div className="rounded-md bg-red-500/15 px-3 py-2 text-sm text-red-700 dark:text-red-400">
@@ -477,7 +546,10 @@ function LaunchWizard() {
           {agentsQuery.data && agentsQuery.data.length === 0 && (
             <div className="rounded-md border border-dashed px-4 py-6 text-sm text-muted-foreground">
               No agents saved for {program.toUpperCase()}.{" "}
-              <Link to="/settings" className="text-brand underline">Add one in the Agents section</Link>.
+              <Link to="/settings" className="text-brand underline">
+                Add one in the Agents section
+              </Link>
+              .
             </div>
           )}
           {agentsQuery.data && agentsQuery.data.length > 0 && (
@@ -490,19 +562,28 @@ function LaunchWizard() {
                   setAgentName(agentsQuery.data?.find((a) => a.agent_id === v)?.name ?? "");
                 }}
               >
-                <SelectTrigger><SelectValue placeholder="Select an agent" /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select an agent" />
+                </SelectTrigger>
                 <SelectContent>
                   {agentsQuery.data.map((a) => (
                     <SelectItem key={a.id} value={a.agent_id}>
                       <div className="flex flex-col">
-                        <span>{a.name} — <span className="font-mono text-[10px] opacity-60">{a.agent_id}</span></span>
+                        <span>
+                          {a.name} —{" "}
+                          <span className="font-mono text-[10px] opacity-60">{a.agent_id}</span>
+                        </span>
                       </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Manage agents in the <Link to="/settings" className="text-brand underline">Agents</Link> section.
+                Manage agents in the{" "}
+                <Link to="/settings" className="text-brand underline">
+                  Agents
+                </Link>{" "}
+                section.
               </p>
             </div>
           )}
@@ -512,19 +593,35 @@ function LaunchWizard() {
       {step === 2 && (
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2 max-w-xl">
-            {([
-              { id: "upload", icon: Upload, title: "Bulk upload", desc: "Dial a CSV of contacts you provide." },
-              { id: "cohort", icon: Gauge, title: "Create cohort", desc: "Build an audience from My Blue Dots." },
-            ] as const).map((o) => (
+            {(
+              [
+                {
+                  id: "upload",
+                  icon: Upload,
+                  title: "Bulk upload",
+                  desc: "Dial a CSV of contacts you provide.",
+                },
+                {
+                  id: "cohort",
+                  icon: Gauge,
+                  title: "Create cohort",
+                  desc: "Build an audience from My Blue Dots.",
+                },
+              ] as const
+            ).map((o) => (
               <button
                 key={o.id}
                 onClick={() => setSource(o.id)}
                 className={cn(
                   "rounded-xl border-2 p-4 text-left transition-colors flex items-start gap-3",
-                  source === o.id ? "border-brand bg-brand-soft" : "border-border bg-card hover:bg-muted/40",
+                  source === o.id
+                    ? "border-brand bg-brand-soft"
+                    : "border-border bg-card hover:bg-muted/40",
                 )}
               >
-                <span className="mt-0.5 text-brand"><o.icon className="h-5 w-5" /></span>
+                <span className="mt-0.5 text-brand">
+                  <o.icon className="h-5 w-5" />
+                </span>
                 <span>
                   <span className="block text-sm font-semibold">{o.title}</span>
                   <span className="block text-xs text-muted-foreground mt-0.5">{o.desc}</span>
@@ -543,7 +640,12 @@ function LaunchWizard() {
               proceedInvalid={proceedInvalid}
               setProceedInvalid={setProceedInvalid}
               onFile={onFile}
-              onReset={() => { setFile(null); setParsed(null); setReport(null); setProceedInvalid(false); }}
+              onReset={() => {
+                setFile(null);
+                setParsed(null);
+                setReport(null);
+                setProceedInvalid(false);
+              }}
             />
           ) : (
             <CohortStep
@@ -561,35 +663,52 @@ function LaunchWizard() {
       )}
 
       {step === 3 && (
-        <Panel title="Step 4 · Schedule" description="Days, time window, and timezone for the call window">
-          <div className="max-w-xl"><ScheduleEditor value={schedule} onChange={setSchedule} /></div>
+        <Panel
+          title="Step 4 · Schedule"
+          description="Days, time window, and timezone for the call window"
+        >
+          <div className="max-w-xl">
+            <ScheduleEditor value={schedule} onChange={setSchedule} />
+          </div>
         </Panel>
       )}
 
       {step === 4 && (
-        <Panel title="Step 5 · Concurrency & retries" description="How aggressively Raya should dial">
+        <Panel
+          title="Step 5 · Concurrency & retries"
+          description="How aggressively Raya should dial"
+        >
           <div className="mb-4 max-w-2xl rounded-md border border-amber-500/30 bg-amber-500/15 px-3 py-2 text-sm text-amber-800 dark:text-amber-300 flex items-start gap-2">
             <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
             <div>
-              Raya rate limit: <strong>1 call per 20 seconds</strong> by default. Keep concurrency low or launches will be throttled (HTTP 429).
+              Raya rate limit: <strong>1 call per 20 seconds</strong> by default. Keep concurrency
+              low or launches will be throttled (HTTP 429).
             </div>
           </div>
-          <div className={cn(
-            "mb-4 max-w-2xl rounded-md border px-3 py-2 text-sm flex items-start gap-2",
-            available === 0
-              ? "border-red-500/30 bg-red-500/15 text-red-700 dark:text-red-400"
-              : available <= 5
-                ? "border-amber-500/30 bg-amber-500/15 text-amber-800 dark:text-amber-300"
-                : "border-brand/20 bg-brand-soft text-brand",
-          )}>
+          <div
+            className={cn(
+              "mb-4 max-w-2xl rounded-md border px-3 py-2 text-sm flex items-start gap-2",
+              available === 0
+                ? "border-red-500/30 bg-red-500/15 text-red-700 dark:text-red-400"
+                : available <= 5
+                  ? "border-amber-500/30 bg-amber-500/15 text-amber-800 dark:text-amber-300"
+                  : "border-brand/20 bg-brand-soft text-brand",
+            )}
+          >
             <Gauge className="h-4 w-4 mt-0.5 shrink-0" />
             <div>
-              <strong>{usage.isLoading ? "…" : available}</strong> of {cap} concurrency available right now (account-wide, shared by KKB + DKB).
+              <strong>{usage.isLoading ? "…" : available}</strong> of {cap} concurrency available
+              right now (account-wide, shared by KKB + DKB).
               {usage.data?.batches?.length ? (
-                <span className="ml-1 opacity-80">In use by {usage.data.batches.length} batch{usage.data.batches.length === 1 ? "" : "es"}.</span>
+                <span className="ml-1 opacity-80">
+                  In use by {usage.data.batches.length} batch
+                  {usage.data.batches.length === 1 ? "" : "es"}.
+                </span>
               ) : null}
               {concurrency > (available as number) && Number.isFinite(available) && (
-                <div className="mt-1 font-medium">Reduce concurrency to {available} or stop a running batch to proceed.</div>
+                <div className="mt-1 font-medium">
+                  Reduce concurrency to {available} or stop a running batch to proceed.
+                </div>
               )}
             </div>
           </div>
@@ -599,10 +718,25 @@ function LaunchWizard() {
               value={concurrency}
               onChange={setConcurrency}
               min={1}
-              max={Math.max(1, Math.min(100, Number.isFinite(available) ? (available as number) : 100))}
+              max={Math.max(
+                1,
+                Math.min(100, Number.isFinite(available) ? (available as number) : 100),
+              )}
             />
-            <NumberField label="Max retries" value={maxRetries} onChange={setMaxRetries} min={0} max={10} />
-            <NumberField label="Retry after (hrs)" value={retryAfterHrs} onChange={setRetryAfterHrs} min={1} max={168} />
+            <NumberField
+              label="Max retries"
+              value={maxRetries}
+              onChange={setMaxRetries}
+              min={0}
+              max={10}
+            />
+            <NumberField
+              label="Retry after (hrs)"
+              value={retryAfterHrs}
+              onChange={setRetryAfterHrs}
+              min={1}
+              max={168}
+            />
           </div>
           <div className="mt-4 max-w-2xl">
             <Label className="text-xs">Contacts to call (status)</Label>
@@ -633,10 +767,10 @@ function LaunchWizard() {
               })}
             </div>
             <p className="mt-1.5 text-xs text-muted-foreground">
-              Pending = new / not-yet-called contacts. Add Unanswered or Failed to also re-call those from a previous run.
+              Pending = new / not-yet-called contacts. Add Unanswered or Failed to also re-call
+              those from a previous run.
             </p>
           </div>
-
         </Panel>
       )}
 
@@ -647,11 +781,26 @@ function LaunchWizard() {
             <Field label="Agent" value={agentName || agentId} mono />
             <Field label="Agent id" value={agentId} mono />
             <Field label="Batch name" value={batchName} />
-            <Field label="Audience" value={source === "cohort" ? "Cohort · My Blue Dots" : "Bulk upload"} />
+            <Field
+              label="Audience"
+              value={source === "cohort" ? "Cohort · My Blue Dots" : "Bulk upload"}
+            />
             {source === "cohort" ? (
               <>
-                <Field label="Cohort intent" value={cohortIntent === "drive" ? "Drive Applications" : "Fill Missing Information"} />
-                <Field label="Cohort filter" value={cohortIntent === "drive" ? profileStatuses.join(", ") : `Confidence ${confidenceBand}`} />
+                <Field
+                  label="Cohort intent"
+                  value={
+                    cohortIntent === "drive" ? "Drive Applications" : "Fill Missing Information"
+                  }
+                />
+                <Field
+                  label="Cohort filter"
+                  value={
+                    cohortIntent === "drive"
+                      ? profileStatuses.join(", ")
+                      : `Confidence ${confidenceBand}`
+                  }
+                />
               </>
             ) : (
               <Field label="File" value={file?.name ?? "—"} />
@@ -662,7 +811,14 @@ function LaunchWizard() {
             <Field label="Campaign day" value={campaignDay} />
             <Field label="Campaign date" value={campaignDate} />
             <Field label="Campaign type" value={campaignType} />
-            <Field label="Contacts" value={source === "cohort" ? String(cohortContacts.length) : `${report?.valid ?? 0} of ${report?.total ?? 0}`} />
+            <Field
+              label="Contacts"
+              value={
+                source === "cohort"
+                  ? String(cohortContacts.length)
+                  : `${report?.valid ?? 0} of ${report?.total ?? 0}`
+              }
+            />
             <Field label="Will skip" value={String(report?.invalid ?? 0)} />
             <Field label="Days" value={dayLabels(schedule.days)} />
             <Field label="Time window" value={`${schedule.startTime}–${schedule.endTime}`} />
@@ -671,27 +827,52 @@ function LaunchWizard() {
             <Field label="Max retries" value={String(maxRetries)} />
             <Field label="Retry after" value={`${retryAfterHrs} hrs`} />
             <Field label="Statuses to call" value={selectedStatuses.join(", ")} />
-
           </div>
           <div className="mt-6 grid gap-4 sm:grid-cols-3 max-w-3xl">
             <div>
-              <Label htmlFor="bn" className="text-xs">Edit batch name</Label>
-              <Input id="bn" value={batchName} onChange={(e) => setBatchName(e.target.value)} className="mt-1" />
+              <Label htmlFor="bn" className="text-xs">
+                Edit batch name
+              </Label>
+              <Input
+                id="bn"
+                value={batchName}
+                onChange={(e) => setBatchName(e.target.value)}
+                className="mt-1"
+              />
             </div>
             <div>
-              <Label htmlFor="cday" className="text-xs">Campaign day</Label>
-              <Input id="cday" value={campaignDay} onChange={(e) => setCampaignDay(e.target.value)} placeholder="Day 1" className="mt-1" />
+              <Label htmlFor="cday" className="text-xs">
+                Campaign day
+              </Label>
+              <Input
+                id="cday"
+                value={campaignDay}
+                onChange={(e) => setCampaignDay(e.target.value)}
+                placeholder="Day 1"
+                className="mt-1"
+              />
             </div>
             <div>
-              <Label htmlFor="cdate" className="text-xs">Campaign date</Label>
-              <Input id="cdate" type="date" value={campaignDate} onChange={(e) => setCampaignDate(e.target.value)} className="mt-1" />
+              <Label htmlFor="cdate" className="text-xs">
+                Campaign date
+              </Label>
+              <Input
+                id="cdate"
+                type="date"
+                value={campaignDate}
+                onChange={(e) => setCampaignDate(e.target.value)}
+                className="mt-1"
+              />
             </div>
           </div>
         </Panel>
       )}
 
       {step === 6 && (
-        <Panel title="Step 7 · Launch" description="Create the batch in Raya and start the schedule">
+        <Panel
+          title="Step 7 · Launch"
+          description="Create the batch in Raya and start the schedule"
+        >
           <div className="space-y-4 max-w-xl">
             {!requested && !batchId && !launching && (
               <div className="space-y-3">
@@ -707,22 +888,28 @@ function LaunchWizard() {
                     <Button onClick={launch} variant="outline" className="gap-1.5">
                       <Rocket className="h-4 w-4" /> Launch campaign
                     </Button>
-                    <p className="text-xs text-muted-foreground">Launch now (skips the request queue)</p>
+                    <p className="text-xs text-muted-foreground">
+                      Launch now (skips the request queue)
+                    </p>
                   </div>
                 )}
               </div>
             )}
             {requested && !batchId && (
               <div className="rounded-md bg-brand-soft text-brand px-3 py-2 text-sm flex items-center gap-2">
-                <Check className="h-4 w-4" /> Request submitted — pending review in Campaign Requests
+                <Check className="h-4 w-4" /> Request submitted — pending review in Campaign
+                Requests
               </div>
             )}
             {launching && (
-              <div className="flex items-center gap-2 text-sm"><Loader2 className="h-4 w-4 animate-spin" /> Creating batch and starting schedule…</div>
+              <div className="flex items-center gap-2 text-sm">
+                <Loader2 className="h-4 w-4 animate-spin" /> Creating batch and starting schedule…
+              </div>
             )}
             {batchId && (
               <div className="rounded-md bg-brand-soft text-brand px-3 py-2 text-sm flex items-center gap-2">
-                <Check className="h-4 w-4" /> Batch created · <span className="font-mono">{batchId}</span>
+                <Check className="h-4 w-4" /> Batch created ·{" "}
+                <span className="font-mono">{batchId}</span>
               </div>
             )}
             {startPending && batchId && !launching && (
@@ -753,11 +940,26 @@ function LaunchWizard() {
           <ChevronLeft className="mr-1 h-4 w-4" /> Back
         </Button>
         {step < STEPS.length - 1 ? (
-          <Button onClick={next} disabled={!canNext} className="bg-brand text-brand-foreground hover:bg-brand/90">
+          <Button
+            onClick={next}
+            disabled={!canNext}
+            className="bg-brand text-brand-foreground hover:bg-brand/90"
+          >
             Next <ChevronRight className="ml-1 h-4 w-4" />
           </Button>
         ) : (
-          <Button variant="outline" onClick={() => { setStep(0); setBatchId(null); setStartStatus(null); setStartPending(false); setFile(null); setParsed(null); setReport(null); }}>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setStep(0);
+              setBatchId(null);
+              setStartStatus(null);
+              setStartPending(false);
+              setFile(null);
+              setParsed(null);
+              setReport(null);
+            }}
+          >
             Start over
           </Button>
         )}
@@ -774,14 +976,24 @@ function Stepper({ step }: { step: number }) {
         const active = i === step;
         return (
           <div key={label} className="flex items-center gap-2 shrink-0">
-            <div className={cn(
-              "h-7 w-7 rounded-full text-xs font-semibold flex items-center justify-center border-2",
-              done ? "bg-brand border-brand text-brand-foreground" :
-              active ? "border-brand text-brand" : "border-border text-muted-foreground",
-            )}>
+            <div
+              className={cn(
+                "h-7 w-7 rounded-full text-xs font-semibold flex items-center justify-center border-2",
+                done
+                  ? "bg-brand border-brand text-brand-foreground"
+                  : active
+                    ? "border-brand text-brand"
+                    : "border-border text-muted-foreground",
+              )}
+            >
               {done ? <Check className="h-3.5 w-3.5" /> : i + 1}
             </div>
-            <span className={cn("text-xs whitespace-nowrap", active ? "font-medium text-foreground" : "text-muted-foreground")}>
+            <span
+              className={cn(
+                "text-xs whitespace-nowrap",
+                active ? "font-medium text-foreground" : "text-muted-foreground",
+              )}
+            >
               {label}
             </span>
             {i < STEPS.length - 1 && <div className="w-6 h-px bg-border" />}
@@ -793,7 +1005,16 @@ function Stepper({ step }: { step: number }) {
 }
 
 function UploadStep({
-  file, parsed, report, validating, region, setRegion, proceedInvalid, setProceedInvalid, onFile, onReset,
+  file,
+  parsed,
+  report,
+  validating,
+  region,
+  setRegion,
+  proceedInvalid,
+  setProceedInvalid,
+  onFile,
+  onReset,
 }: {
   file: File | null;
   parsed: ParsedCsv | null;
@@ -809,11 +1030,22 @@ function UploadStep({
   const [drag, setDrag] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   return (
-    <Panel title="Step 3 · Upload & validate" description="Drop a CSV — we validate before any Raya call is made">
+    <Panel
+      title="Step 3 · Upload & validate"
+      description="Drop a CSV — we validate before any Raya call is made"
+    >
       <div
-        onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDrag(true);
+        }}
         onDragLeave={() => setDrag(false)}
-        onDrop={(e) => { e.preventDefault(); setDrag(false); const f = e.dataTransfer.files?.[0]; if (f) onFile(f); }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDrag(false);
+          const f = e.dataTransfer.files?.[0];
+          if (f) onFile(f);
+        }}
         onClick={() => inputRef.current?.click()}
         className={cn(
           "flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed py-10 cursor-pointer transition-colors",
@@ -824,8 +1056,16 @@ function UploadStep({
           <Upload className="h-5 w-5" />
         </div>
         <p className="text-sm font-medium">Drop CSV here, or click to browse</p>
-        <p className="text-xs text-muted-foreground">Required: contact_name, contact_phone. Optional: country_code (default 91).</p>
-        <input ref={inputRef} type="file" accept=".csv" hidden onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
+        <p className="text-xs text-muted-foreground">
+          Required: contact_name, contact_phone. Optional: country_code (default 91).
+        </p>
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".csv"
+          hidden
+          onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])}
+        />
       </div>
 
       {file && (
@@ -835,13 +1075,19 @@ function UploadStep({
               <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1 flex items-center gap-1.5">
                 <FileText className="h-3.5 w-3.5" /> File
               </div>
-              <div className="text-sm font-medium truncate" title={file.name}>{file.name}</div>
+              <div className="text-sm font-medium truncate" title={file.name}>
+                {file.name}
+              </div>
             </div>
             <Button
               variant="ghost"
               size="sm"
               className="h-7 px-2 text-muted-foreground hover:text-red-600"
-              onClick={(e) => { e.stopPropagation(); onReset(); if (inputRef.current) inputRef.current.value = ""; }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onReset();
+                if (inputRef.current) inputRef.current.value = "";
+              }}
               title="Remove file"
             >
               <X className="h-4 w-4" />
@@ -849,9 +1095,13 @@ function UploadStep({
           </div>
           <InfoTile label="Rows" value={parsed?.rows.length.toLocaleString() ?? "—"} />
           <div className="rounded-lg border bg-card p-3">
-            <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Detected region</div>
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
+              Detected region
+            </div>
             <Select value={region} onValueChange={setRegion}>
-              <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="KA">KA · Kannada · Hubli</SelectItem>
                 <SelectItem value="GZB">GZB · Hindi · Ghaziabad</SelectItem>
@@ -862,19 +1112,28 @@ function UploadStep({
       )}
 
       {validating && (
-        <div className="mt-4 flex items-center gap-2 text-sm"><Loader2 className="h-4 w-4 animate-spin" /> Validating…</div>
+        <div className="mt-4 flex items-center gap-2 text-sm">
+          <Loader2 className="h-4 w-4 animate-spin" /> Validating…
+        </div>
       )}
 
       {report && (
         <div className="mt-4 space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge className="bg-brand-soft text-brand hover:bg-brand-soft">{report.valid} valid</Badge>
+            <Badge className="bg-brand-soft text-brand hover:bg-brand-soft">
+              {report.valid} valid
+            </Badge>
             <Badge variant="secondary">{report.total} total</Badge>
-            {report.invalid > 0 && <Badge className="bg-red-500/15 text-red-700 dark:text-red-400 hover:bg-red-500/25">{report.invalid} problems</Badge>}
+            {report.invalid > 0 && (
+              <Badge className="bg-red-500/15 text-red-700 dark:text-red-400 hover:bg-red-500/25">
+                {report.invalid} problems
+              </Badge>
+            )}
           </div>
           {report.missingCols.length > 0 && (
             <div className="rounded-md bg-red-500/15 text-red-700 dark:text-red-400 px-3 py-2 text-sm">
-              Missing required column{report.missingCols.length === 1 ? "" : "s"}: <span className="font-mono">{report.missingCols.join(", ")}</span>
+              Missing required column{report.missingCols.length === 1 ? "" : "s"}:{" "}
+              <span className="font-mono">{report.missingCols.join(", ")}</span>
             </div>
           )}
           {report.problems.length > 0 && (
@@ -899,7 +1158,11 @@ function UploadStep({
           )}
           {report.invalid > 0 && report.missingCols.length === 0 && (
             <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={proceedInvalid} onChange={(e) => setProceedInvalid(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={proceedInvalid}
+                onChange={(e) => setProceedInvalid(e.target.checked)}
+              />
               Proceed with {report.valid} valid rows only (skip {report.invalid} problem rows)
             </label>
           )}
@@ -912,11 +1175,23 @@ function UploadStep({
           <div className="max-h-72 overflow-auto rounded-md border">
             <Table>
               <TableHeader>
-                <TableRow>{parsed.headers.map((h) => <TableHead key={h} className="whitespace-nowrap text-xs">{h}</TableHead>)}</TableRow>
+                <TableRow>
+                  {parsed.headers.map((h) => (
+                    <TableHead key={h} className="whitespace-nowrap text-xs">
+                      {h}
+                    </TableHead>
+                  ))}
+                </TableRow>
               </TableHeader>
               <TableBody>
                 {parsed.rows.slice(0, 20).map((r, i) => (
-                  <TableRow key={i}>{r.map((c, j) => <TableCell key={j} className="text-xs whitespace-nowrap">{c}</TableCell>)}</TableRow>
+                  <TableRow key={i}>
+                    {r.map((c, j) => (
+                      <TableCell key={j} className="text-xs whitespace-nowrap">
+                        {c}
+                      </TableCell>
+                    ))}
+                  </TableRow>
                 ))}
               </TableBody>
             </Table>
@@ -927,11 +1202,30 @@ function UploadStep({
   );
 }
 
-function NumberField({ label, value, onChange, min, max }: { label: string; value: number; onChange: (n: number) => void; min: number; max: number }) {
+function NumberField({
+  label,
+  value,
+  onChange,
+  min,
+  max,
+}: {
+  label: string;
+  value: number;
+  onChange: (n: number) => void;
+  min: number;
+  max: number;
+}) {
   return (
     <div>
       <Label className="text-xs">{label}</Label>
-      <Input type="number" min={min} max={max} value={value} onChange={(e) => onChange(Number(e.target.value) || 0)} className="mt-1" />
+      <Input
+        type="number"
+        min={min}
+        max={max}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value) || 0)}
+        className="mt-1"
+      />
     </div>
   );
 }
@@ -945,11 +1239,22 @@ function Field({ label, value, mono }: { label: string; value: string; mono?: bo
   );
 }
 
-function InfoTile({ icon, label, value, hint }: { icon?: React.ReactNode; label: string; value: string; hint?: string }) {
+function InfoTile({
+  icon,
+  label,
+  value,
+  hint,
+}: {
+  icon?: React.ReactNode;
+  label: string;
+  value: string;
+  hint?: string;
+}) {
   return (
     <div className="rounded-lg border bg-card p-3">
       <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
-        {icon}{label}
+        {icon}
+        {label}
       </div>
       <div className="text-sm font-medium truncate">{value}</div>
       {hint && <div className="text-xs text-muted-foreground">{hint}</div>}
@@ -959,11 +1264,24 @@ function InfoTile({ icon, label, value, hint }: { icon?: React.ReactNode; label:
 
 const DAY_NAMES = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 function dayLabels(days: number[]) {
-  return days.slice().sort().map((d) => DAY_NAMES[d]).join(", ") || "—";
+  return (
+    days
+      .slice()
+      .sort()
+      .map((d) => DAY_NAMES[d])
+      .join(", ") || "—"
+  );
 }
 
 function CohortStep({
-  intent, setIntent, profileStatuses, setProfileStatuses, confidenceBand, setConfidenceBand, loading, count,
+  intent,
+  setIntent,
+  profileStatuses,
+  setProfileStatuses,
+  confidenceBand,
+  setConfidenceBand,
+  loading,
+  count,
 }: {
   intent: CohortIntent;
   setIntent: (v: CohortIntent) => void;
@@ -981,28 +1299,52 @@ function CohortStep({
     { id: "high", label: "High (> 70)" },
   ];
   const toggleStatus = (s: string) =>
-    setProfileStatuses(profileStatuses.includes(s) ? profileStatuses.filter((x) => x !== s) : [...profileStatuses, s]);
+    setProfileStatuses(
+      profileStatuses.includes(s)
+        ? profileStatuses.filter((x) => x !== s)
+        : [...profileStatuses, s],
+    );
 
   return (
     <Panel title="Step 3 · Create cohort" description="Build an audience from My Blue Dots">
       <div className="grid gap-3 sm:grid-cols-2 max-w-xl mb-5">
-        {([
-          { id: "drive", icon: Rocket, title: "Drive Applications", desc: "Call seekers to push them to apply." },
-          { id: "fill", icon: FileText, title: "Fill Missing Information", desc: "Call seekers to complete their profile." },
-        ] as const).map((o) => (
+        {(
+          [
+            {
+              id: "drive",
+              icon: Rocket,
+              title: "Drive Applications",
+              desc: "Call seekers to push them to apply.",
+            },
+            {
+              id: "fill",
+              icon: FileText,
+              title: "Fill Missing Information",
+              desc: "Call seekers to complete their profile.",
+            },
+          ] as const
+        ).map((o) => (
           <button
             key={o.id}
             onClick={() => setIntent(o.id)}
             className={cn(
               "rounded-xl border-2 p-4 text-left transition-colors flex items-start gap-3",
-              intent === o.id ? "border-brand bg-brand-soft" : "border-border bg-card hover:bg-muted/40",
+              intent === o.id
+                ? "border-brand bg-brand-soft"
+                : "border-border bg-card hover:bg-muted/40",
             )}
           >
-            <span className="mt-0.5 text-brand"><o.icon className="h-5 w-5" /></span>
+            <span className="mt-0.5 text-brand">
+              <o.icon className="h-5 w-5" />
+            </span>
             <span>
               <span className="flex items-center gap-2 text-sm font-semibold">
                 {o.title}
-                {o.id === "fill" && <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium text-amber-800 dark:text-amber-300">Mock</span>}
+                {o.id === "fill" && (
+                  <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium text-amber-800 dark:text-amber-300">
+                    Mock
+                  </span>
+                )}
               </span>
               <span className="block text-xs text-muted-foreground mt-0.5">{o.desc}</span>
             </span>
@@ -1023,10 +1365,13 @@ function CohortStep({
                   onClick={() => toggleStatus(s)}
                   className={cn(
                     "rounded-full border px-3 py-1 text-xs font-medium transition-colors flex items-center gap-1.5",
-                    on ? "border-brand bg-brand text-brand-foreground hover:bg-brand/90" : "border-border bg-card text-muted-foreground hover:bg-muted/40",
+                    on
+                      ? "border-brand bg-brand text-brand-foreground hover:bg-brand/90"
+                      : "border-border bg-card text-muted-foreground hover:bg-muted/40",
                   )}
                 >
-                  {on && <Check className="h-3 w-3" />}{s}
+                  {on && <Check className="h-3 w-3" />}
+                  {s}
                 </button>
               );
             })}
@@ -1035,7 +1380,8 @@ function CohortStep({
       ) : (
         <div className="max-w-xl">
           <div className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/15 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-            Confidence score isn't in the data yet — this is a mock using profile completeness as a stand-in until the field lands.
+            Confidence score isn't in the data yet — this is a mock using profile completeness as a
+            stand-in until the field lands.
           </div>
           <Label className="text-xs">Confidence score · target a band</Label>
           <div className="mt-2 flex flex-wrap gap-2">
@@ -1048,10 +1394,13 @@ function CohortStep({
                   onClick={() => setConfidenceBand(b.id)}
                   className={cn(
                     "rounded-full border px-3 py-1 text-xs font-medium transition-colors flex items-center gap-1.5",
-                    on ? "border-brand bg-brand text-brand-foreground hover:bg-brand/90" : "border-border bg-card text-muted-foreground hover:bg-muted/40",
+                    on
+                      ? "border-brand bg-brand text-brand-foreground hover:bg-brand/90"
+                      : "border-border bg-card text-muted-foreground hover:bg-muted/40",
                   )}
                 >
-                  {on && <Check className="h-3 w-3" />}{b.label}
+                  {on && <Check className="h-3 w-3" />}
+                  {b.label}
                 </button>
               );
             })}
@@ -1061,11 +1410,17 @@ function CohortStep({
 
       <div className="mt-5 flex items-baseline gap-2 border-t border-border pt-4">
         {loading ? (
-          <span className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading My Blue Dots…</span>
+          <span className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading My Blue Dots…
+          </span>
         ) : (
           <>
-            <span className="text-2xl font-semibold tabular-nums">{count.toLocaleString("en-IN")}</span>
-            <span className="text-sm text-muted-foreground">blue dots match — they'll be called</span>
+            <span className="text-2xl font-semibold tabular-nums">
+              {count.toLocaleString("en-IN")}
+            </span>
+            <span className="text-sm text-muted-foreground">
+              blue dots match — they'll be called
+            </span>
           </>
         )}
       </div>

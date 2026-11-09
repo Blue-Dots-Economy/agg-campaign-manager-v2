@@ -14,13 +14,7 @@ import {
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { useProgram } from "@/programs/context";
 import { useAuth } from "@/auth/context";
@@ -82,7 +76,7 @@ function NavLink({
           "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
           active || groupActive
             ? "bg-accent text-accent-foreground"
-            : "text-foreground/85 hover:bg-accent/70"
+            : "text-foreground/85 hover:bg-accent/70",
         )}
       >
         <Link
@@ -94,9 +88,7 @@ function NavLink({
           <item.icon className="h-4 w-4 shrink-0" />
           <div className="flex flex-col">
             <span>{item.label}</span>
-            {item.sub && (
-              <span className="text-[11px] leading-tight opacity-70">{item.sub}</span>
-            )}
+            {item.sub && <span className="text-[11px] leading-tight opacity-70">{item.sub}</span>}
           </div>
         </Link>
         {hasChildren && (
@@ -106,19 +98,14 @@ function NavLink({
             aria-label={collapsed ? "Expand section" : "Collapse section"}
             className="p-1 rounded-md hover:bg-accent/70 text-accent-foreground/70"
           >
-            {collapsed ? (
-              <ChevronRight className="h-4 w-4" />
-            ) : (
-              <ChevronDown className="h-4 w-4" />
-            )}
+            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </button>
         )}
       </div>
       {hasChildren && !collapsed && (
         <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border pl-3">
           {item.children!.map((child) => {
-            const childActive =
-              child.to === "/" ? pathname === "/" : pathname.startsWith(child.to);
+            const childActive = child.to === "/" ? pathname === "/" : pathname.startsWith(child.to);
             const ChildIcon = child.icon;
             return (
               <Link
@@ -130,7 +117,7 @@ function NavLink({
                   "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
                   childActive
                     ? "bg-accent text-accent-foreground"
-                    : "text-foreground/85 hover:bg-accent/70"
+                    : "text-foreground/85 hover:bg-accent/70",
                 )}
               >
                 <ChildIcon className="h-4 w-4 shrink-0" />
@@ -152,14 +139,16 @@ export function MobileNav() {
   const { logout, session } = useAuth();
   const isEcosystem = session?.role === "ecosystem";
   const groups = isEcosystem
-    ? [{
-        title: "",
-        items: [
-          GROUPS[0].items[3],
-          GROUPS[0].items[0],
-          { to: "/", label: "Campaign Overview", icon: LayoutDashboard },
-        ] as NavItem[],
-      }]
+    ? [
+        {
+          title: "",
+          items: [
+            GROUPS[0].items[3],
+            GROUPS[0].items[0],
+            { to: "/", label: "Campaign Overview", icon: LayoutDashboard },
+          ] as NavItem[],
+        },
+      ]
     : GROUPS;
 
   const [expanded, setExpanded] = useState<Set<string>>(() => {
@@ -167,9 +156,7 @@ export function MobileNav() {
     for (const group of GROUPS) {
       for (const item of group.items) {
         if (
-          item.children?.some((c) =>
-            c.to === "/" ? pathname === "/" : pathname.startsWith(c.to)
-          )
+          item.children?.some((c) => (c.to === "/" ? pathname === "/" : pathname.startsWith(c.to)))
         ) {
           initial.add(item.to);
         }
@@ -215,7 +202,7 @@ export function MobileNav() {
                   "flex-1 text-xs font-medium py-1.5 rounded-md uppercase tracking-wide transition-colors",
                   programId === id
                     ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 {registry[id].label}
@@ -260,7 +247,7 @@ export function MobileNav() {
                     "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
                     active
                       ? "bg-accent text-accent-foreground"
-                      : "text-foreground/85 hover:bg-accent/70"
+                      : "text-foreground/85 hover:bg-accent/70",
                   )}
                 >
                   <Icon className="h-4 w-4 shrink-0" />

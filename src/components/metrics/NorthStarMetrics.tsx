@@ -11,10 +11,30 @@ import { cn } from "@/lib/utils";
 
 type Def = { key: string; label: string; num: string; den: string };
 const KKB_DEFS: Def[] = [
-  { key: "pickup_to_app", label: "Pickup → Connection", num: "applicationsTotal", den: "answeredCalls" },
-  { key: "highintent_to_app", label: "High-Intent → Connection", num: "applicationsTotal", den: "highIntentCalls" },
-  { key: "pickup_to_highintent", label: "Pickup → High-Intent", num: "highIntentCalls", den: "answeredCalls" },
-  { key: "jobsshown_to_app", label: "Jobs shown → Connection", num: "applicationsTotal", den: "jobsShownCalls" },
+  {
+    key: "pickup_to_app",
+    label: "Pickup → Connection",
+    num: "applicationsTotal",
+    den: "answeredCalls",
+  },
+  {
+    key: "highintent_to_app",
+    label: "High-Intent → Connection",
+    num: "applicationsTotal",
+    den: "highIntentCalls",
+  },
+  {
+    key: "pickup_to_highintent",
+    label: "Pickup → High-Intent",
+    num: "highIntentCalls",
+    den: "answeredCalls",
+  },
+  {
+    key: "jobsshown_to_app",
+    label: "Jobs shown → Connection",
+    num: "applicationsTotal",
+    den: "jobsShownCalls",
+  },
 ];
 
 function statusColor(value: number | null, threshold: number | null): string {
@@ -73,15 +93,33 @@ export function NorthStarMetrics({ program, m }: { program: string; m: Record<st
         <div className="flex items-center justify-between border-b border-border px-3 py-2">
           <span className="text-sm font-semibold">North Star Metrics</span>
           {canEdit && (
-            <button type="button" onClick={() => setEdit((e) => !e)} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-              {edit ? <><Check className="h-3.5 w-3.5" /> Done</> : <><Pencil className="h-3 w-3" /> Edit</>}
+            <button
+              type="button"
+              onClick={() => setEdit((e) => !e)}
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            >
+              {edit ? (
+                <>
+                  <Check className="h-3.5 w-3.5" /> Done
+                </>
+              ) : (
+                <>
+                  <Pencil className="h-3 w-3" /> Edit
+                </>
+              )}
             </button>
           )}
         </div>
         <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-4 gap-y-2 px-3 py-3 text-xs">
-          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Metric</div>
-          <div className="text-right text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Target</div>
-          <div className="text-right text-[10px] font-medium uppercase tracking-wide text-muted-foreground">This campaign</div>
+          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            Metric
+          </div>
+          <div className="text-right text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            Target
+          </div>
+          <div className="text-right text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            This campaign
+          </div>
           {items.map((it) => (
             <Fragment key={it.key}>
               <div className="truncate text-foreground">{it.label}</div>
@@ -92,13 +130,24 @@ export function NorthStarMetrics({ program, m }: { program: string; m: Record<st
                     defaultValue={it.threshold ?? ""}
                     onChange={(e) => setDrafts((d) => ({ ...d, [it.key]: e.target.value }))}
                     onBlur={() => commit(it.key)}
-                    onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                    }}
                     placeholder="—"
                     className="w-14 rounded border border-input bg-background px-1.5 py-0.5 text-right text-xs"
                   />
-                ) : it.threshold == null ? "—" : `${it.threshold}%`}
+                ) : it.threshold == null ? (
+                  "—"
+                ) : (
+                  `${it.threshold}%`
+                )}
               </div>
-              <div className={cn("text-right font-semibold tabular-nums", statusColor(it.value, it.threshold))}>
+              <div
+                className={cn(
+                  "text-right font-semibold tabular-nums",
+                  statusColor(it.value, it.threshold),
+                )}
+              >
                 {it.value == null ? "—" : `${it.value.toFixed(1)}%`}
               </div>
             </Fragment>

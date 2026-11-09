@@ -33,7 +33,10 @@ function enabledConnections(program: ProgramId) {
 }
 
 async function patchConnection(id: string, patch: Record<string, unknown>) {
-  await getDb().update(sheetConnections).set(fromSqlNames(sheetConnections, patch)).where(eq(sheetConnections.id, id));
+  await getDb()
+    .update(sheetConnections)
+    .set(fromSqlNames(sheetConnections, patch))
+    .where(eq(sheetConnections.id, id));
 }
 
 export const listConnections = createServerFn({ method: "GET" })
@@ -50,7 +53,9 @@ export const listConnections = createServerFn({ method: "GET" })
 
 export const createConnection = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator((d: { program: ProgramId; name: string; sheet_id: string; tab_name?: string }) => d)
+  .inputValidator(
+    (d: { program: ProgramId; name: string; sheet_id: string; tab_name?: string }) => d,
+  )
   .handler(async ({ data }) => {
     const [row] = await getDb()
       .insert(sheetConnections)
@@ -68,7 +73,9 @@ export const createConnection = createServerFn({ method: "POST" })
 
 export const updateConnection = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator((d: { id: string; enabled?: boolean; name?: string; tab_name?: string | null }) => d)
+  .inputValidator(
+    (d: { id: string; enabled?: boolean; name?: string; tab_name?: string | null }) => d,
+  )
   .handler(async ({ data }) => {
     const patch: Record<string, unknown> = {};
     if (data.enabled !== undefined) patch.enabled = data.enabled;
@@ -76,7 +83,10 @@ export const updateConnection = createServerFn({ method: "POST" })
     if (data.tab_name !== undefined) patch.tab_name = data.tab_name;
     const db = getDb();
     if (Object.keys(patch).length > 0) await patchConnection(data.id, patch);
-    const [row] = await db.select(sqlNamed(sheetConnections)).from(sheetConnections).where(eq(sheetConnections.id, data.id));
+    const [row] = await db
+      .select(sqlNamed(sheetConnections))
+      .from(sheetConnections)
+      .where(eq(sheetConnections.id, data.id));
     if (!row) throw new Error("Connection not found");
     return row as unknown as SheetConnection;
   });
@@ -130,7 +140,11 @@ export const testConnection = createServerFn({ method: "POST" })
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (data.id) {
-        await patchConnection(data.id, { status: "error", last_error: msg, last_synced_at: new Date().toISOString() });
+        await patchConnection(data.id, {
+          status: "error",
+          last_error: msg,
+          last_synced_at: new Date().toISOString(),
+        });
       }
       return { ok: false as const, error: msg };
     }
@@ -161,7 +175,11 @@ export const revalidateConnections = createServerFn({ method: "POST" })
         await patchConnection(c.id, patch);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        await patchConnection(c.id, { status: "error", last_error: msg, last_synced_at: new Date().toISOString() });
+        await patchConnection(c.id, {
+          status: "error",
+          last_error: msg,
+          last_synced_at: new Date().toISOString(),
+        });
       }
     }
     return { checked: list.length };
@@ -190,11 +208,17 @@ function asJsonArr(v: string | undefined): string[] {
       /* fall through */
     }
   }
-  return s.split(/[|,;]/).map((x) => x.trim()).filter(Boolean);
+  return s
+    .split(/[|,;]/)
+    .map((x) => x.trim())
+    .filter(Boolean);
 }
 
 function normKey(h: string): string {
-  return String(h ?? "").trim().toLowerCase().replace(/[\s\-]+/g, "_");
+  return String(h ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s\-]+/g, "_");
 }
 
 function mapRow(headers: string[], values: string[]): CallRow {
@@ -212,8 +236,7 @@ function mapRow(headers: string[], values: string[]): CallRow {
   // DKB sheets express "answered" through call_status, not a boolean column.
   const callStatusRaw = get("call_status") ?? "";
   const callStatus = callStatusRaw.trim().toLowerCase();
-  const answeredFromStatus =
-    callStatus.startsWith("answered") || callStatus === "completed";
+  const answeredFromStatus = callStatus.startsWith("answered") || callStatus === "completed";
   return {
     campaign_day: get("campaign_day") ?? "",
     campaign_date: get("campaign_date") ?? "",
@@ -224,9 +247,8 @@ function mapRow(headers: string[], values: string[]): CallRow {
     call_duration_seconds: asNum(get("call_duration_seconds")),
     call_datetime_ist: get("call_datetime_ist") ?? "",
     call_outcome: get("call_outcome") ?? "",
-    call_answered: get("call_answered") !== undefined
-      ? asYesNoBool(get("call_answered"))
-      : answeredFromStatus,
+    call_answered:
+      get("call_answered") !== undefined ? asYesNoBool(get("call_answered")) : answeredFromStatus,
     call_engaged: asYesNoBool(get("call_engaged")),
     applied_to_job: asYesNoBool(get("applied_to_job")),
     applications_count: asNum(get("applications_count")),
@@ -297,7 +319,10 @@ export const fetchProgramRows = createServerFn({ method: "GET" })
     const errors: { id: string; name: string; message: string }[] = [];
     for (const c of list) {
       try {
-        const { headers, rows, effectiveTab } = await readSheet(c.sheet_id, c.tab_name ?? undefined);
+        const { headers, rows, effectiveTab } = await readSheet(
+          c.sheet_id,
+          c.tab_name ?? undefined,
+        );
         for (const r of rows) {
           const mapped = mapRow(headers, r);
           const key = mapped.call_id || `${c.id}:${out.length}`;
@@ -318,7 +343,11 @@ export const fetchProgramRows = createServerFn({ method: "GET" })
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         errors.push({ id: c.id, name: c.name, message: msg });
-        await patchConnection(c.id, { status: "error", last_error: msg, last_synced_at: new Date().toISOString() });
+        await patchConnection(c.id, {
+          status: "error",
+          last_error: msg,
+          last_synced_at: new Date().toISOString(),
+        });
       }
     }
 

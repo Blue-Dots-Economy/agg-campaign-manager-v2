@@ -15,7 +15,10 @@ function normalizePhone(v: any): string {
 }
 
 function normalizeKey(k: string): string {
-  return String(k ?? "").trim().toLowerCase().replace(/[\s\-]+/g, "_");
+  return String(k ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s\-]+/g, "_");
 }
 
 function pickRaw(row: Record<string, any>, candidates: string[]): string | null {
@@ -59,7 +62,7 @@ export const recordLaunchedBatch = createServerFn({ method: "POST" })
       language?: string;
       cityCampaign?: string;
       region?: string;
-        inputRows?: Array<Record<string, any>>;
+      inputRows?: Array<Record<string, any>>;
     }) => {
       if (!d.batchId) throw new Error("batchId required");
       if (!d.program) throw new Error("program required");
@@ -100,7 +103,11 @@ export const recordLaunchedBatch = createServerFn({ method: "POST" })
             program: data.program,
             normalizedPhone: phone,
             contactName: pickRaw(r, ["contact_name", "name", "seeker_name", "candidate_name"]),
-            recommendations: pickRaw(r, ["recommendations", "jobs_recommended", "recommended_jobs"]),
+            recommendations: pickRaw(r, [
+              "recommendations",
+              "jobs_recommended",
+              "recommended_jobs",
+            ]),
             userIntent: pickRaw(r, ["user_intent", "intent"]),
             raw: r,
             updatedAt: new Date().toISOString(),

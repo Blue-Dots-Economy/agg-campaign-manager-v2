@@ -62,9 +62,13 @@ export function DropBreakdownPanel({
             {selectedReason ? "Stage breakdown" : "Drop reasons"}
           </div>
           <div className="text-xs text-muted-foreground">
-            {selectedReason
-              ? <>Where <span className="font-medium text-foreground">{selectedReason}</span> happens</>
-              : "Click a ribbon or label in the chart to filter"}
+            {selectedReason ? (
+              <>
+                Where <span className="font-medium text-foreground">{selectedReason}</span> happens
+              </>
+            ) : (
+              "Click a ribbon or label in the chart to filter"
+            )}
           </div>
         </div>
         {selectedReason && (
@@ -103,7 +107,9 @@ export function DropBreakdownPanel({
                         {fmt(s.byRegion[reg] ?? 0)}
                       </td>
                     ))}
-                    <td className="px-3 py-2 text-right tabular-nums font-medium">{fmt(s.total)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums font-medium">
+                      {fmt(s.total)}
+                    </td>
                   </tr>
                 ))
               : reasonTotals.map((r) => {
@@ -132,7 +138,9 @@ export function DropBreakdownPanel({
                           {fmt(r.byRegion[reg] ?? 0)}
                         </td>
                       ))}
-                      <td className="px-3 py-2 text-right tabular-nums font-medium">{fmt(r.total)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums font-medium">
+                        {fmt(r.total)}
+                      </td>
                     </tr>
                   );
                 })}
@@ -152,10 +160,7 @@ export function DropBreakdownPanel({
               ))}
               <td className="px-3 py-2 text-right tabular-nums">
                 {fmt(
-                  (selectedReason ? stageBreakdown : reasonTotals).reduce(
-                    (s, r) => s + r.total,
-                    0,
-                  ),
+                  (selectedReason ? stageBreakdown : reasonTotals).reduce((s, r) => s + r.total, 0),
                 )}
               </td>
             </tr>

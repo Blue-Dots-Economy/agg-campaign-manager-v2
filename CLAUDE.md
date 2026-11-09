@@ -78,15 +78,16 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 - **Bun is required.** The lockfile is `bun.lock`. Do not use npm, pnpm or yarn, and do not commit another lockfile. `bunfig.toml` holds a 24-hour supply-chain guard (`minimumReleaseAge`); ask the user before adding a package to its exclude list.
 - `vite.config.ts` uses `@lovable.dev/vite-tanstack-config`, which already adds the TanStack Start, React, Tailwind, path-alias and Nitro plugins. Do not add them again.
 - `src/routeTree.gen.ts` is generated. Do not edit it by hand.
-- Prettier settings are in `.prettierrc` (double quotes, semicolons, 100 columns). Format the files you change; do not reformat files you did not change.
+- Prettier settings are in `.prettierrc` (double quotes, semicolons, 100 columns). The repository is formatted and CI fails on unformatted files; run `bun run format` before committing. The formatting commit is listed in `.git-blame-ignore-revs` (`git config blame.ignoreRevsFile .git-blame-ignore-revs`).
 
 ## Common commands
 
 ```bash
 bun install --frozen-lockfile        # install exactly what is committed
 bun run dev                          # local dev server
-bun x tsc --noEmit                   # type-check (there is no typecheck script)
-bun run lint                         # ESLint (advisory in CI, see below)
+bun run typecheck                    # tsc --noEmit
+bun run lint                         # ESLint; errors fail CI
+bun run lint:report                  # lint findings per rule and block (server, web, vendored, tests, tooling)
 bun run build                        # production build
 bun run test                         # unit tests (tests/unit)
 bun test tests/unit/auth.test.ts     # one test file
@@ -97,6 +98,8 @@ bun run db:migrate                   # apply migrations to DATABASE_URL
 ```
 
 The database login is created by `db/bootstrap.sql` (see the `migrations` job in `.github/workflows/ci.yaml` for the exact steps).
+
+Local end-to-end checks: `scripts/e2e/` (`setup.sh` brings up Postgres in Docker and seeds one user per role plus sample calls; `smoke.ts` checks login, the server-function role matrix and dashboard numbers against a running dev server). The `campaign-manager-e2e` skill walks through it, including the browser checks per role.
 
 ## Architecture
 
@@ -122,9 +125,9 @@ Apply them to every line you write or change. Existing code does not meet all of
 
 ## CI
 
-`.github/workflows/ci.yaml` runs on every PR and every push to `main`. Blocking: `typecheck`, `build`, `migrations` (bootstrap, migrate, schema drift, `bun test tests`) and `smoke-image` (builds and boots the Docker image). Advisory: `lint` (ESLint and Prettier have a large existing baseline) and `sonar`. Images are published by `build-images.yaml` on release tags only.
+`.github/workflows/ci.yaml` runs on every PR and every push to `main`. Blocking: `typecheck`, `build`, `lint` (ESLint errors and Prettier), `migrations` (bootstrap, migrate, schema drift, `bun test tests`) and `smoke-image` (builds and boots the Docker image). Advisory: `sonar`. Images are published by `build-images.yaml` on release tags only.
 
-Do not add new ESLint or Prettier problems in files you change, even though the lint job does not fail the build.
+ESLint rules that still have findings in existing code are warnings (a ratchet); each moves to error once its count reaches 0. Do not add new warnings.
 
 ## Commits and pull requests
 

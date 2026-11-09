@@ -32,7 +32,8 @@ function parseBody(text: string): unknown {
 
 function errorMessage(status: number, parsed: unknown): string {
   if (status === 401) return "Raya rejected the API key (401). Check RAYA_API_KEY.";
-  if (status === 429) return "Raya rate limit hit (429). Retried several times but Raya is still throttling requests.";
+  if (status === 429)
+    return "Raya rate limit hit (429). Retried several times but Raya is still throttling requests.";
   if (parsed && typeof parsed === "object") {
     const p = parsed as Record<string, any>;
     const m =
@@ -47,7 +48,8 @@ function errorMessage(status: number, parsed: unknown): string {
       /* ignore */
     }
   }
-  if (typeof parsed === "string" && parsed.trim()) return `Raya API ${status}: ${parsed.slice(0, 600)}`;
+  if (typeof parsed === "string" && parsed.trim())
+    return `Raya API ${status}: ${parsed.slice(0, 600)}`;
   return `Raya API ${status}`;
 }
 
@@ -58,7 +60,9 @@ export async function rayaFetch(
 ): Promise<unknown> {
   const apiKey = process.env.RAYA_API_KEY;
   if (!apiKey) {
-    throw new Error("RAYA_API_KEY is not set. Add it in Project Settings → Secrets, then try again.");
+    throw new Error(
+      "RAYA_API_KEY is not set. Add it in Project Settings → Secrets, then try again.",
+    );
   }
 
   const headers: Record<string, string> = {
@@ -80,9 +84,12 @@ export async function rayaFetch(
     res = await fetch(`${BASE_URL}${path}`, { ...init, headers, body });
     if (res.status !== 429 || attempt === maxAttempts - 1) break;
 
-    const waitMs = retryAfterMs(res.headers.get("retry-after"))
-      ?? Math.min(12_000, baseDelayMs * 2 ** attempt) + Math.floor(Math.random() * 250);
-    console.warn(`[raya] 429 on ${path}, retrying in ${waitMs}ms (attempt ${attempt + 1}/${maxAttempts})`);
+    const waitMs =
+      retryAfterMs(res.headers.get("retry-after")) ??
+      Math.min(12_000, baseDelayMs * 2 ** attempt) + Math.floor(Math.random() * 250);
+    console.warn(
+      `[raya] 429 on ${path}, retrying in ${waitMs}ms (attempt ${attempt + 1}/${maxAttempts})`,
+    );
     await delay(waitMs);
   }
 

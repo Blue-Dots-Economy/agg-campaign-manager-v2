@@ -17,7 +17,11 @@ export const Route = createFileRoute("/api/public/hooks/sync-snapshots")({
           program: i === 0 ? "seekers" : "providers",
           status: r.status,
           ...(r.status === "fulfilled"
-            ? { ok: r.value.ok, rowCount: r.value.rowCount, skipped: (r.value as { skipped?: boolean }).skipped ?? false }
+            ? {
+                ok: r.value.ok,
+                rowCount: r.value.rowCount,
+                skipped: (r.value as { skipped?: boolean }).skipped ?? false,
+              }
             : { error: String(r.reason instanceof Error ? r.reason.message : r.reason) }),
         }));
         return new Response(JSON.stringify({ ok: true, results: body }), {
