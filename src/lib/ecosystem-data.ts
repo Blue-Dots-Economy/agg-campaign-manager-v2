@@ -214,7 +214,7 @@ export function getProvidersForCategory(_region: EcosystemRegion, category: stri
   const conn = splitEvenly(row.connections, list.length);
   return list.map((org, i) => ({
     org,
-    email: maskedEmail(org.split(" ")[0], org.split(" ")[1] ?? "org"),
+    email: maskedEmail(org.split(" ")[0] ?? "", org.split(" ")[1] ?? "org"),
     phone: maskedPhone(i + category.length),
     capacity: cap[i] ?? 0,
     matching: match[i] ?? 0,
@@ -234,7 +234,7 @@ export function getAggregatorsForNeed(_region: EcosystemRegion, area: string): A
   const conn = splitEvenly(row.connections, list.length);
   return list.map((org, i) => ({
     org,
-    email: maskedEmail(org.split(" ")[0], org.split(" ")[1] ?? "org"),
+    email: maskedEmail(org.split(" ")[0] ?? "", org.split(" ")[1] ?? "org"),
     phone: maskedPhone(i + area.length),
     reach: reach[i] ?? 0,
     matching: match[i] ?? 0,
@@ -275,6 +275,50 @@ export const actionGap = (matching: number, connections: number) =>
   Math.max(0, matching - connections);
 
 export const demandSupplyGap = (matching: number, supply: number) => Math.max(0, matching - supply);
+
+/** Action and demand-supply gaps of a row, with their levels and recommended actions. */
+export interface GapFields {
+  ag: number;
+  ds: number;
+  agL: GapLevelLabel;
+  dsL: GapLevelLabel;
+  actions: string[];
+}
+
+function gapFields(
+  kind: "provider" | "seeker",
+  matching: number,
+  connections: number,
+  supply: number,
+): GapFields {
+  const ag = actionGap(matching, connections);
+  const ds = demandSupplyGap(matching, supply);
+  const agL = gapLevel(ag, matching);
+  const dsL = gapLevel(ds, matching);
+  return { ag, ds, agL, dsL, actions: recommendedActions(kind, agL, dsL) };
+}
+
+/** Provider rows (categories or organisations) with their gaps; supply is the capacity. */
+export function providerGapRows<
+  T extends Pick<ProviderCategoryRow, "matching" | "connections" | "capacity">,
+>(rows: T[]): Array<T & GapFields> {
+  return rows.map((r) => ({
+    ...r,
+    ...gapFields("provider", r.matching, r.connections, r.capacity),
+  }));
+}
+
+/** Seeker rows (need areas or aggregators) with their gaps; supply is the reach. */
+export function seekerGapRows<T extends Pick<SeekerNeedRow, "matching" | "connections" | "reach">>(
+  rows: T[],
+): Array<T & GapFields> {
+  return rows.map((r) => ({ ...r, ...gapFields("seeker", r.matching, r.connections, r.reach) }));
+}
+
+/** Whether either gap of a row has the chosen level; "All" matches every row. */
+export function matchesGapLevel(row: Pick<GapFields, "agL" | "dsL">, level: string): boolean {
+  return level === "All" || row.agL === level || row.dsL === level;
+}
 
 /* ---------- onboarding ---------- */
 

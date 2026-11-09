@@ -1,3 +1,5 @@
+// Parses the UP seekers CSV and stores the uploaded copy on the server and in IndexedDB.
+import { z } from "zod";
 import bundledCsv from "@/data/up-seekers.csv?raw";
 
 export type ProfileFieldCheck = { label: string; passed: boolean; value: string };
@@ -48,6 +50,9 @@ const LS_META_KEY = "up-seekers-csv-meta-v1";
 
 export type CsvMeta = { name: string; uploadedAt: string; rows: number };
 
+/** Shape of the meta entry stored in IndexedDB and in the legacy localStorage key. */
+const CsvMetaSchema = z.object({ name: z.string(), uploadedAt: z.string(), rows: z.number() });
+
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
@@ -60,12 +65,13 @@ function openDb(): Promise<IDBDatabase> {
   });
 }
 
-async function idbGet<T>(key: string): Promise<T | undefined> {
+/** Reads one stored value; the caller checks its shape. */
+async function idbGet(key: string): Promise<unknown> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE, "readonly");
     const req = tx.objectStore(STORE).get(key);
-    req.onsuccess = () => resolve(req.result as T | undefined);
+    req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
 }
@@ -134,11 +140,6 @@ function toIntOrNull(v: string | undefined): number | null {
 function toInt(v: string | undefined): number {
   const n = toIntOrNull(v);
   return n ?? 0;
-}
-function toPct(v: string | undefined): number {
-  if (!v) return 0;
-  const n = Number(String(v).replace(/[^0-9.]/g, ""));
-  return Number.isFinite(n) ? n : 0;
 }
 
 /** Default exclusion: rows flagged as test data are dropped from any linked sheet/CSV.
@@ -298,34 +299,36 @@ function computeProfileChecks(r: {
   salary: string;
 }): { passed: number; total: number; fields: ProfileFieldCheck[] } {
   const emailPhone = [r.email.trim(), r.phone.trim()].filter(Boolean).join(" · ");
-  const results = [
-    isNameValid(r.name),
-    isLocationMeaningful(r.location, r.district, r.state),
-    r.email.trim().length > 0 || r.phone.trim().length > 0,
-    r.age.trim().length > 0,
-    r.role.trim().length > 0 && norm(r.role) !== "any",
-    r.salary.trim().length > 0,
-  ];
-  const values = [
-    r.name.trim(),
-    r.location.trim(),
-    emailPhone,
-    r.age.trim(),
-    r.role.trim(),
-    r.salary.trim(),
-  ];
-  const fields: ProfileFieldCheck[] = PROFILE_FIELD_LABELS.map((label, i) => ({
+  const checks: Record<(typeof PROFILE_FIELD_LABELS)[number], { passed: boolean; value: string }> =
+    {
+      Name: { passed: isNameValid(r.name), value: r.name.trim() },
+      Location: {
+        passed: isLocationMeaningful(r.location, r.district, r.state),
+        value: r.location.trim(),
+      },
+      "Email or Phone": {
+        passed: r.email.trim().length > 0 || r.phone.trim().length > 0,
+        value: emailPhone,
+      },
+      Age: { passed: r.age.trim().length > 0, value: r.age.trim() },
+      Role: { passed: r.role.trim().length > 0 && norm(r.role) !== "any", value: r.role.trim() },
+      "Expected Salary": { passed: r.salary.trim().length > 0, value: r.salary.trim() },
+    };
+  const fields: ProfileFieldCheck[] = PROFILE_FIELD_LABELS.map((label) => ({
     label,
-    passed: results[i],
-    value: values[i],
+    ...checks[label],
   }));
-  return { passed: results.filter(Boolean).length, total: results.length, fields };
+  return {
+    passed: fields.filter((f) => f.passed).length,
+    total: fields.length,
+    fields,
+  };
 }
 
 export function parseSeekersCsv(text: string): Seeker[] {
-  const rows = parseCsv(text);
-  if (rows.length < 2) return [];
-  const header = rows[0].map((h) => h.trim().toLowerCase());
+  const [headerRow, ...dataRows] = parseCsv(text);
+  if (!headerRow || dataRows.length === 0) return [];
+  const header = headerRow.map((h) => h.trim().toLowerCase());
   const idx = (name: string) => header.indexOf(name.toLowerCase());
   const cId = idx("id");
   const cUser = idx("user_id");
@@ -349,8 +352,7 @@ export function parseSeekersCsv(text: string): Seeker[] {
   const cTest = idx("test");
 
   const out: Seeker[] = [];
-  for (let i = 1; i < rows.length; i++) {
-    const r = rows[i];
+  for (const r of dataRows) {
     const id = (r[cId] ?? "").trim();
     if (!id) continue;
     if (cTest !== -1 && isTestRow(r[cTest])) continue;
@@ -463,14 +465,13 @@ export async function loadSeekersAsync(): Promise<{ seekers: Seeker[]; meta: Csv
       /* ignore migration errors */
     }
 
-    const stored = await idbGet<string>(CSV_KEY);
-    if (!stored) return bundledResult();
+    const stored = await idbGet(CSV_KEY);
+    if (typeof stored !== "string" || !stored) return bundledResult();
     const seekers = parseSeekersCsv(stored);
-    const meta = (await idbGet<CsvMeta>(META_KEY_IDB)) ?? {
-      name: "Uploaded CSV",
-      uploadedAt: "",
-      rows: seekers.length,
-    };
+    const storedMeta = CsvMetaSchema.safeParse(await idbGet(META_KEY_IDB));
+    const meta: CsvMeta = storedMeta.success
+      ? storedMeta.data
+      : { name: "Uploaded CSV", uploadedAt: "", rows: seekers.length };
     return { seekers, meta };
   } catch {
     return bundledResult();

@@ -80,6 +80,7 @@ export function ReviewersSection() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             type="email"
+            aria-label="Reviewer email"
             placeholder="name@bluedots.com"
             className="flex-1"
           />
@@ -98,7 +99,7 @@ export function ReviewersSection() {
               <li key={e} className="flex items-center justify-between gap-3 py-2.5">
                 <span className="text-sm text-foreground">{e}</span>
                 <button
-                  onClick={() => remove(e)}
+                  onClick={() => void remove(e)}
                   disabled={busy}
                   className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 disabled:opacity-50"
                   title="Remove reviewer"

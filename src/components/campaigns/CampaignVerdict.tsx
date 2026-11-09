@@ -3,9 +3,9 @@ import { CheckCircle2, AlertTriangle } from "lucide-react";
 import { useProgram } from "@/programs/context";
 import { useProgramAggregates, type OverviewFilters } from "@/programs/useProgramAggregates";
 import { useCampaignInsights } from "@/programs/useCampaignInsights";
-import type { ProgramMetricsRaw } from "@/lib/snapshot.functions";
+import { numericMetrics, type MetricValues } from "@/components/metrics/metric-values";
 
-type Metrics = ProgramMetricsRaw & Record<string, number | undefined>;
+type Metrics = MetricValues;
 
 interface MetricSpec {
   key: string;
@@ -113,8 +113,8 @@ export function CampaignVerdict({ campaign, region, filters }: Props) {
   const causes = useCampaignInsights(campaign, { dateFrom, dateTo });
 
   const { worked, didnt, phaseShare, hiTop, sampleCalls } = useMemo(() => {
-    const cm = (campaignAgg.data?.metrics ?? {}) as Metrics;
-    const rm = (regionAgg.data?.metrics ?? {}) as Metrics;
+    const cm: Metrics = numericMetrics(campaignAgg.data?.metrics);
+    const rm: Metrics = numericMetrics(regionAgg.data?.metrics);
     const findings: Finding[] = [];
     for (const spec of SPECS) {
       const c = spec.compute(cm);
@@ -164,8 +164,8 @@ export function CampaignVerdict({ campaign, region, filters }: Props) {
   };
 
   const whyFor = (f: Finding, side: "worked" | "didnt"): string | null => {
-    if (side === "didnt" && f.spec.useHighIntentCause && hiTop.length > 0) {
-      const t = hiTop[0];
+    const t = hiTop[0];
+    if (side === "didnt" && f.spec.useHighIntentCause && t) {
       return `${Math.round(t.pct)}% of high-intent seekers dropped at ${t.phase} on '${t.reason}'.`;
     }
     if (side === "didnt") {

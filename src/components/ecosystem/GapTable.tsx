@@ -17,7 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { JobPost } from "./mockData";
+import type { JobPost } from "./types";
 import {
   GAP_LEVEL_CLASSES,
   ROLE_CATEGORIES,
@@ -28,9 +28,12 @@ import {
 } from "./ecosystemHelpers";
 import { GapDrilldownDialog } from "./GapDrilldownDialog";
 import { BalanceStrip, type BalanceRow, type BalanceGroup } from "./BalanceStrip";
+import { isOneOf } from "@/lib/guards";
 
-type Mode = "role" | "location";
-type View = "balance" | "table";
+const MODES = ["role", "location"] as const;
+type Mode = (typeof MODES)[number];
+const VIEWS = ["balance", "table"] as const;
+type View = (typeof VIEWS)[number];
 
 const GAP_LEVELS: GapLevel[] = ["Supply gap", "Borderline", "Balanced", "Good supply", "Excellent"];
 
@@ -47,8 +50,9 @@ export function GapTable({ jobs }: { jobs: JobPost[] }) {
     const groups = new Map<string, JobPost[]>();
     for (const j of openJobs) {
       const k = mode === "role" ? j.title : j.area;
-      if (!groups.has(k)) groups.set(k, []);
-      groups.get(k)!.push(j);
+      const group = groups.get(k);
+      if (group) group.push(j);
+      else groups.set(k, [j]);
     }
     const out: BalanceRow[] = [];
     for (const [k, arr] of groups) {
@@ -83,8 +87,9 @@ export function GapTable({ jobs }: { jobs: JobPost[] }) {
     const byCat = new Map<string, BalanceRow[]>();
     for (const r of filtered) {
       const cat = roleCategory(r.key);
-      if (!byCat.has(cat)) byCat.set(cat, []);
-      byCat.get(cat)!.push(r);
+      const catRows = byCat.get(cat);
+      if (catRows) catRows.push(r);
+      else byCat.set(cat, [r]);
     }
     const out: BalanceGroup[] = [];
     for (const cat of ROLE_CATEGORIES) {
@@ -125,7 +130,12 @@ export function GapTable({ jobs }: { jobs: JobPost[] }) {
       description="Where role/area demand outpaces available supply."
       action={
         <div className="flex items-center gap-3">
-          <Tabs value={view} onValueChange={(v) => setView(v as View)}>
+          <Tabs
+            value={view}
+            onValueChange={(v) => {
+              if (isOneOf(VIEWS, v)) setView(v);
+            }}
+          >
             <TabsList>
               <TabsTrigger
                 value="balance"
@@ -151,7 +161,8 @@ export function GapTable({ jobs }: { jobs: JobPost[] }) {
         <Tabs
           value={mode}
           onValueChange={(v) => {
-            setMode(v as Mode);
+            if (!isOneOf(MODES, v)) return;
+            setMode(v);
             setKeyFilter("all");
           }}
         >

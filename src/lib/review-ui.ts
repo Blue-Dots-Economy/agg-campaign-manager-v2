@@ -21,8 +21,9 @@ export function buildStatusMap(
     const key = getReviewKey({ call_id: row.call_id, job_id: row.job_id });
     if (!key) continue;
     const email = String(row.reviewer_email || "").toLowerCase();
-    if (!map.has(key)) map.set(key, new Set());
-    map.get(key)!.add(email);
+    const emails = map.get(key);
+    if (emails) emails.add(email);
+    else map.set(key, new Set([email]));
   }
   const me = (myEmail || "").toLowerCase();
   const out = new Map<string, JobReviewStatus>();

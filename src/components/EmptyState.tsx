@@ -71,6 +71,7 @@ export function LoadingState() {
     <div className="space-y-6">
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
         {Array.from({ length: 5 }).map((_, i) => (
+          // A fixed number of placeholders that never reorder, so the index is a stable key.
           <Skeleton key={i} className="h-28 rounded-xl" />
         ))}
       </div>

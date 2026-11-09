@@ -43,18 +43,21 @@ export function MetricCard({
   className,
 }: MetricCardProps) {
   const numericValue = typeof value === "number" ? value : null;
-  const hasTrend =
+  const prev =
     numericValue !== null &&
     previous !== null &&
     previous !== undefined &&
-    Number.isFinite(previous);
+    Number.isFinite(previous)
+      ? previous
+      : null;
+  const hasTrend = prev !== null;
 
   let trendPct: number | null = null;
-  if (hasTrend) {
-    if (previous === 0) {
-      trendPct = numericValue! > 0 ? 100 : 0;
+  if (numericValue !== null && prev !== null) {
+    if (prev === 0) {
+      trendPct = numericValue > 0 ? 100 : 0;
     } else {
-      trendPct = ((numericValue! - (previous as number)) / Math.abs(previous as number)) * 100;
+      trendPct = ((numericValue - prev) / Math.abs(prev)) * 100;
     }
   }
 
@@ -62,9 +65,7 @@ export function MetricCard({
   const parenthetical = comparisonLabel ?? "prev period";
   const subLine =
     sub ??
-    (hasTrend
-      ? `from ${formatValue(previous as number, format, unit)} (${parenthetical})`
-      : undefined);
+    (prev !== null ? `from ${formatValue(prev, format, unit)} (${parenthetical})` : undefined);
 
   const sparkSeries = (trend ?? []).filter((n) => Number.isFinite(n));
   const showSpark = sparkSeries.length >= 2;
@@ -130,7 +131,8 @@ function Sparkline({ data, width = 110, height = 40 }: SparkProps) {
   const linePath = points
     .map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`)
     .join(" ");
-  const areaPath = `${linePath} L${points[n - 1][0].toFixed(1)},${height} L0,${height} Z`;
+  const lastX = points[n - 1]?.[0] ?? 0;
+  const areaPath = `${linePath} L${lastX.toFixed(1)},${height} L0,${height} Z`;
 
   // Direction: compare mean of first third vs last third (robust to single-point spikes).
   const seg = Math.max(1, Math.floor(n / 3));

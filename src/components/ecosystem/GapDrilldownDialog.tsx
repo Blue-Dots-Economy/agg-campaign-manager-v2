@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { JobPost } from "./mockData";
+import type { JobPost } from "./types";
 import {
   GAP_LEVEL_CLASSES,
   fmtInt,

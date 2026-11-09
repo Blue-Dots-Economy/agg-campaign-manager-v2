@@ -2,6 +2,7 @@
 import type { ProgramId } from "@/programs/registry";
 import { MOBILE_DIGITS } from "./contact-validation";
 import { asRecord, first, type RayaItem } from "./raya-record";
+import { compareCodeUnits } from "./sort";
 
 /** Shortest bare sheet id accepted; shorter text is not a Google Sheet id. */
 const MIN_SHEET_ID_LENGTH = 20;
@@ -255,12 +256,6 @@ export function nextCampaignDayLabel(days: ReadonlyArray<string | null>): string
     if (m?.[1]) maxN = Math.max(maxN, Number(m[1]));
   }
   return `Day ${maxN + 1}`;
-}
-
-/** Orders two strings by UTF-16 code units, the same order `Array.prototype.sort` uses by default. */
-function compareCodeUnits(a: string, b: string): number {
-  if (a < b) return -1;
-  return a > b ? 1 : 0;
 }
 
 /** Returns an object's keys in code-unit order, for listing the fields Raya sent. */

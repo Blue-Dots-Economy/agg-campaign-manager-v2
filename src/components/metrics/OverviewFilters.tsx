@@ -31,8 +31,8 @@ const fmt = (d: Date) => format(d, "yyyy-MM-dd");
 
 // Parse a YYYY-MM-DD string as a LOCAL date (avoid UTC shift from new Date("YYYY-MM-DD")).
 const parseLocal = (s: string): Date => {
-  const [y, m, d] = s.split("-").map(Number);
-  return new Date(y, (m ?? 1) - 1, d ?? 1);
+  const [y = Number.NaN, m = 1, d = 1] = s.split("-").map(Number);
+  return new Date(y, m - 1, d);
 };
 
 export function OverviewFilters({

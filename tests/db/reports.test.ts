@@ -2,6 +2,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import pg from "pg";
 import { runMigrations } from "../../src/server/db/migrate";
+import type * as ReportsModule from "../../src/server/db/reports.server";
 
 const URL = process.env.TEST_DATABASE_URL;
 
@@ -16,7 +17,7 @@ const CALLS = [
 ];
 
 describe.skipIf(!URL)("reports", () => {
-  let reports: typeof import("../../src/server/db/reports.server");
+  let reports: typeof ReportsModule;
   let owner: pg.Client;
 
   beforeAll(async () => {

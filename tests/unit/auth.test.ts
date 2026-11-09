@@ -11,9 +11,11 @@ import {
   temporaryPassword,
   verifyPassword,
 } from "../../src/server/auth/password.server";
+import type * as SessionModule from "../../src/server/auth/session.server";
 
 const SECRET = "test-secret-at-least-thirty-two-characters!";
-let session: typeof import("../../src/server/auth/session.server");
+// Loaded after SESSION_SECRET is set; the type import is erased at runtime.
+let session: typeof SessionModule;
 
 beforeAll(async () => {
   process.env.SESSION_SECRET = SECRET;

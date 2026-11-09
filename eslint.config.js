@@ -1,6 +1,6 @@
-// Lint rules for the app. Rules that still have findings start at "warn" and move to "error"
-// once their count reaches 0 (`bun run lint:report` prints the counts). Formatting is checked
-// by Prettier on its own, not by ESLint.
+// Lint rules for the app. Type-safety, hook and import rules are errors. Accessibility and
+// react-refresh rules are warnings (`bun run lint:report` prints the counts). Formatting is
+// checked by Prettier on its own, not by ESLint.
 import js from "@eslint/js";
 import { createTypeScriptImportResolver } from "eslint-import-resolver-typescript";
 import importX from "eslint-plugin-import-x";
@@ -62,22 +62,22 @@ export default tseslint.config(
     rules: {
       eqeqeq: ["error", "always", { null: "ignore" }],
       "no-restricted-imports": ["error", { paths: [SERVER_ONLY] }],
-      "no-useless-escape": "warn",
+      "no-useless-escape": "error",
       "import-x/no-cycle": "error",
-      "@typescript-eslint/consistent-type-assertions": ["warn", { assertionStyle: "never" }],
-      "@typescript-eslint/no-explicit-any": "warn",
-      "@typescript-eslint/no-non-null-assertion": "warn",
+      "@typescript-eslint/consistent-type-assertions": ["error", { assertionStyle: "never" }],
+      "@typescript-eslint/no-explicit-any": "error",
+      "@typescript-eslint/no-non-null-assertion": "error",
       "@typescript-eslint/consistent-type-imports": [
-        "warn",
+        "error",
         { prefer: "type-imports", fixStyle: "inline-type-imports" },
       ],
       "@typescript-eslint/no-unused-vars": [
-        "warn",
+        "error",
         { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" },
       ],
       "react-hooks/rules-of-hooks": "error",
-      "react-hooks/exhaustive-deps": "warn",
-      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/exhaustive-deps": "error",
+      "react-hooks/set-state-in-effect": "error",
       ...A11Y_AS_WARNINGS,
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
     },

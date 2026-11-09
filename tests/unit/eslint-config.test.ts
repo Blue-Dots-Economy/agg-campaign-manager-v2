@@ -20,7 +20,7 @@ describe("type safety rules", () => {
     const code = "const x: unknown = 1;\nexport const y = x as number;\n";
     expect(
       await severities(code, "src/lib/probe.ts", "@typescript-eslint/consistent-type-assertions"),
-    ).toEqual([WARN]);
+    ).toEqual([ERROR]);
   });
 
   test("as const is allowed", async () => {
@@ -66,14 +66,21 @@ describe("type safety rules", () => {
         "src/lib/probe.ts",
         "@typescript-eslint/no-explicit-any",
       ),
-    ).toEqual([WARN]);
+    ).toEqual([ERROR]);
   });
 
   test("a non-null assertion is reported", async () => {
     const code = "export const f = (a: string[]) => a[0]!.length;\n";
     expect(
       await severities(code, "src/lib/probe.ts", "@typescript-eslint/no-non-null-assertion"),
-    ).toEqual([WARN]);
+    ).toEqual([ERROR]);
+  });
+
+  test("an unused variable is an error", async () => {
+    const code = "export function f() {\n  const unused = 1;\n  return 2;\n}\n";
+    expect(await severities(code, "src/lib/probe.ts", "@typescript-eslint/no-unused-vars")).toEqual(
+      [ERROR],
+    );
   });
 
   test("loose equality is an error", async () => {
@@ -92,7 +99,7 @@ describe("type safety rules", () => {
     const code = 'import { Role } from "@/auth/roles";\nexport const r: Role = "admin";\n';
     expect(
       await severities(code, "src/lib/probe.ts", "@typescript-eslint/consistent-type-imports"),
-    ).toEqual([WARN]);
+    ).toEqual([ERROR]);
   });
 });
 
@@ -163,7 +170,7 @@ describe("react", () => {
       'import { useEffect, useState } from "react";\nexport function C({ v }: { v: number }) {\n  const [s, setS] = useState(0);\n  useEffect(() => {\n    setS(v);\n  }, [v]);\n  return s;\n}\n';
     expect(
       await severities(code, "src/components/probe.tsx", "react-hooks/set-state-in-effect"),
-    ).toEqual([WARN]);
+    ).toEqual([ERROR]);
   });
 
   test("an image without alt text is reported", async () => {

@@ -8,6 +8,7 @@ import { fetchNorthStar, saveNorthStar } from "@/lib/north-star.functions";
 import { useAuth } from "@/auth/context";
 import { canEditShared } from "@/auth/roles";
 import { cn } from "@/lib/utils";
+import type { MetricValues } from "./metric-values";
 
 type Def = { key: string; label: string; num: string; den: string };
 const KKB_DEFS: Def[] = [
@@ -44,7 +45,7 @@ function statusColor(value: number | null, threshold: number | null): string {
   return "text-rose-600 dark:text-rose-400";
 }
 
-export function NorthStarMetrics({ program, m }: { program: string; m: Record<string, number> }) {
+export function NorthStarMetrics({ program, m }: { program: string; m: MetricValues }) {
   const qc = useQueryClient();
   const fetchFn = useServerFn(fetchNorthStar);
   const saveFn = useServerFn(saveNorthStar);
@@ -127,11 +128,12 @@ export function NorthStarMetrics({ program, m }: { program: string; m: Record<st
                 {edit ? (
                   <input
                     type="number"
+                    aria-label={`${it.label} target`}
                     defaultValue={it.threshold ?? ""}
                     onChange={(e) => setDrafts((d) => ({ ...d, [it.key]: e.target.value }))}
                     onBlur={() => commit(it.key)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                      if (e.key === "Enter") e.currentTarget.blur();
                     }}
                     placeholder="—"
                     className="w-14 rounded border border-input bg-background px-1.5 py-0.5 text-right text-xs"

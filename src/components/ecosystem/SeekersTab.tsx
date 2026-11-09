@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { MetricCard } from "@/components/metrics/MetricCard";
-import type { JobPost } from "./mockData";
+import type { JobPost } from "./types";
 import { GapTable } from "./GapTable";
 import { mockPrevious, mockTrend } from "./ecosystemHelpers";
 

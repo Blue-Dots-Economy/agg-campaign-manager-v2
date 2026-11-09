@@ -29,11 +29,23 @@ type NavItem = {
   children?: Omit<NavItem, "sub" | "children">[];
 };
 
+const USER_LEVEL_ITEM: NavItem = {
+  to: "/user-level-analysis",
+  label: "My Purple Dots",
+  icon: Users,
+};
+const ECOSYSTEM_ITEM: NavItem = {
+  to: "/ecosystem-view",
+  label: "Ecosystem View",
+  icon: Briefcase,
+  sub: "Coming soon",
+};
+
 const GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: "",
     items: [
-      { to: "/user-level-analysis", label: "My Purple Dots", icon: Users },
+      USER_LEVEL_ITEM,
       {
         to: "/",
         label: "Campaign Overview",
@@ -44,7 +56,19 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
         ],
       },
       { to: "/launch", label: "Launch a campaign", icon: Rocket },
-      { to: "/ecosystem-view", label: "Ecosystem View", icon: Briefcase, sub: "Coming soon" },
+      ECOSYSTEM_ITEM,
+    ],
+  },
+];
+
+/** Menu for the ecosystem role: the ecosystem view first, without campaign sub-pages. */
+const ECOSYSTEM_GROUPS: { title: string; items: NavItem[] }[] = [
+  {
+    title: "",
+    items: [
+      ECOSYSTEM_ITEM,
+      USER_LEVEL_ITEM,
+      { to: "/", label: "Campaign Overview", icon: LayoutDashboard },
     ],
   },
 ];
@@ -64,10 +88,11 @@ function NavLink({
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
-  const hasChildren = (item.children?.length ?? 0) > 0;
+  const children = item.children ?? [];
+  const hasChildren = children.length > 0;
   const groupActive =
     hasChildren &&
-    item.children!.some((c) => (c.to === "/" ? pathname === "/" : pathname.startsWith(c.to)));
+    children.some((c) => (c.to === "/" ? pathname === "/" : pathname.startsWith(c.to)));
 
   return (
     <div>
@@ -104,7 +129,7 @@ function NavLink({
       </div>
       {hasChildren && !collapsed && (
         <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border pl-3">
-          {item.children!.map((child) => {
+          {children.map((child) => {
             const childActive = child.to === "/" ? pathname === "/" : pathname.startsWith(child.to);
             const ChildIcon = child.icon;
             return (
@@ -138,18 +163,7 @@ export function MobileNav() {
   const navigate = useNavigate();
   const { logout, session } = useAuth();
   const isEcosystem = session?.role === "ecosystem";
-  const groups = isEcosystem
-    ? [
-        {
-          title: "",
-          items: [
-            GROUPS[0].items[3],
-            GROUPS[0].items[0],
-            { to: "/", label: "Campaign Overview", icon: LayoutDashboard },
-          ] as NavItem[],
-        },
-      ]
-    : GROUPS;
+  const groups = isEcosystem ? ECOSYSTEM_GROUPS : GROUPS;
 
   const [expanded, setExpanded] = useState<Set<string>>(() => {
     const initial = new Set<string>();
@@ -164,6 +178,11 @@ export function MobileNav() {
     }
     return initial;
   });
+
+  const signOut = async () => {
+    await logout();
+    await navigate({ to: "/login" });
+  };
 
   const toggle = (to: string) => {
     setExpanded((prev) => {
@@ -262,7 +281,7 @@ export function MobileNav() {
           <button
             onClick={() => {
               setOpen(false);
-              void logout().then(() => navigate({ to: "/login" }));
+              void signOut();
             }}
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >

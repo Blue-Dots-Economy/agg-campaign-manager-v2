@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Rocket, Check, FileText, Loader2 } from "lucide-react";
@@ -10,7 +11,7 @@ import { useAuth } from "@/auth/context";
 import { submitCampaignRequest } from "@/lib/campaign-requests.functions";
 import { listProgramAgents } from "@/lib/agents.functions";
 import { buildCohort, type CohortIntent, type ConfidenceBand } from "@/lib/cohort";
-import { loadSeekersAsync, type Seeker } from "@/lib/upSeekersCsv";
+import { useSeekers } from "@/hooks/useSeekers";
 import {
   ScheduleEditor,
   type ScheduleState,
@@ -65,42 +66,23 @@ function RequestCampaignForm() {
   const [confidenceBand, setConfidenceBand] = useState<ConfidenceBand>("low");
   const [schedule, setSchedule] = useState<ScheduleState>(() => makeDefaultSchedule());
   const [note, setNote] = useState("");
-  const [seekers, setSeekers] = useState<Seeker[] | null>(null);
-  const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
   const submitFn = useServerFn(submitCampaignRequest);
   const listAgentsFn = useServerFn(listProgramAgents);
-  const [agentId, setAgentId] = useState<string>("");
-  const [agentName, setAgentName] = useState<string>("");
+  const { data: seekers, isPending: loading } = useSeekers();
 
-  useEffect(() => {
-    if (!seekers && !loading) {
-      setLoading(true);
-      loadSeekersAsync()
-        .then((r) => setSeekers(r.seekers))
-        .catch(() => setSeekers([]))
-        .finally(() => setLoading(false));
-    }
-  }, [seekers, loading]);
-
-  useEffect(() => {
-    let cancelled = false;
-    listAgentsFn({ data: { program } })
-      .then((agents) => {
-        if (cancelled) return;
-        const first = agents?.[0];
-        setAgentId(first?.agent_id || overrides.rayaAgentId || registry[program].rayaAgentId || "");
-        setAgentName(first?.name || "");
-      })
-      .catch(() => {
-        setAgentId(overrides.rayaAgentId || registry[program].rayaAgentId || "");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [program, listAgentsFn, overrides.rayaAgentId]);
+  const agentsQuery = useQuery({
+    queryKey: ["program-agents", program],
+    queryFn: () => listAgentsFn({ data: { program } }),
+  });
+  // The program's first agent; without one, the stored override or the registry default.
+  const firstAgent = agentsQuery.data?.[0];
+  const agentId = agentsQuery.isPending
+    ? ""
+    : firstAgent?.agent_id || overrides.rayaAgentId || registry[program].rayaAgentId || "";
+  const agentName = firstAgent?.name || "";
 
   const cohortContacts = useMemo(
     () => (seekers ? buildCohort(seekers, { intent, profileStatuses, confidenceBand }) : []),
@@ -122,7 +104,7 @@ function RequestCampaignForm() {
     schedule.days
       .slice()
       .sort((a, b) => a - b)
-      .map((d) => DAY_NAMES[d])
+      .map((d) => DAY_NAMES[d] ?? "")
       .join(", ") || "—";
   const audienceFilterLabel =
     intent === "drive"
@@ -260,6 +242,8 @@ function RequestCampaignForm() {
                 ).map((o) => (
                   <button
                     key={o.id}
+                    type="button"
+                    aria-pressed={intent === o.id}
                     onClick={() => setIntent(o.id)}
                     className={cn(
                       "rounded-xl border-2 p-4 text-left transition-colors flex items-start gap-3",
