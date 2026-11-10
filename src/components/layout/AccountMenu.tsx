@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { KeyRound, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,10 +50,6 @@ export function AccountMenu() {
           </span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => navigate({ to: "/change-password" })}>
-          <KeyRound className="h-4 w-4" />
-          Change password
-        </DropdownMenuItem>
         <DropdownMenuItem
           onClick={() => {
             void signOut();

@@ -39,9 +39,6 @@ export const DEFAULT_LANDING: Record<Role, string> = {
   user: "/",
 };
 
-/** Pages every signed-in user may open, whatever the role. */
-export const ACCOUNT_ROUTES = ["/change-password"];
-
 /** Returns the landing page for a role, or the login page when signed out. */
 export function landingFor(role: Role | undefined): string {
   return role ? (DEFAULT_LANDING[role] ?? "/user-level-analysis") : "/login";
@@ -50,7 +47,6 @@ export function landingFor(role: Role | undefined): string {
 /** True when the role may open the page. "/" (Campaign Overview) matches exactly; other routes match by prefix. */
 export function canAccess(role: Role | undefined, pathname: string): boolean {
   if (!role) return false;
-  if (ACCOUNT_ROUTES.includes(pathname)) return true;
   const allowed = ROLE_ROUTES[role] ?? [];
   if (allowed.includes("*")) return true;
   return allowed.some((r) =>

@@ -1,18 +1,13 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import {
-  login as loginFn,
-  logout as logoutFn,
-  me as meFn,
-  type MeResult,
-} from "@/lib/auth.functions";
+import { logout as logoutFn, me as meFn, type MeResult } from "@/lib/auth.functions";
 import type { Role } from "@/auth/roles";
 import { SESSION_QUERY_KEY, isNotSessionQuery, loadSessionOrNull } from "@/auth/session-query";
 
 export type { Role };
 
-// Session is the httpOnly cm_session cookie; the user comes from me().
+// Session is the httpOnly cm_session cookie, set by the Keycloak callback; the user comes from me().
 export type Session = MeResult;
 
 type AuthContextValue = {
@@ -20,7 +15,6 @@ type AuthContextValue = {
   isAuthenticated: boolean;
   isAdmin: boolean;
   hydrated: boolean;
-  login: (email: string, password: string) => Promise<Session | null>;
   logout: () => Promise<void>;
   refresh: () => Promise<Session | null>;
 };
@@ -31,7 +25,6 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const callMe = useServerFn(meFn);
-  const callLogin = useServerFn(loginFn);
   const callLogout = useServerFn(logoutFn);
 
   const sessionQuery = useQuery({
@@ -54,16 +47,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Drops every cached query except the session, so no data from the previous user stays on screen.
   const clearUserData = () => queryClient.removeQueries({ predicate: isNotSessionQuery });
 
-  const login = async (email: string, password: string) => {
-    try {
-      await callLogin({ data: { email, password } });
-    } catch {
-      return null;
-    }
-    clearUserData();
-    return refresh();
-  };
-
   const logout = async () => {
     try {
       await callLogout();
@@ -81,7 +64,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!session,
         isAdmin: session?.role === "admin",
         hydrated,
-        login,
         logout,
         refresh,
       }}

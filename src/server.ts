@@ -3,7 +3,10 @@ import "./lib/error-capture";
 import type { ServerEntry } from "@tanstack/react-start/server-entry";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { assertAuthConfig } from "./server/auth/config.server";
 import { logEvent } from "./server/log.server";
+
+assertAuthConfig();
 
 type FetchOptions = Parameters<ServerEntry["fetch"]>[1];
 

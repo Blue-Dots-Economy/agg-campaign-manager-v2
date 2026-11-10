@@ -1,0 +1,2 @@
+ALTER TABLE "admin_actions" DROP CONSTRAINT "admin_actions_action_check";--> statement-breakpoint
+ALTER TABLE "admin_actions" ADD CONSTRAINT "admin_actions_action_check" CHECK (action = ANY (ARRAY['create_admin'::text, 'promote'::text, 'link'::text, 'relink'::text, 'verify_email'::text, 'create_keycloak_account'::text]));

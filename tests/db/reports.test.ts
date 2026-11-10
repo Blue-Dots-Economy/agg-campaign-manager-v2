@@ -1,4 +1,4 @@
-// Needs db/bootstrap.sql applied and TEST_DATABASE_URL (the campaign_manager login); skipped otherwise.
+// Needs TEST_DATABASE_URL (the campaign_manager login), set up by the migrate step; skipped otherwise.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import pg from "pg";
 import { runMigrations } from "../../src/server/db/migrate";

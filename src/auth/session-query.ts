@@ -5,7 +5,7 @@ import type { QueryClient } from "@tanstack/react-query";
 export const SESSION_QUERY_KEY = ["session"] as const;
 
 /**
- * Loads the session with `load`; a failed load (401 when signed out) means no session.
+ * Loads the session with `load`; a failed load (the server can't be reached) means no session.
  *
  * @returns The session, or `null` when not signed in.
  */
@@ -13,7 +13,7 @@ export async function loadSessionOrNull<T>(load: () => Promise<T>): Promise<T | 
   try {
     return await load();
   } catch {
-    // me() answers 401 when there is no valid session cookie.
+    // me() answers null when nobody is signed in; an error here means the server can't be reached.
     return null;
   }
 }
