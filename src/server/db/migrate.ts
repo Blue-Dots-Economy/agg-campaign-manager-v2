@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import pg from "pg";
+import { toError } from "@/lib/errors";
 import { bootstrapAdmin } from "../admin/bootstrap";
 import { setUpDatabase } from "./setup";
 
@@ -42,8 +43,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     }
   } catch (e) {
     // Drizzle wraps database errors; the cause says what actually went wrong.
-    const cause = (e as Error).cause;
-    console.error((e as Error).message + (cause instanceof Error ? `\n${cause.message}` : ""));
+    const err = toError(e);
+    const cause = err.cause;
+    console.error(err.message + (cause instanceof Error ? `\n${cause.message}` : ""));
     process.exit(1);
   }
 }

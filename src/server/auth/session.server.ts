@@ -44,7 +44,10 @@ export async function signSession(uid: string, now = Date.now()): Promise<string
 export async function verifySession(token: string | undefined): Promise<string | null> {
   if (!token) return null;
   try {
-    const { payload } = await jwtVerify(token, secretKey(), { algorithms: ["HS256"], audience: SESSION_AUDIENCE });
+    const { payload } = await jwtVerify(token, secretKey(), {
+      algorithms: ["HS256"],
+      audience: SESSION_AUDIENCE,
+    });
     return typeof payload.uid === "string" ? payload.uid : null;
   } catch {
     return null;

@@ -40,7 +40,8 @@ export function decideLink(
     if (refused) return { kind: "refused", reason: refused, userId: bySub.id };
     if (bySub.email === id.email) return { kind: "login", userId: bySub.id, set: {} };
     // Their email changed in Keycloak: follow it, unless another user has it.
-    if (byEmail && byEmail.id !== bySub.id) return { kind: "refused", reason: "conflict", userId: bySub.id };
+    if (byEmail && byEmail.id !== bySub.id)
+      return { kind: "refused", reason: "conflict", userId: bySub.id };
     return { kind: "login", userId: bySub.id, set: { email: id.email } };
   }
 
@@ -54,7 +55,11 @@ export function decideLink(
     // else registered with that email can't become an admin. The admin bootstrap
     // or another admin's "Set up login" links them by Keycloak id instead.
     if (!byEmail.keycloakSub && byEmail.role === "admin") {
-      return { kind: "refused", reason: refusalFor(byEmail) ?? "admin-unlinked", userId: byEmail.id };
+      return {
+        kind: "refused",
+        reason: refusalFor(byEmail) ?? "admin-unlinked",
+        userId: byEmail.id,
+      };
     }
     const set = { keycloakSub: id.sub };
     const refused = refusalFor(byEmail);

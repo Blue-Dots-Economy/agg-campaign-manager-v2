@@ -29,14 +29,18 @@ describe("Keycloak settings", () => {
   });
 
   test("refuse a non-http address", () => {
-    expect(() => keycloakConfig({ ...ENV, KEYCLOAK_BASE_URL: "ftp://keycloak" })).toThrow(/http\(s\)/);
+    expect(() => keycloakConfig({ ...ENV, KEYCLOAK_BASE_URL: "ftp://keycloak" })).toThrow(
+      /http\(s\)/,
+    );
   });
 });
 
 describe("APP_BASE_URL", () => {
   test("gives the origin, without a path or trailing slash", () => {
     expect(appOrigin({ APP_BASE_URL: "http://localhost:8088/" })).toBe("http://localhost:8088");
-    expect(appOrigin({ APP_BASE_URL: "https://cm.example.org/app" })).toBe("https://cm.example.org");
+    expect(appOrigin({ APP_BASE_URL: "https://cm.example.org/app" })).toBe(
+      "https://cm.example.org",
+    );
   });
 
   test("is required and must be an http(s) URL", () => {
@@ -53,12 +57,16 @@ describe("startup check", () => {
   });
 
   test("stops when a setting is missing", () => {
-    expect(() => assertAuthConfig({ ...FULL, KEYCLOAK_CLIENT_SECRET: "" })).toThrow(/KEYCLOAK_CLIENT_SECRET/);
+    expect(() => assertAuthConfig({ ...FULL, KEYCLOAK_CLIENT_SECRET: "" })).toThrow(
+      /KEYCLOAK_CLIENT_SECRET/,
+    );
     expect(() => assertAuthConfig({ ...FULL, APP_BASE_URL: "" })).toThrow(/APP_BASE_URL/);
   });
 
   test("stops when SESSION_SECRET is missing or short", () => {
     expect(() => assertAuthConfig(ENV)).toThrow(/SESSION_SECRET/);
-    expect(() => assertAuthConfig({ ...FULL, SESSION_SECRET: "x".repeat(31) })).toThrow(/SESSION_SECRET/);
+    expect(() => assertAuthConfig({ ...FULL, SESSION_SECRET: "x".repeat(31) })).toThrow(
+      /SESSION_SECRET/,
+    );
   });
 });

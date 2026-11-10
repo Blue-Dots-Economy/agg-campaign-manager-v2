@@ -12,10 +12,16 @@ export const Route = createFileRoute("/auth/keycloak/login")({
         const { cookieHeader, secretKey } = await import("@/server/auth/session.server");
 
         const req = kc.newLoginRequest();
-        const headers = new Headers({ location: kc.authorizeUrl(keycloakConfig(), appOrigin(), req) });
+        const headers = new Headers({
+          location: kc.authorizeUrl(keycloakConfig(), appOrigin(), req),
+        });
         headers.append(
           "set-cookie",
-          cookieHeader(kc.OIDC_COOKIE, await kc.sealLoginRequest(req, secretKey()), kc.OIDC_TTL_SECONDS),
+          cookieHeader(
+            kc.OIDC_COOKIE,
+            await kc.sealLoginRequest(req, secretKey()),
+            kc.OIDC_TTL_SECONDS,
+          ),
         );
         return new Response(null, { status: 302, headers });
       },

@@ -23,9 +23,13 @@ function fail(message: string): never {
 function showAccount(a: KeycloakUser): void {
   console.log("Keycloak account with this email:");
   console.log(`  Username:     ${a.username}`);
-  console.log(`  Email:        ${a.email ?? "-"} (${a.emailVerified ? "verified" : "NOT verified"})`);
+  console.log(
+    `  Email:        ${a.email ?? "-"} (${a.emailVerified ? "verified" : "NOT verified"})`,
+  );
   console.log(`  Phone number: ${a.phoneNumber ?? "-"}`);
-  console.log(`  Created:      ${a.createdTimestamp ? new Date(a.createdTimestamp).toISOString() : "-"}`);
+  console.log(
+    `  Created:      ${a.createdTimestamp ? new Date(a.createdTimestamp).toISOString() : "-"}`,
+  );
   console.log(`  Enabled:      ${a.enabled ? "yes" : "NO"}`);
 }
 
@@ -41,14 +45,22 @@ async function main(): Promise<void> {
     },
     strict: true,
   });
-  const parsed = z.string().trim().toLowerCase().email().safeParse(values.email ?? "");
+  const parsed = z
+    .string()
+    .trim()
+    .toLowerCase()
+    .email()
+    .safeParse(values.email ?? "");
   if (!parsed.success) fail(`A valid --email is required.\n${USAGE}`);
   const email = parsed.data;
   const operator = values.by?.trim() ?? "";
-  if (values.apply && !operator) fail(`--apply needs --by=<your name>, saved with the change.\n${USAGE}`);
+  if (values.apply && !operator)
+    fail(`--apply needs --by=<your name>, saved with the change.\n${USAGE}`);
   // The retype check must reach a person: no flag skips it.
   if (values["verify-email"] && values.apply && !(process.stdin.isTTY && process.stdout.isTTY)) {
-    fail("--verify-email with --apply needs an interactive terminal, so the email can be typed again. Nothing was changed.");
+    fail(
+      "--verify-email with --apply needs an interactive terminal, so the email can be typed again. Nothing was changed.",
+    );
   }
 
   const url = process.env.DATABASE_URL;
@@ -78,13 +90,19 @@ async function main(): Promise<void> {
 
     if (plan.verifyEmail) {
       const rl = createInterface({ input: process.stdin, output: process.stdout });
-      const typed = (await rl.question("You are vouching that this Keycloak account belongs to this person. Type the email again to confirm: ")).trim();
+      const typed = (
+        await rl.question(
+          "You are vouching that this Keycloak account belongs to this person. Type the email again to confirm: ",
+        )
+      ).trim();
       rl.close();
       if (typed.toLowerCase() !== email) fail("The email did not match. Nothing was changed.");
     }
 
     await applyPlan(db, keycloak, email, existing, plan, operator);
-    console.log(`Done. Saved in admin_actions by "${operator}". ${email} can sign in with Keycloak.`);
+    console.log(
+      `Done. Saved in admin_actions by "${operator}". ${email} can sign in with Keycloak.`,
+    );
   } finally {
     await pool.end();
   }

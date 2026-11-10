@@ -2,6 +2,7 @@
 // service account (realm-management: view-users, manage-users). It never edits,
 // disables or deletes a Keycloak user, except markEmailVerified, which only the
 // server admin command calls (--verify-email).
+import { z } from "zod";
 import type { KeycloakConfig } from "./config.server";
 
 export interface KeycloakUser {
@@ -20,7 +21,8 @@ export const ACCOUNT_MESSAGES: Record<AccountRefusal, string> = {
   unverified:
     "A Keycloak account with this email exists but its email is not verified. It can't be added until it is verified in Keycloak.",
   disabled: "This Keycloak account is disabled.",
-  "username-taken": "Another Keycloak account already uses this email as its username. Sort it out in Keycloak first.",
+  "username-taken":
+    "Another Keycloak account already uses this email as its username. Sort it out in Keycloak first.",
   "linked-elsewhere": "This Keycloak account is already linked to another user.",
 };
 
@@ -38,12 +40,21 @@ export class KeycloakHttpError extends Error {
 }
 
 // Reuse a verified, enabled account; create one if there is none.
-export function decideAccount(existing: KeycloakUser | null): { kind: "reuse" } | { kind: "create" } | { kind: "refuse"; reason: AccountRefusal } {
+export function decideAccount(
+  existing: KeycloakUser | null,
+): { kind: "reuse" } | { kind: "create" } | { kind: "refuse"; reason: AccountRefusal } {
   if (!existing) return { kind: "create" };
   if (!existing.enabled) return { kind: "refuse", reason: "disabled" };
   if (!existing.emailVerified) return { kind: "refuse", reason: "unverified" };
   return { kind: "reuse" };
 }
+
+const TokenReply = z.object({ access_token: z.string(), expires_in: z.number().catch(60) });
+const UserListReply = z.array(z.record(z.string(), z.unknown()));
+const UserReply = z.record(z.string(), z.unknown());
+
+type EnsureResult =
+  { kind: "ok"; id: string; created: boolean } | { kind: "refused"; reason: AccountRefusal };
 
 export class KeycloakAdmin {
   private token: { value: string; expiresAt: number } | null = null;
@@ -66,25 +77,33 @@ export class KeycloakAdmin {
       {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ grant_type: "client_credentials", client_id: this.c.clientId, client_secret: this.c.clientSecret }),
+        body: new URLSearchParams({
+          grant_type: "client_credentials",
+          client_id: this.c.clientId,
+          client_secret: this.c.clientSecret,
+        }),
       },
     );
     // 401 is a wrong client secret, 400 a client without a service account.
-    if (!res.ok) throw new KeycloakHttpError("Keycloak service account login failed", res.status, true);
-    const body = (await res.json()) as { access_token?: unknown; expires_in?: unknown };
-    if (typeof body.access_token !== "string") throw new Error("Keycloak returned no service account token");
-    const ttl = typeof body.expires_in === "number" ? body.expires_in : 60;
-    this.token = { value: body.access_token, expiresAt: this.now() + Math.max(ttl - 30, 0) * 1000 };
+    if (!res.ok)
+      throw new KeycloakHttpError("Keycloak service account login failed", res.status, true);
+    const body = TokenReply.safeParse(await res.json());
+    if (!body.success) throw new Error("Keycloak returned no service account token");
+    const ttl = body.data.expires_in;
+    this.token = {
+      value: body.data.access_token,
+      expiresAt: this.now() + Math.max(ttl - 30, 0) * 1000,
+    };
     return this.token.value;
   }
 
   // One retry with a fresh token if Keycloak refuses the cached one.
   private async call(path: string, init: RequestInit = {}): Promise<Response> {
-    const send = async (fresh: boolean) =>
-      this.fetchFn(this.adminUrl(path), {
-        ...init,
-        headers: { ...(init.headers as Record<string, string>), authorization: `Bearer ${await this.accessToken(fresh)}` },
-      });
+    const send = async (fresh: boolean) => {
+      const headers = new Headers(init.headers);
+      headers.set("authorization", `Bearer ${await this.accessToken(fresh)}`);
+      return this.fetchFn(this.adminUrl(path), { ...init, headers });
+    };
     const res = await send(false);
     return res.status === 401 ? send(true) : res;
   }
@@ -93,8 +112,12 @@ export class KeycloakAdmin {
   async findByEmail(email: string): Promise<KeycloakUser | null> {
     const res = await this.call(`/users?${new URLSearchParams({ email, exact: "true" })}`);
     if (!res.ok) throw new KeycloakHttpError("Keycloak user lookup failed", res.status);
-    const list = (await res.json()) as Record<string, unknown>[];
-    const match = list.find((u) => typeof u.email === "string" && u.email.toLowerCase() === email.toLowerCase());
+    const parsed = UserListReply.safeParse(await res.json());
+    if (!parsed.success) throw new Error("Keycloak returned an unexpected user list");
+    const list = parsed.data;
+    const match = list.find(
+      (u) => typeof u.email === "string" && u.email.toLowerCase() === email.toLowerCase(),
+    );
     return match ? toUser(match) : null;
   }
 
@@ -104,7 +127,13 @@ export class KeycloakAdmin {
     const res = await this.call("/users", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ username: email, email, emailVerified: true, enabled: true, ...(name ? { firstName: name } : {}) }),
+      body: JSON.stringify({
+        username: email,
+        email,
+        emailVerified: true,
+        enabled: true,
+        ...(name ? { firstName: name } : {}),
+      }),
     });
     if (res.status === 409) return "exists";
     if (res.status !== 201) throw new KeycloakHttpError("Keycloak user create failed", res.status);
@@ -118,7 +147,9 @@ export class KeycloakAdmin {
   async markEmailVerified(id: string): Promise<void> {
     const get = await this.call(`/users/${encodeURIComponent(id)}`);
     if (!get.ok) throw new KeycloakHttpError("Keycloak user read failed", get.status);
-    const user = (await get.json()) as Record<string, unknown>;
+    const parsed = UserReply.safeParse(await get.json());
+    if (!parsed.success) throw new Error("Keycloak returned an unexpected user");
+    const user = parsed.data;
     const put = await this.call(`/users/${encodeURIComponent(id)}`, {
       method: "PUT",
       headers: { "content-type": "application/json" },
@@ -128,25 +159,28 @@ export class KeycloakAdmin {
   }
 
   // Finds or creates the account for an email, following §3.5's rules.
-  async ensureAccount(email: string, name: string | null): Promise<{ kind: "ok"; id: string; created: boolean } | { kind: "refused"; reason: AccountRefusal }> {
-    let existing = await this.findByEmail(email);
-    let decision = decideAccount(existing);
-    if (decision.kind === "create") {
-      const made = await this.create(email, name);
-      if (made !== "exists") return { kind: "ok", id: made.id, created: true };
-      // Created a moment ago by someone else, or the username is taken by an
-      // account with another email.
-      existing = await this.findByEmail(email);
-      if (!existing) return { kind: "refused", reason: "username-taken" };
-      decision = decideAccount(existing);
-    }
-    if (decision.kind === "refuse") return { kind: "refused", reason: decision.reason };
-    return { kind: "ok", id: existing!.id, created: false };
+  async ensureAccount(email: string, name: string | null): Promise<EnsureResult> {
+    const existing = await this.findByEmail(email);
+    if (existing) return existingAccount(existing);
+    const made = await this.create(email, name);
+    if (made !== "exists") return { kind: "ok", id: made.id, created: true };
+    // Created a moment ago by someone else, or the username is taken by an
+    // account with another email.
+    const again = await this.findByEmail(email);
+    if (!again) return { kind: "refused", reason: "username-taken" };
+    return existingAccount(again);
   }
 }
 
+// An account that already exists is reused only when decideAccount allows it.
+function existingAccount(u: KeycloakUser): EnsureResult {
+  const decision = decideAccount(u);
+  if (decision.kind === "refuse") return { kind: "refused", reason: decision.reason };
+  return { kind: "ok", id: u.id, created: false };
+}
+
 function toUser(u: Record<string, unknown>): KeycloakUser {
-  const attrs = (u.attributes ?? {}) as Record<string, unknown>;
+  const attrs = UserReply.safeParse(u.attributes).data ?? {};
   const phone = Array.isArray(attrs.phoneNumber) ? attrs.phoneNumber[0] : null;
   return {
     id: String(u.id),

@@ -5,7 +5,12 @@ import type { KeycloakIdentity } from "../../src/server/auth/keycloak.server";
 import type { LinkResult } from "../../src/server/auth/keycloak-link.server";
 
 const REQ = { state: "state-1", nonce: "n", verifier: "v", startedAt: 0 };
-const IDENTITY: KeycloakIdentity = { sub: "sub-1", email: "priya@example.org", emailVerified: true, name: "Priya" };
+const IDENTITY: KeycloakIdentity = {
+  sub: "sub-1",
+  email: "priya@example.org",
+  emailVerified: true,
+  name: "Priya",
+};
 
 // Fakes for everything outside the handler; each test overrides what it needs.
 function deps(over: Partial<CallbackDeps> = {}) {
@@ -26,7 +31,11 @@ function deps(over: Partial<CallbackDeps> = {}) {
     link: async (): Promise<LinkResult> => ({ kind: "login", userId: "u-1", role: "admin" }),
     signSession: async (uid) => `session-for-${uid}`,
     readCookie: (request, name) =>
-      request.headers.get("cookie")?.split("; ").find((c) => c.startsWith(`${name}=`))?.slice(name.length + 1),
+      request.headers
+        .get("cookie")
+        ?.split("; ")
+        .find((c) => c.startsWith(`${name}=`))
+        ?.slice(name.length + 1),
     cookieHeader: (name, value, maxAge) => `${name}=${value}; Max-Age=${maxAge}`,
     oidcCookie: "cm_oidc",
     sessionCookie: "cm_session",
@@ -55,7 +64,10 @@ describe("Keycloak callback", () => {
   test("a good login starts a session and clears the login cookie", async () => {
     const res = await handleCallback(callback("state=state-1&code=c"), deps().d);
     expect(res.status).toBe(302);
-    expect(res.headers.getSetCookie()).toEqual(["cm_oidc=; Max-Age=0", "cm_session=session-for-u-1; Max-Age=3600"]);
+    expect(res.headers.getSetCookie()).toEqual([
+      "cm_oidc=; Max-Age=0",
+      "cm_session=session-for-u-1; Max-Age=3600",
+    ]);
   });
 
   test("a state that doesn't match is refused, and both cookies are cleared", async () => {
@@ -65,7 +77,10 @@ describe("Keycloak callback", () => {
 
   test("Keycloak's ?error= is logged with its description and refused", async () => {
     const { d, logged } = deps();
-    const res = await handleCallback(callback("error=access_denied&error_description=User%0Acancelled"), d);
+    const res = await handleCallback(
+      callback("error=access_denied&error_description=User%0Acancelled"),
+      d,
+    );
     expect(outcome(res)).toEqual({ location: "/login?error=failed", cleared: true });
     expect(logged).toEqual(["[keycloak] login failed at Keycloak: access_denied: User cancelled"]);
   });

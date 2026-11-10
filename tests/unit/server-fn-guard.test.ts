@@ -96,7 +96,8 @@ describe("server functions", () => {
   test("exactly the public functions use only publicMiddleware", () => {
     const open = fns.filter((f) => f.middleware.includes("publicMiddleware")).map((f) => f.name);
     expect(open.sort()).toEqual([...PUBLIC].sort());
-    for (const f of fns.filter((x) => PUBLIC.has(x.name))) expect([f.name, f.middleware]).toEqual([f.name, ["publicMiddleware"]]);
+    for (const f of fns.filter((x) => PUBLIC.has(x.name)))
+      expect([f.name, f.middleware]).toEqual([f.name, ["publicMiddleware"]]);
   });
 
   test("no server function goes without a check", () => {

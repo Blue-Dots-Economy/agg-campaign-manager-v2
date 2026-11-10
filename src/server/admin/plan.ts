@@ -46,11 +46,20 @@ export function planAdminCommand(
   o: AdminOptions,
 ): AdminPlan {
   const plan: AdminPlan = {
-    error: null, reason: null, notes: [], createKeycloak: false, verifyEmail: false, linkTo: null, createAdmin: false, promote: false, relink: false,
+    error: null,
+    reason: null,
+    notes: [],
+    createKeycloak: false,
+    verifyEmail: false,
+    linkTo: null,
+    createAdmin: false,
+    promote: false,
+    relink: false,
   };
   const stop = (reason: StopReason, error: string): AdminPlan => ({ ...plan, error, reason });
 
-  if (o.verifyEmail && o.relink) return stop("options", "--verify-email can't be used with --relink, which only clears a link.");
+  if (o.verifyEmail && o.relink)
+    return stop("options", "--verify-email can't be used with --relink, which only clears a link.");
 
   // Linked to another Keycloak account than the one with this email: signing in
   // with this email would be refused as a conflict. Only a person can say which
@@ -85,8 +94,16 @@ export function planAdminCommand(
       plan.createKeycloak = true;
       plan.notes.push("Create a Keycloak account with this email, marked verified, and link it.");
     } else {
-      if (!account.enabled) return stop("disabled", "The Keycloak account with this email is disabled. Enable it in Keycloak first.");
-      if (accountLinkedToOther) return stop("linked-elsewhere", "The Keycloak account with this email is already linked to another user.");
+      if (!account.enabled)
+        return stop(
+          "disabled",
+          "The Keycloak account with this email is disabled. Enable it in Keycloak first.",
+        );
+      if (accountLinkedToOther)
+        return stop(
+          "linked-elsewhere",
+          "The Keycloak account with this email is already linked to another user.",
+        );
       if (!account.emailVerified) {
         if (!o.verifyEmail) {
           return stop(
@@ -96,7 +113,9 @@ export function planAdminCommand(
           );
         }
         plan.verifyEmail = true;
-        plan.notes.push("Mark the existing Keycloak account's email as verified (you vouch for it).");
+        plan.notes.push(
+          "Mark the existing Keycloak account's email as verified (you vouch for it).",
+        );
       }
       plan.linkTo = account.id;
       plan.notes.push("Link the existing Keycloak account.");
@@ -123,7 +142,9 @@ export function planAdminCommand(
 }
 
 export function planChangesAnything(p: AdminPlan): boolean {
-  return p.createKeycloak || p.verifyEmail || p.createAdmin || p.promote || p.relink || p.linkTo !== null;
+  return (
+    p.createKeycloak || p.verifyEmail || p.createAdmin || p.promote || p.relink || p.linkTo !== null
+  );
 }
 
 function describe(u: ExistingUser): string {

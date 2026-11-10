@@ -1,11 +1,18 @@
 import { describe, expect, test } from "bun:test";
-import { actionAllowed, userState, type UserAction, type UserState } from "../../src/auth/user-state";
+import {
+  actionAllowed,
+  userState,
+  type UserAction,
+  type UserState,
+} from "../../src/auth/user-state";
 
 describe("user state", () => {
   test("follows active, role and rejected_at", () => {
     expect(userState({ active: true, role: "user", rejectedAt: null })).toBe("active");
     expect(userState({ active: false, role: null, rejectedAt: null })).toBe("pending");
-    expect(userState({ active: false, role: null, rejectedAt: "2026-10-01T00:00:00Z" })).toBe("rejected");
+    expect(userState({ active: false, role: null, rejectedAt: "2026-10-01T00:00:00Z" })).toBe(
+      "rejected",
+    );
     expect(userState({ active: false, role: "user", rejectedAt: null })).toBe("deactivated");
   });
 });
@@ -23,7 +30,8 @@ describe("what an admin may do", () => {
 
   for (const [action, allowed] of Object.entries(table) as [UserAction, UserState[]][]) {
     test(`${action} is allowed only on ${allowed.join(", ")}`, () => {
-      for (const s of states) expect([s, actionAllowed(s, action)]).toEqual([s, allowed.includes(s)]);
+      for (const s of states)
+        expect([s, actionAllowed(s, action)]).toEqual([s, allowed.includes(s)]);
     });
   }
 });

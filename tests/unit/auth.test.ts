@@ -51,7 +51,9 @@ describe("session", () => {
   test("a token signed with the same secret but not meant as a session is rejected", async () => {
     const key = new TextEncoder().encode(SECRET);
     const sign = (aud?: string) => {
-      const t = new SignJWT({ uid: "u-1" }).setProtectedHeader({ alg: "HS256" }).setExpirationTime("1h");
+      const t = new SignJWT({ uid: "u-1" })
+        .setProtectedHeader({ alg: "HS256" })
+        .setExpirationTime("1h");
       return (aud ? t.setAudience(aud) : t).sign(key);
     };
     expect(await session.verifySession(await sign())).toBeNull();
@@ -150,7 +152,6 @@ describe("roles", () => {
     for (const page of all)
       expect([page, canAccess(role, page)]).toEqual([page, pages[role].includes(page)]);
   });
-
 
   test("server function groups follow the pages", () => {
     expect(FN_ROLES.admin).toEqual(["admin"]);

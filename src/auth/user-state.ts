@@ -4,7 +4,11 @@
 export type UserState = "active" | "pending" | "rejected" | "deactivated";
 export type UserAction = "approve" | "reject" | "activate" | "deactivate" | "edit";
 
-export function userState(u: { active: boolean; role: string | null; rejectedAt: string | null }): UserState {
+export function userState(u: {
+  active: boolean;
+  role: string | null;
+  rejectedAt: string | null;
+}): UserState {
   if (u.rejectedAt) return "rejected";
   if (u.active) return "active";
   return u.role ? "deactivated" : "pending";

@@ -30,10 +30,15 @@ let privateKey: CryptoKey;
 beforeAll(async () => {
   const pair = await generateKeyPair("RS256");
   privateKey = pair.privateKey;
-  keys = createLocalJWKSet({ keys: [{ ...(await exportJWK(pair.publicKey)), kid: "k1", alg: "RS256" }] });
+  keys = createLocalJWKSet({
+    keys: [{ ...(await exportJWK(pair.publicKey)), kid: "k1", alg: "RS256" }],
+  });
 });
 
-const idToken = (claims: Record<string, unknown>, opts: { iss?: string; aud?: string; exp?: string } = {}) =>
+const idToken = (
+  claims: Record<string, unknown>,
+  opts: { iss?: string; aud?: string; exp?: string } = {},
+) =>
   new SignJWT({
     typ: "ID",
     nonce: "n-1",
@@ -55,7 +60,9 @@ const login = (startedAt = now()) => ({ nonce: "n-1", startedAt });
 
 describe("PKCE", () => {
   test("S256 challenge matches the RFC 7636 example", () => {
-    expect(pkceChallenge("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk")).toBe("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM");
+    expect(pkceChallenge("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk")).toBe(
+      "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+    );
   });
 });
 
@@ -63,9 +70,13 @@ describe("login request", () => {
   test("the Keycloak URL uses the public address, PKCE, the callback, and always asks for a code", () => {
     const req = newLoginRequest();
     const url = new URL(authorizeUrl(cfg, APP, req));
-    expect(url.origin + url.pathname).toBe("http://keycloak:8080/realms/bluedots/protocol/openid-connect/auth");
+    expect(url.origin + url.pathname).toBe(
+      "http://keycloak:8080/realms/bluedots/protocol/openid-connect/auth",
+    );
     expect(url.searchParams.get("client_id")).toBe("campaign-manager");
-    expect(url.searchParams.get("redirect_uri")).toBe("http://localhost:8088/auth/keycloak/callback");
+    expect(url.searchParams.get("redirect_uri")).toBe(
+      "http://localhost:8088/auth/keycloak/callback",
+    );
     expect(url.searchParams.get("code_challenge")).toBe(pkceChallenge(req.verifier));
     expect(url.searchParams.get("code_challenge_method")).toBe("S256");
     expect(url.searchParams.get("state")).toBe(req.state);
@@ -87,14 +98,19 @@ describe("login request", () => {
     const sealed = await sealLoginRequest(req, SECRET);
     expect(await openLoginRequest(sealed, SECRET)).toEqual(req);
     expect(await openLoginRequest(sealed + "x", SECRET)).toBeNull();
-    expect(await openLoginRequest(sealed, new TextEncoder().encode("another-secret-also-thirty-two-characters"))).toBeNull();
+    expect(
+      await openLoginRequest(
+        sealed,
+        new TextEncoder().encode("another-secret-also-thirty-two-characters"),
+      ),
+    ).toBeNull();
     expect(await openLoginRequest(undefined, SECRET)).toBeNull();
   });
 
   test("an edited start time breaks the signature", async () => {
     const sealed = await sealLoginRequest(newLoginRequest(), SECRET);
     const [h, p, s] = sealed.split(".");
-    const payload = JSON.parse(Buffer.from(p, "base64url").toString());
+    const payload = JSON.parse(Buffer.from(p ?? "", "base64url").toString());
     const edited = Buffer.from(JSON.stringify({ ...payload, startedAt: 0 })).toString("base64url");
     expect(await openLoginRequest(`${h}.${edited}.${s}`, SECRET)).toBeNull();
   });
@@ -131,32 +147,65 @@ describe("code exchange", () => {
     const refuse = (body: unknown, status: number) =>
       (async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch;
     await expect(
-      exchangeCode(cfg, APP, "c", "v", refuse({ error: "invalid_client", error_description: "Invalid client credentials" }, 401)),
+      exchangeCode(
+        cfg,
+        APP,
+        "c",
+        "v",
+        refuse({ error: "invalid_client", error_description: "Invalid client credentials" }, 401),
+      ),
     ).rejects.toThrow("HTTP 401 (invalid_client: Invalid client credentials)");
-    await expect(exchangeCode(cfg, APP, "c", "v", refuse({ error: "invalid_grant" }, 400))).rejects.toThrow(
-      "HTTP 400 (invalid_grant)",
-    );
+    await expect(
+      exchangeCode(cfg, APP, "c", "v", refuse({ error: "invalid_grant" }, 400)),
+    ).rejects.toThrow("HTTP 400 (invalid_grant)");
   });
 });
 
 describe("ID token check", () => {
   test("a valid token gives the identity, with the email lowercased", async () => {
     const id = await verifyIdToken(cfg, await idToken({}), login(), keys);
-    expect(id).toEqual({ sub: "sub-123", email: "priya@example.org", emailVerified: true, name: "Priya" });
+    expect(id).toEqual({
+      sub: "sub-123",
+      email: "priya@example.org",
+      emailVerified: true,
+      name: "Priya",
+    });
   });
 
   test("reports an unverified or missing email instead of refusing", async () => {
-    expect((await verifyIdToken(cfg, await idToken({ email_verified: false }), login(), keys)).emailVerified).toBe(false);
-    expect((await verifyIdToken(cfg, await idToken({ email: undefined }), login(), keys)).email).toBeNull();
+    expect(
+      (await verifyIdToken(cfg, await idToken({ email_verified: false }), login(), keys))
+        .emailVerified,
+    ).toBe(false);
+    expect(
+      (await verifyIdToken(cfg, await idToken({ email: undefined }), login(), keys)).email,
+    ).toBeNull();
   });
 
   test("refuses the wrong nonce, issuer, audience, client, type or an expired token", async () => {
-    await expect(verifyIdToken(cfg, await idToken({}), { ...login(), nonce: "other" }, keys)).rejects.toThrow(/nonce/);
-    await expect(verifyIdToken(cfg, await idToken({}, { iss: "http://keycloak:8080/realms/other" }), login(), keys)).rejects.toThrow();
-    await expect(verifyIdToken(cfg, await idToken({}, { aud: "signals-ui" }), login(), keys)).rejects.toThrow();
-    await expect(verifyIdToken(cfg, await idToken({ azp: "signals-ui" }), login(), keys)).rejects.toThrow(/another client/);
-    await expect(verifyIdToken(cfg, await idToken({ typ: "Bearer" }), login(), keys)).rejects.toThrow(/Not an ID token/);
-    await expect(verifyIdToken(cfg, await idToken({}, { exp: "-2m" }), login(), keys)).rejects.toThrow();
+    await expect(
+      verifyIdToken(cfg, await idToken({}), { ...login(), nonce: "other" }, keys),
+    ).rejects.toThrow(/nonce/);
+    await expect(
+      verifyIdToken(
+        cfg,
+        await idToken({}, { iss: "http://keycloak:8080/realms/other" }),
+        login(),
+        keys,
+      ),
+    ).rejects.toThrow();
+    await expect(
+      verifyIdToken(cfg, await idToken({}, { aud: "signals-ui" }), login(), keys),
+    ).rejects.toThrow();
+    await expect(
+      verifyIdToken(cfg, await idToken({ azp: "signals-ui" }), login(), keys),
+    ).rejects.toThrow(/another client/);
+    await expect(
+      verifyIdToken(cfg, await idToken({ typ: "Bearer" }), login(), keys),
+    ).rejects.toThrow(/Not an ID token/);
+    await expect(
+      verifyIdToken(cfg, await idToken({}, { exp: "-2m" }), login(), keys),
+    ).rejects.toThrow();
   });
 
   test("refuses a token signed with another key", async () => {
@@ -174,13 +223,17 @@ describe("ID token check", () => {
 
 describe("a code at every sign-in", () => {
   test("refuses a token with no auth_time", async () => {
-    await expect(verifyIdToken(cfg, await idToken({ auth_time: undefined }), login(), keys)).rejects.toThrow(/auth_time/);
+    await expect(
+      verifyIdToken(cfg, await idToken({ auth_time: undefined }), login(), keys),
+    ).rejects.toThrow(/auth_time/);
   });
 
   test("refuses a silent sign-in from an older Keycloak session", async () => {
     const start = now();
     const old = await idToken({ auth_time: start - AUTH_TIME_ALLOWANCE_SECONDS - 1 });
-    await expect(verifyIdToken(cfg, old, login(start), keys)).rejects.toThrow(/No code was entered/);
+    await expect(verifyIdToken(cfg, old, login(start), keys)).rejects.toThrow(
+      /No code was entered/,
+    );
   });
 
   test("allows a small clock difference between the app and Keycloak", async () => {
@@ -193,7 +246,9 @@ describe("a code at every sign-in", () => {
 describe("Not you? sign-out", () => {
   test("ends the Keycloak session on the public address and returns to /login", () => {
     const url = new URL(keycloakSignOutUrl(cfg, APP));
-    expect(url.origin + url.pathname).toBe("http://keycloak:8080/realms/bluedots/protocol/openid-connect/logout");
+    expect(url.origin + url.pathname).toBe(
+      "http://keycloak:8080/realms/bluedots/protocol/openid-connect/logout",
+    );
     expect(url.searchParams.get("client_id")).toBe("campaign-manager");
     expect(url.searchParams.get("post_logout_redirect_uri")).toBe("http://localhost:8088/login");
     expect(url.searchParams.has("id_token_hint")).toBe(false);

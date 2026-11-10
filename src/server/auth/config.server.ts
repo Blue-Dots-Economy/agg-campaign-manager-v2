@@ -21,20 +21,26 @@ export interface KeycloakConfig {
   issuer: string;
 }
 
-const REQUIRED = ["KEYCLOAK_BASE_URL", "KEYCLOAK_REALM", "KEYCLOAK_CLIENT_ID", "KEYCLOAK_CLIENT_SECRET"] as const;
+const REQUIRED = [
+  "KEYCLOAK_BASE_URL",
+  "KEYCLOAK_REALM",
+  "KEYCLOAK_CLIENT_ID",
+  "KEYCLOAK_CLIENT_SECRET",
+] as const;
 
 export function keycloakConfig(env: Env = process.env): KeycloakConfig {
-  const missing = REQUIRED.filter((k) => !env[k]?.trim());
+  const value = (k: (typeof REQUIRED)[number]) => env[k]?.trim() ?? "";
+  const missing = REQUIRED.filter((k) => !value(k));
   if (missing.length) throw new Error(`Keycloak login needs ${missing.join(", ")}`);
-  const baseUrl = httpUrl("KEYCLOAK_BASE_URL", env.KEYCLOAK_BASE_URL!);
+  const baseUrl = httpUrl("KEYCLOAK_BASE_URL", value("KEYCLOAK_BASE_URL"));
   const internal = env.KEYCLOAK_INTERNAL_BASE_URL?.trim();
-  const realm = env.KEYCLOAK_REALM!.trim();
+  const realm = value("KEYCLOAK_REALM");
   return {
     baseUrl,
     internalBaseUrl: internal ? httpUrl("KEYCLOAK_INTERNAL_BASE_URL", internal) : baseUrl,
     realm,
-    clientId: env.KEYCLOAK_CLIENT_ID!.trim(),
-    clientSecret: env.KEYCLOAK_CLIENT_SECRET!.trim(),
+    clientId: value("KEYCLOAK_CLIENT_ID"),
+    clientSecret: value("KEYCLOAK_CLIENT_SECRET"),
     issuer: `${baseUrl}/realms/${realm}`,
   };
 }
@@ -47,7 +53,8 @@ function httpUrl(name: string, raw: string, originOnly = false): string {
   } catch {
     throw new Error(`${name} is not a valid URL: "${raw}"`);
   }
-  if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error(`${name} must be an http(s) URL`);
+  if (url.protocol !== "https:" && url.protocol !== "http:")
+    throw new Error(`${name} must be an http(s) URL`);
   return originOnly ? url.origin : url.href.replace(/\/+$/, "");
 }
 
@@ -56,5 +63,6 @@ export function assertAuthConfig(env: Env = process.env): void {
   keycloakConfig(env);
   // Checked here too, so a bad value stops the server instead of the first login.
   const secret = env.SESSION_SECRET;
-  if (!secret || secret.length < 32) throw new Error("SESSION_SECRET must be set (at least 32 characters)");
+  if (!secret || secret.length < 32)
+    throw new Error("SESSION_SECRET must be set (at least 32 characters)");
 }

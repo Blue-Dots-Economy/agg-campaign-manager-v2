@@ -2,10 +2,18 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "../db/client.server";
 import { isUniqueViolation } from "../db/errors";
+import { logEvent } from "../log.server";
 import { appUsers } from "../db/schema";
-import { decideLink, type LinkCandidate, type LinkDecision, type RefusalReason, type VerifiedIdentity } from "./keycloak-link";
+import {
+  decideLink,
+  type LinkCandidate,
+  type LinkDecision,
+  type RefusalReason,
+  type VerifiedIdentity,
+} from "./keycloak-link";
 
-export type LinkResult = { kind: "login"; userId: string; role: string } | { kind: "refused"; reason: RefusalReason };
+export type LinkResult =
+  { kind: "login"; userId: string; role: string } | { kind: "refused"; reason: RefusalReason };
 
 const candidateFields = {
   id: appUsers.id,
@@ -18,16 +26,28 @@ const candidateFields = {
 
 type Db = Pick<ReturnType<typeof getDb>, "select" | "insert" | "update">;
 
-async function findBy(db: Db, column: typeof appUsers.keycloakSub | typeof appUsers.email, value: string): Promise<LinkCandidate | null> {
+async function findBy(
+  db: Db,
+  column: typeof appUsers.keycloakSub | typeof appUsers.email,
+  value: string,
+): Promise<LinkCandidate | null> {
   const [row] = await db.select(candidateFields).from(appUsers).where(eq(column, value)).limit(1);
   return row ?? null;
 }
 
 async function decide(db: Db, id: VerifiedIdentity): Promise<LinkDecision> {
-  return decideLink(await findBy(db, appUsers.keycloakSub, id.sub), await findBy(db, appUsers.email, id.email), id);
+  return decideLink(
+    await findBy(db, appUsers.keycloakSub, id.sub),
+    await findBy(db, appUsers.email, id.email),
+    id,
+  );
 }
 
-export async function linkKeycloakIdentity(id: VerifiedIdentity, name: string | null, db: Db = getDb()): Promise<LinkResult> {
+export async function linkKeycloakIdentity(
+  id: VerifiedIdentity,
+  name: string | null,
+  db: Db = getDb(),
+): Promise<LinkResult> {
   let decision = await decide(db, id);
 
   if (decision.kind === "create-pending") {
@@ -46,7 +66,10 @@ export async function linkKeycloakIdentity(id: VerifiedIdentity, name: string | 
   try {
     if (decision.kind === "refused") {
       if (decision.set && decision.userId) {
-        await db.update(appUsers).set({ ...decision.set, updatedAt: now }).where(eq(appUsers.id, decision.userId));
+        await db
+          .update(appUsers)
+          .set({ ...decision.set, updatedAt: now })
+          .where(eq(appUsers.id, decision.userId));
       }
       return { kind: "refused", reason: decision.reason };
     }
@@ -61,7 +84,13 @@ export async function linkKeycloakIdentity(id: VerifiedIdentity, name: string | 
     // Unique keycloak_sub or email taken by a concurrent change: an admin sorts it
     // out. Anything else is a real failure, not a conflict.
     if (!isUniqueViolation(e)) throw e;
-    console.error(`[keycloak] login for ${id.sub} refused as a conflict: ${(e as Error).message}`);
+    logEvent("error", {
+      operation: "keycloak.link",
+      status: "failure",
+      keycloak_sub: id.sub,
+      reason: "conflict",
+      error: e,
+    });
     return { kind: "refused", reason: "conflict" };
   }
 }

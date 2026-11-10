@@ -1,7 +1,11 @@
 // OpenID Connect authorization code flow with PKCE, against Keycloak.
 import { createHash, randomBytes } from "node:crypto";
 import { createRemoteJWKSet, jwtVerify, SignJWT, type JWTVerifyGetKey } from "jose";
+import { z } from "zod";
 import type { KeycloakConfig } from "./config.server";
+
+const IdTokenReply = z.object({ id_token: z.string() });
+const ErrorReply = z.object({ error: z.unknown(), error_description: z.unknown() }).partial();
 
 export const OIDC_COOKIE = "cm_oidc";
 export const OIDC_TTL_SECONDS = 10 * 60;
@@ -31,7 +35,12 @@ export interface LoginRequest {
 }
 
 export function newLoginRequest(now = Date.now()): LoginRequest {
-  return { state: randomToken(), nonce: randomToken(), verifier: randomToken(), startedAt: Math.floor(now / 1000) };
+  return {
+    state: randomToken(),
+    nonce: randomToken(),
+    verifier: randomToken(),
+    startedAt: Math.floor(now / 1000),
+  };
 }
 
 // prompt=login and max_age=0 make Keycloak ask for a code even when the browser
@@ -67,12 +76,19 @@ export async function sealLoginRequest(req: LoginRequest, secret: Uint8Array): P
     .sign(secret);
 }
 
-export async function openLoginRequest(token: string | undefined, secret: Uint8Array): Promise<LoginRequest | null> {
+export async function openLoginRequest(
+  token: string | undefined,
+  secret: Uint8Array,
+): Promise<LoginRequest | null> {
   if (!token) return null;
   try {
-    const { payload } = await jwtVerify(token, secret, { algorithms: ["HS256"], audience: OIDC_AUDIENCE });
-    const { state, nonce, verifier, startedAt } = payload as Record<string, unknown>;
-    if (typeof state !== "string" || typeof nonce !== "string" || typeof verifier !== "string") return null;
+    const { payload } = await jwtVerify(token, secret, {
+      algorithms: ["HS256"],
+      audience: OIDC_AUDIENCE,
+    });
+    const { state, nonce, verifier, startedAt } = payload;
+    if (typeof state !== "string" || typeof nonce !== "string" || typeof verifier !== "string")
+      return null;
     if (typeof startedAt !== "number") return null;
     return { state, nonce, verifier, startedAt };
   } catch {
@@ -105,17 +121,19 @@ export async function exchangeCode(
     // an expired or reused code (invalid_grant). The body never carries the code.
     let detail = "";
     try {
-      const err = (await res.json()) as { error?: unknown; error_description?: unknown };
-      const text = [err.error, err.error_description].filter((v) => typeof v === "string" && v).join(": ");
+      const err = ErrorReply.safeParse(await res.json()).data;
+      const text = [err?.error, err?.error_description]
+        .filter((v) => typeof v === "string" && v)
+        .join(": ");
       if (text) detail = ` (${text.replace(/[\r\n]+/g, " ").slice(0, 300)})`;
     } catch {
       // Not JSON: the status is all there is.
     }
     throw new Error(`Keycloak code exchange failed: HTTP ${res.status}${detail}`);
   }
-  const body = (await res.json()) as { id_token?: unknown };
-  if (typeof body.id_token !== "string") throw new Error("Keycloak returned no ID token");
-  return body.id_token;
+  const body = IdTokenReply.safeParse(await res.json());
+  if (!body.success) throw new Error("Keycloak returned no ID token");
+  return body.data.id_token;
 }
 
 export interface KeycloakIdentity {
@@ -155,7 +173,8 @@ export async function verifyIdToken(
   });
   if (payload.typ !== "ID") throw new Error("Not an ID token");
   if (payload.nonce !== req.nonce) throw new Error("ID token nonce does not match");
-  if (payload.azp !== undefined && payload.azp !== c.clientId) throw new Error("ID token was issued to another client");
+  if (payload.azp !== undefined && payload.azp !== c.clientId)
+    throw new Error("ID token was issued to another client");
   if (typeof payload.auth_time !== "number") throw new Error("ID token has no auth_time");
   if (payload.auth_time < req.startedAt - AUTH_TIME_ALLOWANCE_SECONDS) {
     throw new Error("No code was entered for this login (auth_time is older than the login)");
@@ -175,6 +194,9 @@ export async function verifyIdToken(
 // token hint, Keycloak asks the user to confirm, then returns to /login.
 export function keycloakSignOutUrl(c: KeycloakConfig, appOrigin: string): string {
   const url = new URL(protocolUrl(c.baseUrl, c, "logout"));
-  url.search = new URLSearchParams({ client_id: c.clientId, post_logout_redirect_uri: `${appOrigin}/login` }).toString();
+  url.search = new URLSearchParams({
+    client_id: c.clientId,
+    post_logout_redirect_uri: `${appOrigin}/login`,
+  }).toString();
   return url.toString();
 }

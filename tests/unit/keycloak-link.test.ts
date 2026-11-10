@@ -14,7 +14,11 @@ const user = (over: Partial<LinkCandidate> = {}): LinkCandidate => ({
 
 describe("linking a Keycloak identity", () => {
   test("first login: an unlinked user with the verified email gets linked and logs in", () => {
-    expect(decideLink(null, user(), id)).toEqual({ kind: "login", userId: "u-1", set: { keycloakSub: "sub-1" } });
+    expect(decideLink(null, user(), id)).toEqual({
+      kind: "login",
+      userId: "u-1",
+      set: { keycloakSub: "sub-1" },
+    });
   });
 
   test("later logins match by the Keycloak id", () => {
@@ -24,7 +28,11 @@ describe("linking a Keycloak identity", () => {
 
   test("an email changed in Keycloak is followed", () => {
     const linked = user({ keycloakSub: "sub-1", email: "old@example.org" });
-    expect(decideLink(linked, null, id)).toEqual({ kind: "login", userId: "u-1", set: { email: "priya@example.org" } });
+    expect(decideLink(linked, null, id)).toEqual({
+      kind: "login",
+      userId: "u-1",
+      set: { email: "priya@example.org" },
+    });
   });
 
   test("an email changed to one another user has is a conflict", () => {
@@ -34,7 +42,10 @@ describe("linking a Keycloak identity", () => {
   });
 
   test("an email linked to a different Keycloak account is a conflict", () => {
-    expect(decideLink(null, user({ keycloakSub: "sub-OLD" }), id)).toMatchObject({ kind: "refused", reason: "conflict" });
+    expect(decideLink(null, user({ keycloakSub: "sub-OLD" }), id)).toMatchObject({
+      kind: "refused",
+      reason: "conflict",
+    });
   });
 
   test("an unknown person becomes a pending user", () => {
@@ -51,24 +62,42 @@ describe("linking a Keycloak identity", () => {
   });
 
   test("rejected and deactivated users are refused", () => {
-    const rejected = user({ keycloakSub: "sub-1", active: false, role: null, rejectedAt: "2026-10-01T00:00:00Z" });
+    const rejected = user({
+      keycloakSub: "sub-1",
+      active: false,
+      role: null,
+      rejectedAt: "2026-10-01T00:00:00Z",
+    });
     expect(decideLink(rejected, rejected, id)).toMatchObject({ kind: "refused", reason: "denied" });
     const deactivated = user({ keycloakSub: "sub-1", active: false });
-    expect(decideLink(deactivated, deactivated, id)).toMatchObject({ kind: "refused", reason: "denied" });
+    expect(decideLink(deactivated, deactivated, id)).toMatchObject({
+      kind: "refused",
+      reason: "denied",
+    });
   });
 
   test("an admin is never linked by email", () => {
     const admin = user({ role: "admin" });
-    expect(decideLink(null, admin, id)).toEqual({ kind: "refused", reason: "admin-unlinked", userId: "u-1" });
+    expect(decideLink(null, admin, id)).toEqual({
+      kind: "refused",
+      reason: "admin-unlinked",
+      userId: "u-1",
+    });
     // Once linked by Keycloak id (bootstrap or Set up login), they log in as usual.
     const linked = user({ role: "admin", keycloakSub: "sub-1" });
     expect(decideLink(linked, linked, id)).toEqual({ kind: "login", userId: "u-1", set: {} });
     // A deactivated admin is still told they have no access.
-    expect(decideLink(null, user({ role: "admin", active: false }), id)).toMatchObject({ reason: "denied" });
+    expect(decideLink(null, user({ role: "admin", active: false }), id)).toMatchObject({
+      reason: "denied",
+    });
   });
 
   test("a refused user's email is not changed", () => {
     const deactivated = user({ keycloakSub: "sub-1", active: false, email: "old@example.org" });
-    expect(decideLink(deactivated, null, id)).toEqual({ kind: "refused", reason: "denied", userId: "u-1" });
+    expect(decideLink(deactivated, null, id)).toEqual({
+      kind: "refused",
+      reason: "denied",
+      userId: "u-1",
+    });
   });
 });

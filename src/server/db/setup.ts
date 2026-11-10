@@ -4,6 +4,7 @@
 // from DATABASE_URL. Each part is created only if missing, so it is safe to re-run;
 // an existing login keeps its password.
 import pg from "pg";
+import { errorMessage } from "@/lib/errors";
 
 function withDatabase(url: string, database: string): string {
   const u = new URL(url);
@@ -26,14 +27,17 @@ export async function setUpDatabase(adminUrl: string, appUrl: string): Promise<v
   const login = decodeURIComponent(app.username);
   const password = decodeURIComponent(app.password);
   const database = decodeURIComponent(app.pathname.replace(/^\//, ""));
-  if (!login || !password || !database) throw new Error("DATABASE_URL needs a login, a password and a database name");
+  if (!login || !password || !database)
+    throw new Error("DATABASE_URL needs a login, a password and a database name");
 
   await asAdmin(adminUrl, async (c) => {
     const role = c.escapeIdentifier(login);
     const hasRole = await c.query("select 1 from pg_roles where rolname = $1", [login]);
-    if (!hasRole.rowCount) await c.query(`create role ${role} login password ${c.escapeLiteral(password)}`);
+    if (!hasRole.rowCount)
+      await c.query(`create role ${role} login password ${c.escapeLiteral(password)}`);
     const hasDb = await c.query("select 1 from pg_database where datname = $1", [database]);
-    if (!hasDb.rowCount) await c.query(`create database ${c.escapeIdentifier(database)} owner ${role}`);
+    if (!hasDb.rowCount)
+      await c.query(`create database ${c.escapeIdentifier(database)} owner ${role}`);
     await c.query(`revoke all on database ${c.escapeIdentifier(database)} from public`);
   });
 
@@ -48,7 +52,7 @@ export async function setUpDatabase(adminUrl: string, appUrl: string): Promise<v
     try {
       await c.query("create extension if not exists pg_stat_statements with schema extensions");
     } catch (e) {
-      console.warn(`pg_stat_statements not installed: ${(e as Error).message}`);
+      console.warn(`pg_stat_statements not installed: ${errorMessage(e)}`);
     }
   });
 }

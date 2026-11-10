@@ -12,11 +12,18 @@ describe.skipIf(!URL)("linking a Keycloak identity in the database", () => {
   let owner: pg.Client;
   let pool: pg.Pool;
   let db: ReturnType<typeof drizzle>;
-  const link = { linkKeycloakIdentity: (id: { sub: string; email: string }, name: string | null) => linkKeycloakIdentity(id, name, db) };
+  const link = {
+    linkKeycloakIdentity: (id: { sub: string; email: string }, name: string | null) =>
+      linkKeycloakIdentity(id, name, db),
+  };
 
   const row = async (email: string) =>
-    (await owner.query("select role, active, keycloak_sub, rejected_at, last_login_at from app_users where email = $1", [email]))
-      .rows[0];
+    (
+      await owner.query(
+        "select role, active, keycloak_sub, rejected_at, last_login_at from app_users where email = $1",
+        [email],
+      )
+    ).rows[0];
 
   beforeAll(async () => {
     await runMigrations(URL!);
@@ -43,7 +50,10 @@ describe.skipIf(!URL)("linking a Keycloak identity in the database", () => {
   });
 
   test("a known user is linked on first login and gets their role", async () => {
-    const r = await link.linkKeycloakIdentity({ sub: "sub-known", email: `known${DOMAIN}` }, "Known");
+    const r = await link.linkKeycloakIdentity(
+      { sub: "sub-known", email: `known${DOMAIN}` },
+      "Known",
+    );
     expect(r).toMatchObject({ kind: "login", role: "coordinator" });
     const u = await row(`known${DOMAIN}`);
     expect(u.keycloak_sub).toBe("sub-known");
@@ -51,30 +61,57 @@ describe.skipIf(!URL)("linking a Keycloak identity in the database", () => {
   });
 
   test("an unknown person is stored as pending, inactive and without a role", async () => {
-    const r = await link.linkKeycloakIdentity({ sub: "sub-new", email: `new${DOMAIN}` }, "New Person");
+    const r = await link.linkKeycloakIdentity(
+      { sub: "sub-new", email: `new${DOMAIN}` },
+      "New Person",
+    );
     expect(r).toEqual({ kind: "refused", reason: "pending" });
-    expect(await row(`new${DOMAIN}`)).toMatchObject({ role: null, active: false, keycloak_sub: "sub-new" });
+    expect(await row(`new${DOMAIN}`)).toMatchObject({
+      role: null,
+      active: false,
+      keycloak_sub: "sub-new",
+    });
   });
 
   test("logging in again while pending changes nothing", async () => {
-    const r = await link.linkKeycloakIdentity({ sub: "sub-new", email: `new${DOMAIN}` }, "New Person");
+    const r = await link.linkKeycloakIdentity(
+      { sub: "sub-new", email: `new${DOMAIN}` },
+      "New Person",
+    );
     expect(r).toEqual({ kind: "refused", reason: "pending" });
-    expect((await owner.query("select count(*)::int as n from app_users where email = $1", [`new${DOMAIN}`])).rows[0].n).toBe(1);
+    expect(
+      (
+        await owner.query("select count(*)::int as n from app_users where email = $1", [
+          `new${DOMAIN}`,
+        ])
+      ).rows[0].n,
+    ).toBe(1);
   });
 
   test("two first logins at once store one pending user, without an error", async () => {
     const who = { sub: "sub-twice", email: `twice${DOMAIN}` };
-    const results = await Promise.all([link.linkKeycloakIdentity(who, null), link.linkKeycloakIdentity(who, null)]);
+    const results = await Promise.all([
+      link.linkKeycloakIdentity(who, null),
+      link.linkKeycloakIdentity(who, null),
+    ]);
     expect(results).toEqual([
       { kind: "refused", reason: "pending" },
       { kind: "refused", reason: "pending" },
     ]);
-    expect((await owner.query("select count(*)::int as n from app_users where email = $1", [who.email])).rows[0].n).toBe(1);
+    expect(
+      (await owner.query("select count(*)::int as n from app_users where email = $1", [who.email]))
+        .rows[0].n,
+    ).toBe(1);
   });
 
   test("a rejected user stays refused, not pending again", async () => {
-    await owner.query("update app_users set rejected_at = now() where email = $1", [`new${DOMAIN}`]);
-    const r = await link.linkKeycloakIdentity({ sub: "sub-new", email: `new${DOMAIN}` }, "New Person");
+    await owner.query("update app_users set rejected_at = now() where email = $1", [
+      `new${DOMAIN}`,
+    ]);
+    const r = await link.linkKeycloakIdentity(
+      { sub: "sub-new", email: `new${DOMAIN}` },
+      "New Person",
+    );
     expect(r).toEqual({ kind: "refused", reason: "denied" });
   });
 
@@ -84,7 +121,10 @@ describe.skipIf(!URL)("linking a Keycloak identity in the database", () => {
   });
 
   test("a recreated Keycloak account for a linked email is a conflict", async () => {
-    const r = await link.linkKeycloakIdentity({ sub: "sub-recreated", email: `known${DOMAIN}` }, null);
+    const r = await link.linkKeycloakIdentity(
+      { sub: "sub-recreated", email: `known${DOMAIN}` },
+      null,
+    );
     expect(r).toEqual({ kind: "refused", reason: "conflict" });
   });
 });

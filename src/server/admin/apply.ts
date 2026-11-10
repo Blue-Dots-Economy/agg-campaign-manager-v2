@@ -15,12 +15,20 @@ export interface Lookup {
   linkedToOther: boolean;
 }
 
-export async function lookUp(db: NodePgDatabase, keycloak: KeycloakAdmin, email: string): Promise<Lookup> {
+export async function lookUp(
+  db: NodePgDatabase,
+  keycloak: KeycloakAdmin,
+  email: string,
+): Promise<Lookup> {
   const [existing] = await db.select().from(appUsers).where(eq(appUsers.email, email)).limit(1);
   const account = await keycloak.findByEmail(email);
   let linkedToOther = false;
   if (account) {
-    const [owner] = await db.select({ email: appUsers.email }).from(appUsers).where(eq(appUsers.keycloakSub, account.id)).limit(1);
+    const [owner] = await db
+      .select({ email: appUsers.email })
+      .from(appUsers)
+      .where(eq(appUsers.keycloakSub, account.id))
+      .limit(1);
     linkedToOther = !!owner && owner.email !== email;
   }
   return { existing: existing ?? null, account, linkedToOther };
@@ -35,14 +43,19 @@ export async function applyPlan(
   plan: AdminPlan,
   operator: string,
 ): Promise<void> {
-  const record = (action: "create_admin" | "promote" | "link" | "relink" | "verify_email", keycloakUserId: string | null) =>
-    db.insert(adminActions).values({ action, email, keycloakUserId, operator });
+  const record = (
+    action: "create_admin" | "promote" | "link" | "relink" | "verify_email",
+    keycloakUserId: string | null,
+  ) => db.insert(adminActions).values({ action, email, keycloakUserId, operator });
   const now = new Date().toISOString();
 
   let keycloakSub = plan.linkTo;
   if (plan.createKeycloak) {
     const made = await keycloak.create(email, existing?.name ?? null);
-    if (made === "exists") throw new Error("A Keycloak account with this email or username appeared just now. Run it again.");
+    if (made === "exists")
+      throw new Error(
+        "A Keycloak account with this email or username appeared just now. Run it again.",
+      );
     keycloakSub = made.id;
   }
   if (plan.verifyEmail && plan.linkTo) {
@@ -57,7 +70,13 @@ export async function applyPlan(
   } else if (plan.promote) {
     await db
       .update(appUsers)
-      .set({ role: "admin", active: true, rejectedAt: null, ...(keycloakSub ? { keycloakSub } : {}), updatedAt: now })
+      .set({
+        role: "admin",
+        active: true,
+        rejectedAt: null,
+        ...(keycloakSub ? { keycloakSub } : {}),
+        updatedAt: now,
+      })
       .where(eq(appUsers.email, email));
     await record("promote", keycloakSub ?? existing?.keycloakSub ?? null);
   } else if (keycloakSub && existing && !existing.keycloakSub) {
@@ -66,7 +85,10 @@ export async function applyPlan(
     await record("link", keycloakSub);
   }
   if (plan.relink) {
-    await db.update(appUsers).set({ keycloakSub: null, updatedAt: now }).where(eq(appUsers.email, email));
+    await db
+      .update(appUsers)
+      .set({ keycloakSub: null, updatedAt: now })
+      .where(eq(appUsers.email, email));
     await record("relink", existing?.keycloakSub ?? null);
   }
 }

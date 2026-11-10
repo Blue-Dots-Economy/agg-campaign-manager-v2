@@ -44,13 +44,19 @@ export async function bootstrapAdmin(
   const [admin] = await db
     .select({ email: appUsers.email })
     .from(appUsers)
-    .where(and(eq(appUsers.role, "admin"), eq(appUsers.active, true), isNotNull(appUsers.keycloakSub)))
+    .where(
+      and(eq(appUsers.role, "admin"), eq(appUsers.active, true), isNotNull(appUsers.keycloakSub)),
+    )
     .limit(1);
   if (admin) return `An active admin who can sign in exists (${admin.email}); no admin created.`;
 
   const keycloak = makeKeycloak();
   const { existing, account, linkedToOther } = await lookUp(db, keycloak, email);
-  const plan = planAdminCommand(existing, account, linkedToOther, { promote: true, relink: false, verifyEmail: false });
+  const plan = planAdminCommand(existing, account, linkedToOther, {
+    promote: true,
+    relink: false,
+    verifyEmail: false,
+  });
   if (plan.reason) throw new Error(`Admin bootstrap stopped for ${email}: ${STOPPED[plan.reason]}`);
   await applyPlan(db, keycloak, email, existing, plan, OPERATOR);
   return `Admin bootstrap for ${email}: ${plan.notes.join(" ")}`;

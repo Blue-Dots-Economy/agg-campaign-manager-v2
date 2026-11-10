@@ -13,8 +13,17 @@ export interface CallbackDeps {
   appOrigin: () => string;
   secretKey: () => Uint8Array;
   openLoginRequest: (token: string | undefined, secret: Uint8Array) => Promise<LoginRequest | null>;
-  exchangeCode: (c: KeycloakConfig, appOrigin: string, code: string, verifier: string) => Promise<string>;
-  verifyIdToken: (c: KeycloakConfig, idToken: string, req: LoginRequest) => Promise<KeycloakIdentity>;
+  exchangeCode: (
+    c: KeycloakConfig,
+    appOrigin: string,
+    code: string,
+    verifier: string,
+  ) => Promise<string>;
+  verifyIdToken: (
+    c: KeycloakConfig,
+    idToken: string,
+    req: LoginRequest,
+  ) => Promise<KeycloakIdentity>;
   link: (id: { sub: string; email: string }, name: string | null) => Promise<LinkResult>;
   signSession: (userId: string) => Promise<string>;
   readCookie: (request: Request, name: string) => string | undefined;
@@ -48,7 +57,9 @@ export async function handleCallback(request: Request, d: CallbackDeps): Promise
     // Keycloak reports a cancelled or failed login with ?error=.
     const error = url.searchParams.get("error");
     if (error) {
-      log(`[keycloak] login failed at Keycloak: ${oauthErrorText(error, url.searchParams.get("error_description"))}`);
+      log(
+        `[keycloak] login failed at Keycloak: ${oauthErrorText(error, url.searchParams.get("error_description"))}`,
+      );
       return backToLogin("failed");
     }
     const req = await d.openLoginRequest(d.readCookie(request, d.oidcCookie), d.secretKey());
@@ -59,7 +70,11 @@ export async function handleCallback(request: Request, d: CallbackDeps): Promise
     const cfg = d.config();
     let identity: KeycloakIdentity;
     try {
-      identity = await d.verifyIdToken(cfg, await d.exchangeCode(cfg, d.appOrigin(), code, req.verifier), req);
+      identity = await d.verifyIdToken(
+        cfg,
+        await d.exchangeCode(cfg, d.appOrigin(), code, req.verifier),
+        req,
+      );
     } catch (e) {
       log(`[keycloak] login refused: ${e instanceof Error ? e.message : String(e)}`);
       return backToLogin("failed");
@@ -69,9 +84,14 @@ export async function handleCallback(request: Request, d: CallbackDeps): Promise
     const result = await d.link({ sub: identity.sub, email: identity.email }, identity.name);
     if (result.kind === "refused") return backToLogin(result.reason);
 
-    const headers = new Headers({ location: landingFor(isRole(result.role) ? result.role : undefined) });
+    const headers = new Headers({
+      location: landingFor(isRole(result.role) ? result.role : undefined),
+    });
     headers.append("set-cookie", d.cookieHeader(d.oidcCookie, "", 0));
-    headers.append("set-cookie", d.cookieHeader(d.sessionCookie, await d.signSession(result.userId), d.sessionTtlSeconds));
+    headers.append(
+      "set-cookie",
+      d.cookieHeader(d.sessionCookie, await d.signSession(result.userId), d.sessionTtlSeconds),
+    );
     return new Response(null, { status: 302, headers });
   } catch (e) {
     log(`[keycloak] login failed: ${e instanceof Error ? e.message : String(e)}`);
