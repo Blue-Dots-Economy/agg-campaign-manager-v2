@@ -42,13 +42,20 @@ export function AudioPlayer({ src, companyName, duration, datetime }: AudioPlaye
     const a = audioRef.current;
     if (!a) return;
     a.playbackRate = speed;
-    try { window.localStorage.setItem(SPEED_KEY, String(speed)); } catch { /* ignore */ }
+    try {
+      window.localStorage.setItem(SPEED_KEY, String(speed));
+    } catch {
+      /* ignore */
+    }
   }, [speed]);
 
-  useEffect(() => {
+  // Reset the play state when a new recording loads, during render rather than in an effect.
+  const [loadedSrc, setLoadedSrc] = useState(src);
+  if (src !== loadedSrc) {
+    setLoadedSrc(src);
     setPlaying(false);
     setCurrent(0);
-  }, [src]);
+  }
 
   const pct = useMemo(() => (dur > 0 ? (current / dur) * 100 : 0), [current, dur]);
 
@@ -61,10 +68,18 @@ export function AudioPlayer({ src, companyName, duration, datetime }: AudioPlaye
     );
   }
 
-  const toggle = () => {
+  const toggle = async () => {
     const a = audioRef.current;
     if (!a) return;
-    if (a.paused) a.play(); else a.pause();
+    if (!a.paused) {
+      a.pause();
+      return;
+    }
+    try {
+      await a.play();
+    } catch {
+      // play() rejects when the browser blocks playback or the source fails; the button stays on "Play".
+    }
   };
 
   const seek = (v: number) => {
@@ -85,7 +100,7 @@ export function AudioPlayer({ src, companyName, duration, datetime }: AudioPlaye
       <div className="flex items-center gap-3">
         <button
           type="button"
-          onClick={toggle}
+          onClick={() => void toggle()}
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground hover:opacity-90"
           aria-label={playing ? "Pause" : "Play"}
         >
@@ -98,8 +113,12 @@ export function AudioPlayer({ src, companyName, duration, datetime }: AudioPlaye
               const active = (i / BARS.length) * 100 <= pct;
               return (
                 <div
+                  // BARS is a fixed module-level list, so the index is a stable key.
                   key={i}
-                  className={cn("flex-1 rounded-sm transition-colors", active ? "bg-primary" : "bg-muted-foreground/25")}
+                  className={cn(
+                    "flex-1 rounded-sm transition-colors",
+                    active ? "bg-primary" : "bg-muted-foreground/25",
+                  )}
                   style={{ height: `${h}%` }}
                 />
               );
@@ -136,8 +155,14 @@ export function AudioPlayer({ src, companyName, duration, datetime }: AudioPlaye
                 <button
                   key={s}
                   type="button"
-                  onClick={() => { setSpeed(s); setSpeedOpen(false); }}
-                  className={cn("block w-full px-2 py-1 text-left text-xs hover:bg-muted", s === speed && "bg-muted font-semibold")}
+                  onClick={() => {
+                    setSpeed(s);
+                    setSpeedOpen(false);
+                  }}
+                  className={cn(
+                    "block w-full px-2 py-1 text-left text-xs hover:bg-muted",
+                    s === speed && "bg-muted font-semibold",
+                  )}
                 >
                   {s}x
                 </button>
@@ -149,6 +174,7 @@ export function AudioPlayer({ src, companyName, duration, datetime }: AudioPlaye
 
       <audio
         ref={audioRef}
+        aria-label="Call recording"
         src={src}
         preload="metadata"
         onLoadedMetadata={(e) => setDur(e.currentTarget.duration || duration || 0)}

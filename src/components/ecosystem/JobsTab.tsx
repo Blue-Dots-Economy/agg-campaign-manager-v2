@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { MetricCard } from "@/components/metrics/MetricCard";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import type { Application, JobPost } from "./mockData";
+import type { Application, JobPost } from "./types";
 import { GapTable } from "./GapTable";
 import { ApplicationsDrilldown } from "./ApplicationsDrilldown";
 import { APP_AGE_LABEL, appAgeBucket, mockPrevious, mockTrend } from "./ecosystemHelpers";
@@ -81,7 +81,9 @@ export function JobsTab({
                 </div>
               ))}
             </div>
-            <p className="mt-3 text-xs text-muted-foreground">Click card to see all applications.</p>
+            <p className="mt-3 text-xs text-muted-foreground">
+              Click card to see all applications.
+            </p>
           </HoverCardContent>
         </HoverCard>
 

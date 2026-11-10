@@ -1,10 +1,16 @@
 import { createServerFn } from "@tanstack/react-start";
 import { and, asc, desc, eq, isNull, or } from "drizzle-orm";
+import { z } from "zod";
+import type { ProgramId } from "@/programs/registry";
 import { requireRole } from "@/auth/middleware";
 import { FN_ROLES } from "@/auth/roles";
 import { getDb } from "@/server/db/client.server";
 import { fromSqlNames } from "@/server/db/columns";
 import { callRows, sheetConnections, transcriptReviews } from "@/server/db/schema";
+import type { LogFields } from "@/server/log.server";
+import { parseInput } from "@/lib/validation";
+import { UpstreamError } from "@/lib/errors";
+import { isRecord, programIdSchema } from "@/lib/input-schemas";
 import {
   getCallDetail,
   readStagingCallIds,
@@ -14,18 +20,27 @@ import {
   readAllReviewedIds,
 } from "./sheets.server";
 
-export type ReviewDataset = "seekers" | "providers";
+/** Program whose calls are reviewed. */
+export type ReviewDataset = ProgramId;
 
-function normKey(h: string): string {
-  return String(h ?? "").trim().toLowerCase().replace(/[\s\-]+/g, "_");
-}
+/** Most calls the review list loads for one program. */
+const MAX_REVIEW_CALLS = 100_000;
+
+/** Master-sheet tab that holds every submitted review. */
+const FEEDBACK_TAB = "Feedback Responses";
+
+const callIdText = z.string().max(200);
 
 async function resolveSheet(
   dataset: ReviewDataset,
   channel?: string,
 ): Promise<{ sheet_id: string; tab_name: string | null }> {
   const rows = await getDb()
-    .select({ sheet_id: sheetConnections.sheetId, tab_name: sheetConnections.tabName, channel: sheetConnections.channel })
+    .select({
+      sheet_id: sheetConnections.sheetId,
+      tab_name: sheetConnections.tabName,
+      channel: sheetConnections.channel,
+    })
     .from(sheetConnections)
     .where(and(eq(sheetConnections.program, dataset), eq(sheetConnections.enabled, true)));
   if (rows.length === 0) throw new Error(`No enabled sheet connection for dataset '${dataset}'`);
@@ -34,14 +49,16 @@ async function resolveSheet(
     rows.find((r) => (r.channel ?? "outbound") === want) ??
     rows.find((r) => (r.channel ?? "outbound") === "outbound") ??
     rows[0];
+  if (!pick) throw new Error(`No enabled sheet connection for dataset '${dataset}'`);
   return { sheet_id: pick.sheet_id, tab_name: pick.tab_name ?? null };
 }
 
+/** Lists the calls of a program for the review page. */
 export const fetchReviewCalls = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.dashboard)])
-  .inputValidator((data: { dataset: ReviewDataset }) => data)
+  .validator(parseInput(z.object({ dataset: programIdSchema })))
   .handler(async ({ data }): Promise<Array<Record<string, string>>> => {
-    const rows: Record<string, unknown>[] = await getDb()
+    const rows = await getDb()
       .select({
         call_id: callRows.callId,
         campaign_day: callRows.campaignDay,
@@ -61,13 +78,13 @@ export const fetchReviewCalls = createServerFn({ method: "GET" })
       .from(callRows)
       .where(eq(callRows.program, data.dataset))
       .orderBy(asc(callRows.callId))
-      .limit(100000);
-    return rows.map((r: Record<string, unknown>) => {
-      const d = (r.data ?? {}) as Record<string, unknown>;
-      const raw = (d.raw ?? {}) as Record<string, unknown>;
+      .limit(MAX_REVIEW_CALLS);
+    return rows.map((r) => {
+      const d = isRecord(r.data) ? r.data : {};
+      const raw = isRecord(d.raw) ? d.raw : {};
       const pick = (...keys: string[]) => {
         for (const k of keys) {
-          const v = (d as Record<string, unknown>)[k] ?? (raw as Record<string, unknown>)[k];
+          const v = d[k] ?? raw[k];
           if (v !== undefined && v !== null && String(v) !== "") return String(v);
         }
         return "";
@@ -75,27 +92,29 @@ export const fetchReviewCalls = createServerFn({ method: "GET" })
       return {
         call_id: r.call_id != null ? String(r.call_id) : "",
         job_id: pick("job_id"),
-        
+
         campaign_day: r.campaign_day != null ? String(r.campaign_day) : "",
         campaign_date: r.campaign_date != null ? String(r.campaign_date) : "",
         campaign_type: r.campaign_type != null ? String(r.campaign_type) : "",
         language: r.language != null ? String(r.language) : "",
         city_campaign: r.city_campaign != null ? String(r.city_campaign) : "",
         call_outcome: r.call_outcome != null ? String(r.call_outcome) : "",
-        call_duration_seconds: r.call_duration_seconds != null ? String(r.call_duration_seconds) : "",
+        call_duration_seconds:
+          r.call_duration_seconds != null ? String(r.call_duration_seconds) : "",
         call_datetime_ist: pick("call_datetime_ist"),
         intent_score: r.intent_score != null ? String(r.intent_score) : "",
         drop_reason: r.drop_reason != null ? String(r.drop_reason) : "",
         job_status: r.job_status != null ? String(r.job_status) : "",
         channel: r.channel != null ? String(r.channel) : "outbound",
         call_recording_url: "",
-      } as Record<string, string>;
+      };
     });
   });
 
+/** Returns the transcript and summary of one call from its sheet. */
 export const fetchCallDetail = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.campaigns)])
-  .inputValidator((data: { dataset: ReviewDataset; callId: string }) => data)
+  .validator(parseInput(z.object({ dataset: programIdSchema, callId: callIdText })))
   .handler(async ({ data }) => {
     const [row] = await getDb()
       .select({ channel: callRows.channel })
@@ -110,6 +129,7 @@ export const fetchCallDetail = createServerFn({ method: "GET" })
     );
   });
 
+/** Lists which calls have been reviewed and by whom. */
 export const fetchReviewMap = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.dashboard)])
   .handler(async () => {
@@ -122,9 +142,12 @@ export const fetchReviewMap = createServerFn({ method: "GET" })
       .from(transcriptReviews);
   });
 
+/** Lists the call and job ids one reviewer has reviewed. */
 export const fetchReviewedCallIds = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator((data: { email: string; program?: ReviewDataset }) => data)
+  .validator(
+    parseInput(z.object({ email: z.string().max(320), program: programIdSchema.optional() })),
+  )
   .handler(async ({ data }): Promise<string[]> => {
     const email = (data.email || "").trim().toLowerCase();
     if (!email) return [];
@@ -141,9 +164,11 @@ export const fetchReviewedCallIds = createServerFn({ method: "GET" })
     if (data.program) {
       try {
         const { sheet_id } = await resolveSheet(data.program);
-        const sheetIds = await readReviewedIdsForEmail(sheet_id, "Feedback Responses", email);
+        const sheetIds = await readReviewedIdsForEmail(sheet_id, FEEDBACK_TAB, email);
         for (const v of sheetIds) ids.add(v);
-      } catch { /* ignore */ }
+      } catch {
+        // The database ids are enough; the sheet is a secondary copy.
+      }
     }
     return Array.from(ids);
   });
@@ -151,7 +176,7 @@ export const fetchReviewedCallIds = createServerFn({ method: "GET" })
 /** Every call_id/job_id reviewed by ANY reviewer for a program (DB ∪ sheet). */
 export const fetchAllReviewedCallIds = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.dashboard)])
-  .inputValidator((data: { program: ReviewDataset }) => data)
+  .validator(parseInput(z.object({ program: programIdSchema })))
   .handler(async ({ data }): Promise<string[]> => {
     const ids = new Set<string>();
     // 1) transcript_reviews for this program (+ legacy null-dataset rows)
@@ -166,15 +191,18 @@ export const fetchAllReviewedCallIds = createServerFn({ method: "GET" })
     // 2) Master sheet "Feedback Responses" tab (all reviewers). Never throws.
     try {
       const { sheet_id } = await resolveSheet(data.program);
-      const sheetIds = await readAllReviewedIds(sheet_id, "Feedback Responses");
+      const sheetIds = await readAllReviewedIds(sheet_id, FEEDBACK_TAB);
       for (const v of sheetIds) ids.add(v);
-    } catch { /* ignore */ }
+    } catch {
+      // The database ids are enough; the sheet is a secondary copy.
+    }
     return Array.from(ids);
   });
 
+/** Lists the reviews of one call or job, newest first. */
 export const fetchExistingReviews = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.dashboard)])
-  .inputValidator((data: { callId?: string | null; jobId?: string | null }) => data)
+  .validator(parseInput(z.object({ callId: callIdText.nullish(), jobId: callIdText.nullish() })))
   .handler(async ({ data }) => {
     const callId = (data.callId ?? "").trim();
     const jobId = (data.jobId ?? "").trim();
@@ -194,27 +222,33 @@ export const fetchExistingReviews = createServerFn({ method: "GET" })
       .orderBy(desc(transcriptReviews.createdAt));
   });
 
-export interface ReviewInput {
-  job_id?: string | null;
-  call_id?: string | null;
-  company_name?: string | null;
-  campaign_day?: string | null;
-  campaign_type?: string | null;
-  language?: string | null;
-  city_campaign?: string | null;
-  contact_phone?: string | null;
-  call_outcome?: string | null;
-  job_status_in_master?: string | null;
-  review_type?: string | null;
-  quantitative_issues?: string | null;
-  turn_flags?: string | null;
-  overall_rating?: number | null;
-  reviewer_notes?: string | null;
-  summary_match?: string | null;
-  job_status_correct?: string | null;
-  output_fields_accurate?: string | null;
-  dataset: ReviewDataset;
-}
+const reviewText = z.string().max(500).nullish();
+
+/** A transcript review as the review page submits it. */
+const reviewInputSchema = z.object({
+  job_id: callIdText.nullish(),
+  call_id: callIdText.nullish(),
+  company_name: reviewText,
+  campaign_day: reviewText,
+  campaign_type: reviewText,
+  language: reviewText,
+  city_campaign: reviewText,
+  contact_phone: reviewText,
+  call_outcome: reviewText,
+  job_status_in_master: reviewText,
+  review_type: reviewText,
+  quantitative_issues: z.string().max(5000).nullish(),
+  turn_flags: z.string().max(50_000).nullish(),
+  overall_rating: z.number().int().min(0).max(5).nullish(),
+  reviewer_notes: z.string().max(10_000).nullish(),
+  summary_match: reviewText,
+  job_status_correct: reviewText,
+  output_fields_accurate: reviewText,
+  dataset: programIdSchema,
+});
+
+/** A transcript review as the browser sends it. */
+export type ReviewInput = z.input<typeof reviewInputSchema>;
 
 const FEEDBACK_COLUMNS = [
   "timestamp",
@@ -238,9 +272,23 @@ const FEEDBACK_COLUMNS = [
   "dataset",
 ];
 
+/**
+ * Log fields for a failed review-sheet append. The error message is left out: Google's reply can
+ * repeat the row, which holds the contact's phone number.
+ */
+export function sheetAppendFailure(e: unknown): LogFields {
+  return {
+    operation: "review.sheetAppend",
+    status: "failure",
+    error_type: e instanceof Error ? e.name : "unknown",
+    http_status: e instanceof UpstreamError ? e.status : undefined,
+  };
+}
+
+/** Stores the signed-in user's review of a call and appends it to the master sheet. */
 export const submitReview = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.campaigns)])
-  .inputValidator((data: { review: ReviewInput }) => data)
+  .validator(parseInput(z.object({ review: reviewInputSchema })))
   .handler(async ({ data, context }) => {
     // The reviewer is the signed-in user, never what the browser sends.
     const review = {
@@ -251,13 +299,18 @@ export const submitReview = createServerFn({ method: "POST" })
       reviewer_name: context.user.email,
     };
     // One review per (call_id, reviewer_email); no unique constraint to upsert on.
-    const values = fromSqlNames(transcriptReviews, review as unknown as Record<string, unknown>);
+    const values = fromSqlNames(transcriptReviews, review);
     const db = getDb();
     await db.transaction(async (tx) => {
       if (review.call_id) {
         await tx
           .delete(transcriptReviews)
-          .where(and(eq(transcriptReviews.callId, review.call_id), eq(transcriptReviews.reviewerEmail, review.reviewer_email)));
+          .where(
+            and(
+              eq(transcriptReviews.callId, review.call_id),
+              eq(transcriptReviews.reviewerEmail, review.reviewer_email),
+            ),
+          );
       }
       await tx.insert(transcriptReviews).values(values);
     });
@@ -265,20 +318,21 @@ export const submitReview = createServerFn({ method: "POST" })
     // Append to master sheet's "Feedback Responses" tab. Never fail the DB write on a sheet hiccup.
     try {
       const { sheet_id } = await resolveSheet(review.dataset);
-      const tab = "Feedback Responses";
+      const tab = FEEDBACK_TAB;
       const state = await readStagingCallIds(sheet_id, tab);
       if (!state.hasHeaders) {
         await writeStagingHeaders(sheet_id, tab, FEEDBACK_COLUMNS);
       }
       const timestamp = new Date().toISOString();
-      const rec: Record<string, unknown> = { ...(review as unknown as Record<string, unknown>), timestamp };
+      const rec: Record<string, unknown> = { ...review, timestamp };
       const row = FEEDBACK_COLUMNS.map((c) => {
         const v = rec[c];
         return v === null || v === undefined ? "" : String(v);
       });
       await appendStagingRows(sheet_id, tab, [row]);
     } catch (e) {
-      console.error("[submitReview] sheet append failed:", e);
+      const { logEvent } = await import("@/server/log.server");
+      logEvent("error", sheetAppendFailure(e));
     }
 
     return { ok: true };

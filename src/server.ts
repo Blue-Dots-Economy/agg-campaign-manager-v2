@@ -1,24 +1,35 @@
 import "./lib/error-capture";
 
+import type { ServerEntry } from "@tanstack/react-start/server-entry";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { assertAuthConfig } from "./server/auth/config.server";
+import { logEvent } from "./server/log.server";
 
 assertAuthConfig();
 
-type ServerEntry = {
-  fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
-};
+type FetchOptions = Parameters<ServerEntry["fetch"]>[1];
 
 let serverEntryPromise: Promise<ServerEntry> | undefined;
 
-async function getServerEntry(): Promise<ServerEntry> {
-  if (!serverEntryPromise) {
-    serverEntryPromise = import("@tanstack/react-start/server-entry").then(
-      (m) => (m.default ?? m) as ServerEntry,
-    );
-  }
+async function loadServerEntry(): Promise<ServerEntry> {
+  const m = await import("@tanstack/react-start/server-entry");
+  return m.default;
+}
+
+function getServerEntry(): Promise<ServerEntry> {
+  serverEntryPromise ??= loadServerEntry();
   return serverEntryPromise;
+}
+
+/** Logs an error that ended a request, with its stack for debugging. */
+function logRequestFailure(operation: string, error: unknown): void {
+  logEvent("error", {
+    operation,
+    status: "failure",
+    error,
+    stack: error instanceof Error ? error.stack : undefined,
+  });
 }
 
 // h3 swallows in-handler throws into a normal 500 Response with body
@@ -33,21 +44,25 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
     return response;
   }
 
-  console.error(consumeLastCapturedError() ?? new Error(`h3 swallowed SSR error: ${body}`));
+  logRequestFailure(
+    "ssr.render",
+    consumeLastCapturedError() ?? new Error(`h3 swallowed SSR error: ${body}`),
+  );
   return new Response(renderErrorPage(), {
     status: 500,
     headers: { "content-type": "text/html; charset=utf-8" },
   });
 }
 
+/** Server entry: wraps the TanStack Start handler and shows the error page on a crash. */
 export default {
-  async fetch(request: Request, env: unknown, ctx: unknown) {
+  async fetch(request: Request, opts?: FetchOptions) {
     try {
       const handler = await getServerEntry();
-      const response = await handler.fetch(request, env, ctx);
+      const response = await handler.fetch(request, opts);
       return await normalizeCatastrophicSsrResponse(response);
     } catch (error) {
-      console.error(error);
+      logRequestFailure("ssr.request", error);
       return new Response(renderErrorPage(), {
         status: 500,
         headers: { "content-type": "text/html; charset=utf-8" },

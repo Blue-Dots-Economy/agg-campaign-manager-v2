@@ -1,7 +1,16 @@
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Plug, Trash2, RefreshCw, Copy, CheckCircle2, AlertCircle, Loader2, Pencil } from "lucide-react";
+import {
+  Plug,
+  Trash2,
+  RefreshCw,
+  Copy,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  Pencil,
+} from "lucide-react";
 import { Panel } from "@/components/Panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,12 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import {
   listConnections,
@@ -46,7 +50,7 @@ import { registry, type ProgramId } from "@/programs/registry";
 
 function extractSheetId(input: string): string {
   const m = input.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
-  return m ? m[1] : input.trim();
+  return m?.[1] ?? input.trim();
 }
 function maskId(id: string) {
   if (id.length <= 12) return id;
@@ -117,20 +121,22 @@ function ProgramConnections({ program }: { program: ProgramId }) {
     qc.invalidateQueries({ queryKey: ["program-rows", program] });
   };
 
+  // Re-checks every connection of the program once per visit and refreshes the list when any were checked.
+  // A failed re-check shows per row, so the mutation has no error handler.
+  const { mutate: revalidate } = useMutation({
+    mutationFn: (p: ProgramId) => revalidateFn({ data: { program: p } }),
+    onSuccess: (res, p) => {
+      if (res.checked === 0) return;
+      qc.invalidateQueries({ queryKey: ["connections", p] });
+      qc.invalidateQueries({ queryKey: ["program-rows", p] });
+    },
+  });
   useEffect(() => {
-    let cancelled = false;
-    revalidateFn({ data: { program } })
-      .then((res) => {
-        if (!cancelled && res.checked > 0) invalidate();
-      })
-      .catch(() => { /* surfaced per-row */ });
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [program]);
+    revalidate(program);
+  }, [program, revalidate]);
 
   const toggle = useMutation({
-    mutationFn: (vars: { id: string; enabled: boolean }) =>
-      updateFn({ data: vars }),
+    mutationFn: (vars: { id: string; enabled: boolean }) => updateFn({ data: vars }),
     onSuccess: invalidate,
   });
   const remove = useMutation({
@@ -154,7 +160,9 @@ function ProgramConnections({ program }: { program: ProgramId }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="text-sm text-muted-foreground">
-          {isLoading ? "Loading…" : `${data?.length ?? 0} connection${(data?.length ?? 0) === 1 ? "" : "s"}`}
+          {isLoading
+            ? "Loading…"
+            : `${data?.length ?? 0} connection${(data?.length ?? 0) === 1 ? "" : "s"}`}
         </div>
         <ConnectDialog program={program} onCreated={invalidate} />
       </div>
@@ -274,45 +282,46 @@ function TabPicker({
   disabled?: boolean;
 }) {
   const listTabsFn = useServerFn(listSheetTabsFn);
-  const [tabs, setTabs] = useState<string[] | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
   const [manual, setManual] = useState(false);
 
+  const tabsQuery = useQuery({
+    queryKey: ["sheet-tabs", sheetId],
+    queryFn: () => listTabsFn({ data: { sheet_id: sheetId } }),
+    enabled: Boolean(sheetId),
+    staleTime: 0,
+    gcTime: 0,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+  const result = tabsQuery.data;
+  const tabs = result ? (result.ok ? result.tabs : []) : null;
+  const err = tabsQuery.error
+    ? tabsQuery.error.message
+    : result && !result.ok
+      ? result.error
+      : null;
+  const loading = tabsQuery.isFetching;
+
+  // When the tab list for a sheet arrives and no tab is chosen, choose the first one, once per sheet.
+  // This runs in an effect because the value belongs to the parent form.
+  const firstTab = tabs?.[0];
+  const autoPickedFor = useRef<string | null>(null);
   useEffect(() => {
-    if (!sheetId) {
-      setTabs(null);
-      setErr(null);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    setErr(null);
-    listTabsFn({ data: { sheet_id: sheetId } })
-      .then((res) => {
-        if (cancelled) return;
-        if (res.ok) {
-          setTabs(res.tabs);
-          if (!value && res.tabs.length > 0) onChange(res.tabs[0]);
-        } else {
-          setTabs([]);
-          setErr(res.error);
-        }
-      })
-      .catch((e) => {
-        if (!cancelled) setErr(e instanceof Error ? e.message : String(e));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sheetId]);
+    if (!firstTab || autoPickedFor.current === sheetId) return;
+    autoPickedFor.current = sheetId;
+    if (!value) onChange(firstTab);
+  }, [sheetId, firstTab, value, onChange]);
 
   if (!sheetId) {
-    return <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder="Paste sheet URL first" disabled />;
+    return (
+      <Input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Paste sheet URL first"
+        disabled
+      />
+    );
   }
   if (loading) {
     return (
@@ -324,10 +333,19 @@ function TabPicker({
   if (manual || err || !tabs || tabs.length === 0) {
     return (
       <div className="space-y-1">
-        <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder="Sheet1" disabled={disabled} />
+        <Input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Sheet1"
+          disabled={disabled}
+        />
         {err && <div className="text-xs text-red-600 break-all">{err}</div>}
         {tabs && tabs.length > 0 && (
-          <button type="button" className="text-xs text-brand underline" onClick={() => setManual(false)}>
+          <button
+            type="button"
+            className="text-xs text-brand underline"
+            onClick={() => setManual(false)}
+          >
             Pick from list
           </button>
         )}
@@ -342,11 +360,17 @@ function TabPicker({
         </SelectTrigger>
         <SelectContent>
           {tabs.map((t) => (
-            <SelectItem key={t} value={t}>{t}</SelectItem>
+            <SelectItem key={t} value={t}>
+              {t}
+            </SelectItem>
           ))}
         </SelectContent>
       </Select>
-      <button type="button" className="text-xs text-muted-foreground underline" onClick={() => setManual(true)}>
+      <button
+        type="button"
+        className="text-xs text-muted-foreground underline"
+        onClick={() => setManual(true)}
+      >
         Type manually
       </button>
     </div>
@@ -358,7 +382,11 @@ function ConnectDialog({ program, onCreated }: { program: ProgramId; onCreated: 
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [tab, setTab] = useState("");
-  const [testResult, setTestResult] = useState<{ ok: boolean; rows?: number; error?: string } | null>(null);
+  const [testResult, setTestResult] = useState<{
+    ok: boolean;
+    rows?: number;
+    error?: string;
+  } | null>(null);
   const [testing, setTesting] = useState(false);
 
   const createFn = useServerFn(createConnection);
@@ -386,7 +414,10 @@ function ConnectDialog({ program, onCreated }: { program: ProgramId; onCreated: 
       await createFn({ data: { program, name, sheet_id: sheetId, tab_name: tab || undefined } });
       toast.success("Connection added");
       setOpen(false);
-      setName(""); setUrl(""); setTab(""); setTestResult(null);
+      setName("");
+      setUrl("");
+      setTab("");
+      setTestResult(null);
       onCreated();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed");
@@ -407,11 +438,19 @@ function ConnectDialog({ program, onCreated }: { program: ProgramId; onCreated: 
         <div className="space-y-3 pt-2">
           <div>
             <Label>Friendly name</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="KKB Day-8 Hubli" />
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="KKB Day-8 Hubli"
+            />
           </div>
           <div>
             <Label>Sheet URL or ID</Label>
-            <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://docs.google.com/spreadsheets/d/…" />
+            <Input
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://docs.google.com/spreadsheets/d/…"
+            />
             {sheetId && url && (
               <div className="mt-1 text-xs text-muted-foreground font-mono">id: {sheetId}</div>
             )}
@@ -423,7 +462,9 @@ function ConnectDialog({ program, onCreated }: { program: ProgramId; onCreated: 
           {testResult && (
             <div
               className={`rounded-md px-3 py-2 text-sm ${
-                testResult.ok ? "bg-brand-soft text-brand" : "bg-red-500/15 text-red-700 dark:text-red-400"
+                testResult.ok
+                  ? "bg-brand-soft text-brand"
+                  : "bg-red-500/15 text-red-700 dark:text-red-400"
               }`}
             >
               {testResult.ok ? `Connected · ${testResult.rows} rows` : testResult.error}
@@ -459,12 +500,13 @@ function EditConnectionDialog({
   const updateFn = useServerFn(updateConnection);
   const testFn = useServerFn(testConnection);
 
-  useEffect(() => {
-    if (open) {
+  const onOpenChange = (next: boolean) => {
+    if (next) {
       setName(connection.name);
       setTab(connection.tab_name ?? "");
     }
-  }, [open, connection]);
+    setOpen(next);
+  };
 
   const onSave = async () => {
     setSaving(true);
@@ -485,9 +527,9 @@ function EditConnectionDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm">
+        <Button variant="ghost" size="sm" aria-label="Edit connection">
           <Pencil className="h-4 w-4" />
         </Button>
       </DialogTrigger>
@@ -509,7 +551,9 @@ function EditConnectionDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
           <Button onClick={onSave} disabled={saving} className="bg-brand hover:bg-brand/90">
             {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Save & test

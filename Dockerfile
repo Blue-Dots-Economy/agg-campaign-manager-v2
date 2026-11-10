@@ -11,8 +11,8 @@
 # repos: the -dev variant (shell, npm) builds, the minimal variant runs. dhi.io
 # refuses anonymous pulls, so building this needs `docker login dhi.io`, and any
 # CI workflow that builds it needs a dhi.io login step.
-ARG BUILD_IMAGE=dhi.io/node:24-alpine-dev
-ARG RUNTIME_IMAGE=dhi.io/node:24-alpine
+ARG BUILD_IMAGE=dhi.io/node:26-alpine-dev
+ARG RUNTIME_IMAGE=dhi.io/node:26-alpine
 # Bun is the package manager (bun.lock). Pinned to the version CI uses, so the
 # image and CI resolve identically.
 ARG BUN_IMAGE=dhi.io/bun:1.4.2-alpine-dev

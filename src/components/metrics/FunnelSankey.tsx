@@ -1,7 +1,13 @@
 import { useMemo, useRef, useState, useEffect } from "react";
-import { sankey, sankeyLinkHorizontal, sankeyJustify } from "d3-sankey";
-import type { DropRow } from "./DropAnalysisTable";
-import type { KkbMetrics } from "./program-overviews";
+import {
+  sankey,
+  sankeyLinkHorizontal,
+  sankeyJustify,
+  type SankeyLink,
+  type SankeyNode,
+} from "d3-sankey";
+import { dropValue, type DropRow } from "./drop-rows";
+import type { KkbMetrics } from "./overview-metrics";
 import { reasonColor } from "./reasonColors";
 
 const SINK_GREY = "var(--muted-foreground)";
@@ -23,7 +29,20 @@ const STAGE_SOURCE: Record<string, string> = {
 const fmt = (n: number) => n.toLocaleString();
 
 type NodeIn = { name: string; kind: "trunk" | "sink"; color: string };
-type LinkIn = { source: string; target: string; value: number; color: string; kind: "trunk" | "leak" };
+type LinkIn = {
+  source: string;
+  target: string;
+  value: number;
+  color: string;
+  kind: "trunk" | "leak";
+};
+type LinkExtra = Omit<LinkIn, "source" | "target">;
+type LaidOutNode = SankeyNode<NodeIn, LinkExtra>;
+
+/** Name of a laid-out link end; d3-sankey replaces the index with the node object. */
+function endName(end: SankeyLink<NodeIn, LinkExtra>["source"]): string {
+  return typeof end === "object" ? end.name : "";
+}
 
 export function FunnelSankey({
   m,
@@ -43,7 +62,7 @@ export function FunnelSankey({
   useEffect(() => {
     if (!containerRef.current) return;
     const ro = new ResizeObserver((entries) => {
-      const w = entries[0].contentRect.width;
+      const w = entries[0]?.contentRect.width ?? 0;
       if (w > 0) setWidth(Math.max(360, w));
     });
     ro.observe(containerRef.current);
@@ -51,8 +70,6 @@ export function FunnelSankey({
   }, []);
 
   const { nodes, links, height, unmappedStageCount } = useMemo(() => {
-    const valueOf = (r: DropRow) => (onlyRegion ? (r.byRegion?.[onlyRegion] ?? 0) : r.total);
-
     const calls = m.totalCalls;
     const picked = m.answeredCalls;
     const engaged = m.engagedCalls;
@@ -75,7 +92,8 @@ export function FunnelSankey({
     const trunkIndex = new Map(trunk.map((node, index) => [node.name, index]));
     const nearestSurviving = (name: string) => {
       const start = trunkIndex.get(name);
-      if (start === undefined) return survivingTrunk[survivingTrunk.length - 1]?.name ?? "Calls made";
+      if (start === undefined)
+        return survivingTrunk[survivingTrunk.length - 1]?.name ?? "Calls made";
       for (let index = start; index >= 0; index -= 1) {
         const candidate = trunk[index]?.name;
         if (candidate && survivingNames.has(candidate)) return candidate;
@@ -99,7 +117,8 @@ export function FunnelSankey({
       const target = survivingTrunk[index];
       if (!source || !target) continue;
       const color =
-        survivingTrunk[survivingTrunk.length - 1]?.name === "Providers connected" && index === survivingTrunk.length - 1
+        survivingTrunk[survivingTrunk.length - 1]?.name === "Providers connected" &&
+        index === survivingTrunk.length - 1
           ? TRUNK_END
           : TRUNK;
       addLink(source.name, target.name, target.value, color, "trunk");
@@ -113,7 +132,7 @@ export function FunnelSankey({
 
     const unmappedStages = new Set<string>();
     for (const r of rows) {
-      const v = valueOf(r);
+      const v = dropValue(r, onlyRegion);
       if (v <= 0) continue;
       const mappedSource = STAGE_SOURCE[r.stage];
       if (!mappedSource) unmappedStages.add(r.stage);
@@ -129,7 +148,13 @@ export function FunnelSankey({
     const notConnected = Math.max(0, providersFound - providersConnected);
     if (notConnected > 0) {
       addNode("Not connected", "sink", SINK_GREY);
-      addLink(nearestSurviving("Providers found"), "Not connected", notConnected, SINK_GREY, "leak");
+      addLink(
+        nearestSurviving("Providers found"),
+        "Not connected",
+        notConnected,
+        SINK_GREY,
+        "leak",
+      );
     }
 
     const nodeArr = Array.from(nodeMap.values()).map((n) => ({ ...n }));
@@ -143,7 +168,7 @@ export function FunnelSankey({
     const sinkCount = nodeArr.filter((n) => n.kind === "sink").length;
     const h = Math.max(420, sinkCount * 36 + 80);
 
-    const sk = sankey<any, any>()
+    const sk = sankey<NodeIn, LinkExtra>()
       .nodeWidth(14)
       .nodePadding(14)
       .nodeAlign(sankeyJustify)
@@ -157,7 +182,12 @@ export function FunnelSankey({
       links: linkArr.map((l) => ({ ...l })),
     });
 
-    return { nodes: graph.nodes, links: graph.links, height: h, unmappedStageCount: unmappedStages.size };
+    return {
+      nodes: graph.nodes,
+      links: graph.links,
+      height: h,
+      unmappedStageCount: unmappedStages.size,
+    };
   }, [m, rows, onlyRegion, width]);
 
   const isSelectable = (name: string) => name !== "No pickup" && name !== "Not connected";
@@ -176,23 +206,28 @@ export function FunnelSankey({
           </style>
         </defs>
         <g>
-          {links.map((l: any, i: number) => {
-            const d = sankeyLinkHorizontal()(l) ?? "";
-            const targetName = (l.target as any).name as string;
-            const sourceName = (l.source as any).name as string;
+          {links.map((l, i) => {
+            const d = sankeyLinkHorizontal<NodeIn, LinkExtra>()(l) ?? "";
+            const targetName = endName(l.target);
+            const sourceName = endName(l.source);
             const baseOp = l.kind === "trunk" ? 0.45 : 0.65;
             const dim = selectedReason && targetName !== selectedReason ? 0.08 : baseOp;
             const clickable = l.kind === "leak" && isSelectable(targetName);
             return (
               <path
-                key={i}
+                // Two leaks can share source and target (one reason at two stages), so the index keeps keys unique.
+                key={`${sourceName}-${targetName}-${i}`}
                 className={`sk-link ${clickable ? "sk-clickable" : ""}`}
                 d={d}
                 fill="none"
                 style={{ stroke: l.color }}
                 strokeOpacity={dim}
                 strokeWidth={Math.max(1, l.width ?? 1)}
-                onClick={clickable ? () => onSelectReason?.(targetName === selectedReason ? null : targetName) : undefined}
+                onClick={
+                  clickable
+                    ? () => onSelectReason?.(targetName === selectedReason ? null : targetName)
+                    : undefined
+                }
               >
                 <title>
                   {`${sourceName} → ${targetName}: ${fmt(l.value)}${clickable ? " (click to filter)" : ""}`}
@@ -202,11 +237,11 @@ export function FunnelSankey({
           })}
         </g>
         <g>
-          {nodes.map((n: any, i: number) => {
-            const x = n.x0;
-            const y = n.y0;
-            const w = n.x1 - n.x0;
-            const h = Math.max(2, n.y1 - n.y0);
+          {nodes.map((n: LaidOutNode) => {
+            const x = n.x0 ?? 0;
+            const y = n.y0 ?? 0;
+            const w = (n.x1 ?? 0) - x;
+            const h = Math.max(2, (n.y1 ?? 0) - y);
             const isRight = x > width / 2;
             const labelX = isRight ? x - 6 : x + w + 6;
             const anchor = isRight ? "end" : "start";
@@ -215,10 +250,14 @@ export function FunnelSankey({
             const dim = selectedReason && n.kind === "sink" && n.name !== selectedReason ? 0.25 : 1;
             return (
               <g
-                key={i}
+                key={n.name}
                 opacity={dim}
                 className={clickable ? "sk-clickable" : undefined}
-                onClick={clickable ? () => onSelectReason?.(n.name === selectedReason ? null : n.name) : undefined}
+                onClick={
+                  clickable
+                    ? () => onSelectReason?.(n.name === selectedReason ? null : n.name)
+                    : undefined
+                }
               >
                 <rect x={x} y={y} width={w} height={h} style={{ fill: n.color }} rx={2} />
                 <text
@@ -248,7 +287,8 @@ export function FunnelSankey({
       </svg>
       {unmappedStageCount > 0 ? (
         <p className="mt-2 text-xs text-muted-foreground">
-          {unmappedStageCount} drop {unmappedStageCount === 1 ? "stage" : "stages"} not mapped to a funnel step
+          {unmappedStageCount} drop {unmappedStageCount === 1 ? "stage" : "stages"} not mapped to a
+          funnel step
         </p>
       ) : null}
     </div>

@@ -38,15 +38,15 @@
 # That commit is on bluedots-automation's `feature` branch but not yet on `main`;
 # repin to @main once it is promoted.
 #
-# No develop/feature integration branch here, and Lovable commits straight to
-# main, so pull_request is unfiltered and push is main-only.
+# pull_request is unfiltered. push runs on main (Lovable commits straight to it)
+# and on develop (the integration branch).
 
 name: security
 
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, develop]
   # Monthly sweep: new CVEs get published against code nobody has touched.
   schedule:
     - cron: "0 3 1 * *"
@@ -72,6 +72,6 @@ jobs:
     uses: Blue-Dots-Economy/bluedots-automation/.github/workflows/security-scan.yml@d6a39c5b22be14b4b4aeaa78fc1d86c1f67bb555 # feature 2026-09-25 -- repin to @main once promoted
     with:
       language: ts
-      node-version: "24"
+      node-version: "26"
       run-gitleaks: true
       block: false

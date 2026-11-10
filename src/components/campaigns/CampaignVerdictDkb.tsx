@@ -3,9 +3,10 @@ import { CheckCircle2, AlertTriangle } from "lucide-react";
 import { useProgram } from "@/programs/context";
 import { useProgramAggregates, type OverviewFilters } from "@/programs/useProgramAggregates";
 import { useDkbCampaignInsights } from "@/programs/useDkbCampaignInsights";
-import type { DkbMetrics } from "@/components/metrics/program-overviews";
+import type { DkbMetrics } from "@/components/metrics/overview-metrics";
+import { numericMetrics, type MetricValues } from "@/components/metrics/metric-values";
 
-type Metrics = Partial<DkbMetrics> & Record<string, number | undefined>;
+type Metrics = Partial<Omit<DkbMetrics, "providerFunnel">> & MetricValues;
 
 interface MetricSpec {
   key: string;
@@ -95,8 +96,8 @@ export function CampaignVerdictDkb({ campaign, region, filters }: Props) {
   const causes = useDkbCampaignInsights(campaign, { dateFrom, dateTo });
 
   const { worked, didnt, phaseShare, sampleCalls } = useMemo(() => {
-    const cm = (campaignAgg.data?.metrics ?? {}) as Metrics;
-    const rm = (regionAgg.data?.metrics ?? {}) as Metrics;
+    const cm: Metrics = numericMetrics(campaignAgg.data?.metrics);
+    const rm: Metrics = numericMetrics(regionAgg.data?.metrics);
     const findings: Finding[] = [];
     for (const spec of SPECS) {
       const c = spec.compute(cm);
@@ -192,7 +193,9 @@ function VerdictCard({
   const tone = isGood
     ? "border-emerald-500/30 bg-emerald-500/5"
     : "border-rose-500/30 bg-rose-500/5";
-  const iconColor = isGood ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400";
+  const iconColor = isGood
+    ? "text-emerald-600 dark:text-emerald-400"
+    : "text-rose-600 dark:text-rose-400";
   const chipTone = isGood
     ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
     : "bg-rose-500/15 text-rose-700 dark:text-rose-300";
@@ -217,7 +220,8 @@ function VerdictCard({
                     <div className="text-sm font-medium text-foreground">
                       {f.spec.label}: {f.spec.format(f.campaignVal)}
                       <span className="text-muted-foreground font-normal">
-                        {" "}vs {f.spec.format(f.regionVal)}
+                        {" "}
+                        vs {f.spec.format(f.regionVal)}
                       </span>
                     </div>
                   </div>
@@ -227,9 +231,7 @@ function VerdictCard({
                     {fmtDelta(f.deltaPct)}
                   </span>
                 </div>
-                {why && (
-                  <div className="mt-0.5 text-xs text-muted-foreground">Why: {why}</div>
-                )}
+                {why && <div className="mt-0.5 text-xs text-muted-foreground">Why: {why}</div>}
               </li>
             );
           })}

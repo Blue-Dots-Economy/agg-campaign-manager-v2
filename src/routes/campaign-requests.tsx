@@ -21,14 +21,26 @@ import {
 import { rayaCreateBatch, rayaStartBatch } from "@/lib/raya.functions";
 import { recordLaunchedBatch } from "@/lib/launched-batches.functions";
 import { cn } from "@/lib/utils";
+import {
+  batchContacts,
+  cohortFiltersLine,
+  scheduleFromJson,
+  selectedStatusesFromJson,
+} from "@/lib/campaign-request-fields";
 
 export const Route = createFileRoute("/campaign-requests")({
   head: () => ({
     meta: [
       { title: "Campaign Requests · Review & Launch" },
-      { name: "description", content: "Review, edit and launch campaign requests submitted from the launch wizard." },
+      {
+        name: "description",
+        content: "Review, edit and launch campaign requests submitted from the launch wizard.",
+      },
       { property: "og:title", content: "Campaign Requests · Review & Launch" },
-      { property: "og:description", content: "Review, edit and launch campaign requests submitted from the launch wizard." },
+      {
+        property: "og:description",
+        content: "Review, edit and launch campaign requests submitted from the launch wizard.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -36,36 +48,8 @@ export const Route = createFileRoute("/campaign-requests")({
   component: CampaignRequestsPage,
 });
 
-type RequestRow = {
-  id: string;
-  program: string;
-  agent_id: string;
-  agent_name: string | null;
-  batch_name: string;
-  campaign_day: string | null;
-  campaign_date: string | null;
-  campaign_type: string | null;
-  region: string | null;
-  language: string | null;
-  city_campaign: string | null;
-  channel: string | null;
-  source: string | null;
-  cohort_intent: string | null;
-  cohort_filters: Record<string, unknown> | null;
-  contacts: Array<Record<string, unknown>>;
-  contact_count: number;
-  schedule: { timezone?: string; start_time?: string; end_time?: string; days?: number[] } | null;
-  concurrency: number | null;
-  max_retries: number | null;
-  retry_after_hrs: number | null;
-  selected_statuses: string[] | null;
-  requested_by: string | null;
-  status: string;
-  reviewer_email: string | null;
-  decline_reason: string | null;
-  batch_id: string | null;
-  created_at: string;
-};
+/** A campaign request row as the list server function returns it. */
+type RequestRow = Awaited<ReturnType<typeof listCampaignRequests>>[number];
 
 const FILTERS = ["pending", "approved", "declined", "all"] as const;
 type Filter = (typeof FILTERS)[number];
@@ -88,26 +72,9 @@ function statusBadgeClass(status: string) {
   return "bg-muted text-muted-foreground border-border";
 }
 
-function toScheduleState(s: RequestRow["schedule"]): ScheduleState {
-  return {
-    timezone: s?.timezone || "Asia/Kolkata",
-    startTime: s?.start_time || "09:00",
-    endTime: s?.end_time || "18:00",
-    days: Array.isArray(s?.days) && s!.days!.length ? s!.days! : [1, 2, 3, 4, 5],
-  };
-}
-
 function sourceLine(r: RequestRow) {
   if (r.source === "upload") return "Bulk upload";
   return `Cohort · ${r.cohort_intent === "drive" ? "Drive Applications" : "Fill Missing Information"}`;
-}
-
-function filtersLine(r: RequestRow): string | null {
-  const f = r.cohort_filters as { profileStatuses?: string[]; confidenceBand?: string } | null;
-  if (!f) return null;
-  if (Array.isArray(f.profileStatuses) && f.profileStatuses.length) return f.profileStatuses.join(", ");
-  if (f.confidenceBand) return `Confidence: ${f.confidenceBand}`;
-  return null;
 }
 
 function CampaignRequestsPage() {
@@ -116,8 +83,7 @@ function CampaignRequestsPage() {
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["campaign-requests", filter],
-    queryFn: () =>
-      listFn({ data: filter === "all" ? {} : { status: filter } }) as Promise<RequestRow[]>,
+    queryFn: () => listFn({ data: filter === "all" ? {} : { status: filter } }),
   });
 
   const rows = data ?? [];
@@ -141,7 +107,9 @@ function CampaignRequestsPage() {
               onClick={() => setFilter(f)}
               className={cn(
                 "px-3 py-1.5 text-xs font-medium rounded-md capitalize transition-colors",
-                filter === f ? "bg-brand text-brand-foreground" : "text-muted-foreground hover:bg-muted",
+                filter === f
+                  ? "bg-brand text-brand-foreground"
+                  : "text-muted-foreground hover:bg-muted",
               )}
             >
               {f}
@@ -173,11 +141,13 @@ function CampaignRequestsPage() {
 
 function RequestCard({ req, onChanged }: { req: RequestRow; onChanged: () => void }) {
   const [open, setOpen] = useState(false);
-  const [schedule, setSchedule] = useState<ScheduleState>(() => toScheduleState(req.schedule));
+  const [schedule, setSchedule] = useState<ScheduleState>(() => scheduleFromJson(req.schedule));
   const [concurrency, setConcurrency] = useState<number>(req.concurrency ?? 5);
   const [maxRetries, setMaxRetries] = useState<number>(req.max_retries ?? 1);
   const [retryAfterHrs, setRetryAfterHrs] = useState<number>(req.retry_after_hrs ?? 4);
-  const [statuses, setStatuses] = useState<string[]>(req.selected_statuses ?? ["Pending"]);
+  const [statuses, setStatuses] = useState<string[]>(() =>
+    selectedStatusesFromJson(req.selected_statuses),
+  );
   const [busy, setBusy] = useState(false);
   const [declining, setDeclining] = useState(false);
   const [reason, setReason] = useState("");
@@ -276,16 +246,21 @@ function RequestCard({ req, onChanged }: { req: RequestRow; onChanged: () => voi
       toast.error(msg);
       return;
     }
+    const contacts = batchContacts(req.contacts);
+    if (!contacts) {
+      const msg = "This request's contacts are not in the expected format.";
+      setError(msg);
+      toast.error(msg);
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
       await persist();
 
-      const created = (await createBatchFn({
-        data: { agentId: req.agent_id, batchName: req.batch_name, contacts: req.contacts as any },
-      })) as
-        | { ok: true; batchId: string }
-        | { ok: false; batchId: null; validation: { message: string } };
+      const created = await createBatchFn({
+        data: { agentId: req.agent_id, batchName: req.batch_name, contacts },
+      });
 
       if (!created.ok) {
         const msg = created.validation?.message ?? "Batch creation failed";
@@ -311,7 +286,7 @@ function RequestCard({ req, onChanged }: { req: RequestRow; onChanged: () => voi
             language: req.language ?? undefined,
             cityCampaign: req.city_campaign ?? undefined,
             region: req.region ?? undefined,
-            inputRows: req.contacts,
+            inputRows: contacts,
           },
         });
       } catch {
@@ -351,7 +326,7 @@ function RequestCard({ req, onChanged }: { req: RequestRow; onChanged: () => voi
   const toggleStatus = (s: string) =>
     setStatuses((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
 
-  const cf = filtersLine(req);
+  const cf = cohortFiltersLine(req.cohort_filters);
 
   return (
     <Panel>
@@ -362,8 +337,13 @@ function RequestCard({ req, onChanged }: { req: RequestRow; onChanged: () => voi
             {req.campaign_type && (
               <span className="text-xs text-muted-foreground">· {req.campaign_type}</span>
             )}
-            <Badge variant="outline" className="uppercase text-[10px]">{req.program}</Badge>
-            <Badge variant="outline" className={cn("capitalize text-[10px]", statusBadgeClass(req.status))}>
+            <Badge variant="outline" className="uppercase text-[10px]">
+              {req.program}
+            </Badge>
+            <Badge
+              variant="outline"
+              className={cn("capitalize text-[10px]", statusBadgeClass(req.status))}
+            >
               {req.status}
             </Badge>
           </div>
@@ -388,20 +368,34 @@ function RequestCard({ req, onChanged }: { req: RequestRow; onChanged: () => voi
       {isPending && open && (
         <div className="mt-5 space-y-5 border-t pt-5">
           <div className="grid gap-2 sm:grid-cols-2 text-xs text-muted-foreground">
-            <div>Program: <span className="text-foreground">{req.program.toUpperCase()}</span></div>
-            <div>Agent: <span className="text-foreground">{req.agent_name || req.agent_id}</span></div>
             <div>
-              Campaign: <span className="text-foreground">
-                {[req.campaign_day, req.campaign_date, req.campaign_type].filter(Boolean).join(" · ") || "—"}
+              Program: <span className="text-foreground">{req.program.toUpperCase()}</span>
+            </div>
+            <div>
+              Agent: <span className="text-foreground">{req.agent_name || req.agent_id}</span>
+            </div>
+            <div>
+              Campaign:{" "}
+              <span className="text-foreground">
+                {[req.campaign_day, req.campaign_date, req.campaign_type]
+                  .filter(Boolean)
+                  .join(" · ") || "—"}
               </span>
             </div>
             <div>
-              Region: <span className="text-foreground">
+              Region:{" "}
+              <span className="text-foreground">
                 {[req.region, req.language].filter(Boolean).join(" · ") || "—"}
               </span>
             </div>
-            <div>Contacts: <span className="text-foreground">{req.contact_count}</span></div>
-            {cf && <div>Filters: <span className="text-foreground">{cf}</span></div>}
+            <div>
+              Contacts: <span className="text-foreground">{req.contact_count}</span>
+            </div>
+            {cf && (
+              <div>
+                Filters: <span className="text-foreground">{cf}</span>
+              </div>
+            )}
           </div>
 
           <ScheduleEditor value={schedule} onChange={setSchedule} />
@@ -480,8 +474,16 @@ function RequestCard({ req, onChanged }: { req: RequestRow; onChanged: () => voi
 
           <div className="flex flex-wrap items-center gap-2">
             {createdBatchId ? (
-              <Button onClick={retryStart} disabled={busy} className="bg-brand text-brand-foreground hover:bg-brand/90 gap-1.5">
-                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
+              <Button
+                onClick={retryStart}
+                disabled={busy}
+                className="bg-brand text-brand-foreground hover:bg-brand/90 gap-1.5"
+              >
+                {busy ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Rocket className="h-4 w-4" />
+                )}
                 Retry start · {createdBatchId}
               </Button>
             ) : (
@@ -490,7 +492,11 @@ function RequestCard({ req, onChanged }: { req: RequestRow; onChanged: () => voi
                 disabled={busy || overCap}
                 className="bg-brand text-brand-foreground hover:bg-brand/90 gap-1.5"
               >
-                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Rocket className="h-4 w-4" />}
+                {busy ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Rocket className="h-4 w-4" />
+                )}
                 Approve &amp; launch
               </Button>
             )}

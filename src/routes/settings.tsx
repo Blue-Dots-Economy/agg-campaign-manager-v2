@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useProgram } from "@/programs/context";
+import type { ProgramId } from "@/programs/registry";
 import { getOverrides, setOverrides, useProgramOverrides } from "@/lib/program-overrides";
 import { rayaKeyStatus } from "@/lib/raya.functions";
 import { getExportTarget, setExportTarget } from "@/lib/raya-export.functions";
@@ -19,9 +20,22 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { toast } from "sonner";
-import { CheckCircle2, AlertCircle, Gauge, ExternalLink, ShieldAlert, Sun, Moon, Monitor } from "lucide-react";
+import {
+  CheckCircle2,
+  AlertCircle,
+  Gauge,
+  ExternalLink,
+  ShieldAlert,
+  Sun,
+  Moon,
+  Monitor,
+} from "lucide-react";
 import { useTheme, type Theme } from "@/lib/theme";
-import { getConcurrencyCap, setConcurrencyCap, CONCURRENCY_CAP_DEFAULT } from "@/lib/concurrency-cap";
+import {
+  getConcurrencyCap,
+  setConcurrencyCap,
+  CONCURRENCY_CAP_DEFAULT,
+} from "@/lib/concurrency-cap";
 import { ConnectionsSection } from "@/components/settings/ConnectionsSection";
 import { AgentsSection } from "@/components/settings/AgentsSection";
 import { ReviewersSection } from "@/components/settings/ReviewersSection";
@@ -38,7 +52,9 @@ function Settings() {
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-        <p className="text-sm text-muted-foreground mt-1">Connections, agents, reviewers, and program configuration.</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          Connections, agents, reviewers, and program configuration.
+        </p>
       </header>
       <Tabs defaultValue="connections">
         <TabsList>
@@ -49,12 +65,28 @@ function Settings() {
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="reference">Reference</TabsTrigger>
         </TabsList>
-        <TabsContent value="connections" className="mt-4"><ConnectionsSection /></TabsContent>
-        <TabsContent value="agents" className="mt-4"><AgentsSection /></TabsContent>
-        {isAdmin && <TabsContent value="reviewers" className="mt-4"><ReviewersSection /></TabsContent>}
-        {isAdmin && <TabsContent value="users-roles" className="mt-4"><UsersRolesSection /></TabsContent>}
-        <TabsContent value="general" className="mt-4"><GeneralSettings /></TabsContent>
-        <TabsContent value="reference" className="mt-4"><ReferenceSettings /></TabsContent>
+        <TabsContent value="connections" className="mt-4">
+          <ConnectionsSection />
+        </TabsContent>
+        <TabsContent value="agents" className="mt-4">
+          <AgentsSection />
+        </TabsContent>
+        {isAdmin && (
+          <TabsContent value="reviewers" className="mt-4">
+            <ReviewersSection />
+          </TabsContent>
+        )}
+        {isAdmin && (
+          <TabsContent value="users-roles" className="mt-4">
+            <UsersRolesSection />
+          </TabsContent>
+        )}
+        <TabsContent value="general" className="mt-4">
+          <GeneralSettings />
+        </TabsContent>
+        <TabsContent value="reference" className="mt-4">
+          <ReferenceSettings />
+        </TabsContent>
       </Tabs>
     </div>
   );
@@ -66,22 +98,33 @@ function GeneralSettings() {
 
   const [agentId, setAgentId] = useState("");
   const [sheetUrl, setSheetUrl] = useState("");
-  const [keyConfigured, setKeyConfigured] = useState<boolean | null>(null);
   const [cap, setCap] = useState<number>(() => getConcurrencyCap());
 
-  const keyStatusFn = useServerFn(rayaKeyStatus);
-
-  useEffect(() => {
+  // Load the stored overrides into the form whenever the program changes, during render.
+  const [formProgram, setFormProgram] = useState<ProgramId | null>(null);
+  if (formProgram !== programId) {
+    setFormProgram(programId);
     const o = getOverrides(programId);
     setAgentId(o.rayaAgentId ?? config.rayaAgentId ?? "");
     setSheetUrl(o.sheetCsvUrl ?? config.sheetCsvUrl ?? "");
-  }, [programId, config]);
+  }
 
-  useEffect(() => {
-    keyStatusFn({ data: undefined as any })
-      .then((r: any) => setKeyConfigured(Boolean(r?.configured)))
-      .catch(() => setKeyConfigured(false));
-  }, [keyStatusFn]);
+  const keyStatusFn = useServerFn(rayaKeyStatus);
+  const keyStatus = useQuery({
+    queryKey: ["raya-key-status"],
+    queryFn: async () => {
+      try {
+        const r = await keyStatusFn();
+        return Boolean(r?.configured);
+      } catch {
+        // A failed check shows the key as missing.
+        return false;
+      }
+    },
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+  const keyConfigured = keyStatus.data ?? null;
 
   const save = () => {
     setOverrides(programId, { rayaAgentId: agentId, sheetCsvUrl: sheetUrl });
@@ -91,19 +134,26 @@ function GeneralSettings() {
   return (
     <div className="space-y-6">
       <AppearancePanel />
-      <Panel title="Raya API key" description="Stored as a backend secret · never sent to the browser">
+      <Panel
+        title="Raya API key"
+        description="Stored as a backend secret · never sent to the browser"
+      >
         {keyConfigured === null ? (
           <p className="text-sm text-muted-foreground">Checking…</p>
         ) : keyConfigured ? (
           <div className="flex items-center gap-2 rounded-md bg-brand-soft text-brand px-3 py-2 text-sm">
             <CheckCircle2 className="h-4 w-4" />
-            <span><strong>RAYA_API_KEY</strong> is set.</span>
+            <span>
+              <strong>RAYA_API_KEY</strong> is set.
+            </span>
           </div>
         ) : (
           <div className="flex items-start gap-2 rounded-md bg-destructive/10 text-destructive px-3 py-2 text-sm">
             <AlertCircle className="h-4 w-4 mt-0.5" />
             <div>
-              <p><strong>RAYA_API_KEY</strong> is not set.</p>
+              <p>
+                <strong>RAYA_API_KEY</strong> is not set.
+              </p>
               <p className="text-xs mt-1 text-destructive/80">
                 Add it in Project Settings → Secrets, then reload this page.
               </p>
@@ -112,10 +162,15 @@ function GeneralSettings() {
         )}
       </Panel>
 
-      <Panel title="Concurrency cap" description="Account-wide pool of concurrent calls shared across all programs (default 20)">
+      <Panel
+        title="Concurrency cap"
+        description="Account-wide pool of concurrent calls shared across all programs (default 20)"
+      >
         <div className="flex items-end gap-3 max-w-sm">
           <div className="flex-1">
-            <Label htmlFor="cap" className="text-xs">Max concurrent calls (cap)</Label>
+            <Label htmlFor="cap" className="text-xs">
+              Max concurrent calls (cap)
+            </Label>
             <div className="mt-1 flex items-center gap-2">
               <Gauge className="h-4 w-4 text-brand" />
               <Input
@@ -124,13 +179,18 @@ function GeneralSettings() {
                 min={1}
                 max={500}
                 value={cap}
-                onChange={(e) => setCap(Math.max(1, Number(e.target.value) || CONCURRENCY_CAP_DEFAULT))}
+                onChange={(e) =>
+                  setCap(Math.max(1, Number(e.target.value) || CONCURRENCY_CAP_DEFAULT))
+                }
               />
             </div>
           </div>
           <Button
             className="bg-brand text-brand-foreground hover:bg-brand/90"
-            onClick={() => { setConcurrencyCap(cap); toast.success(`Cap set to ${cap}`); }}
+            onClick={() => {
+              setConcurrencyCap(cap);
+              toast.success(`Cap set to ${cap}`);
+            }}
           >
             Save cap
           </Button>
@@ -142,10 +202,15 @@ function GeneralSettings() {
 
       <ExportStagingPanel program={programId} />
 
-      <Panel title="Program defaults" description={`${config.label} · fallbacks used when a program has no agent/sheet configured above.`}>
+      <Panel
+        title="Program defaults"
+        description={`${config.label} · fallbacks used when a program has no agent/sheet configured above.`}
+      >
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
-            <Label htmlFor="agent" className="text-xs">Raya agent id</Label>
+            <Label htmlFor="agent" className="text-xs">
+              Raya agent id
+            </Label>
             <Input
               id="agent"
               value={agentId}
@@ -154,11 +219,14 @@ function GeneralSettings() {
               className="mt-1 font-mono"
             />
             <p className="text-[11px] text-muted-foreground mt-1">
-              Used by createBatch, startBatch, listBatches and initiateCall for the {config.label} program.
+              Used by createBatch, startBatch, listBatches and initiateCall for the {config.label}{" "}
+              program.
             </p>
           </div>
           <div>
-            <Label htmlFor="sheet" className="text-xs">Connected sheet (CSV URL)</Label>
+            <Label htmlFor="sheet" className="text-xs">
+              Connected sheet (CSV URL)
+            </Label>
             <Input
               id="sheet"
               value={sheetUrl}
@@ -169,7 +237,10 @@ function GeneralSettings() {
           </div>
           <div className="sm:col-span-2 flex items-center justify-between border-t pt-3 mt-1">
             <p className="text-xs text-muted-foreground">
-              Active agent: <span className="font-mono">{overrides.rayaAgentId || config.rayaAgentId || "—"}</span>
+              Active agent:{" "}
+              <span className="font-mono">
+                {overrides.rayaAgentId || config.rayaAgentId || "—"}
+              </span>
             </p>
             <Button className="bg-brand text-brand-foreground hover:bg-brand/90" onClick={save}>
               Save changes
@@ -189,7 +260,10 @@ function AppearancePanel() {
     { value: "system", label: "System", icon: Monitor },
   ];
   return (
-    <Panel title="Appearance" description="Choose a light or dark theme, or follow your system setting.">
+    <Panel
+      title="Appearance"
+      description="Choose a light or dark theme, or follow your system setting."
+    >
       <div className="inline-flex rounded-lg border border-border bg-card p-1">
         {opts.map((o) => {
           const Icon = o.icon;
@@ -257,7 +331,10 @@ function ReferenceSettings() {
           </p>
           <div className="flex flex-wrap gap-1.5">
             {config.columns.map((c, i) => (
-              <span key={c} className="text-[11px] font-mono px-2 py-1 rounded bg-muted text-foreground">
+              <span
+                key={c}
+                className="text-[11px] font-mono px-2 py-1 rounded bg-muted text-foreground"
+              >
                 {i + 1}. {c}
               </span>
             ))}
@@ -266,6 +343,13 @@ function ReferenceSettings() {
       </AccordionItem>
     </Accordion>
   );
+}
+
+/** Tab the staging export writes to unless the user picks another. */
+const DEFAULT_STAGING_TAB = "Sheet1";
+
+function stagingSheetUrl(target: { sheet_id?: string | null } | null | undefined): string {
+  return target?.sheet_id ? `https://docs.google.com/spreadsheets/d/${target.sheet_id}/edit` : "";
 }
 
 function ExportStagingPanel({ program }: { program: "seekers" | "providers" }) {
@@ -279,21 +363,18 @@ function ExportStagingPanel({ program }: { program: "seekers" | "providers" }) {
   });
   const target = query.data;
 
-  const [sheetUrl, setSheetUrl] = useState("");
-  const [tabName, setTabName] = useState("Sheet1");
-  const [label, setLabel] = useState("");
+  const [sheetUrl, setSheetUrl] = useState(() => stagingSheetUrl(target));
+  const [tabName, setTabName] = useState(DEFAULT_STAGING_TAB);
+  const [label, setLabel] = useState(target?.label ?? "");
 
-  useEffect(() => {
-    if (target) {
-      setSheetUrl(target.sheet_id ? `https://docs.google.com/spreadsheets/d/${target.sheet_id}/edit` : "");
-      setTabName("Sheet1");
-      setLabel(target.label ?? "");
-    } else {
-      setSheetUrl("");
-      setTabName("Sheet1");
-      setLabel("");
-    }
-  }, [target]);
+  // Reset the form to the saved target whenever a new one loads, during render.
+  const [formTarget, setFormTarget] = useState(target);
+  if (formTarget !== target) {
+    setFormTarget(target);
+    setSheetUrl(stagingSheetUrl(target));
+    setTabName(DEFAULT_STAGING_TAB);
+    setLabel(target?.label ?? "");
+  }
 
   const save = useMutation({
     mutationFn: () =>
@@ -309,8 +390,7 @@ function ExportStagingPanel({ program }: { program: "seekers" | "providers" }) {
       toast.success("Staging sheet saved");
       qc.invalidateQueries({ queryKey: ["export-target", program] });
     },
-    onError: (e) =>
-      toast.error(e instanceof Error ? e.message : "Failed to save staging target"),
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed to save staging target"),
   });
 
   return (
@@ -322,14 +402,19 @@ function ExportStagingPanel({ program }: { program: "seekers" | "providers" }) {
         <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
         <p>
           Create a fresh Google Sheet for QC. Share it with{" "}
-          <span className="font-mono">blue-dots-admin@blue-dots-project.iam.gserviceaccount.com</span>{" "}
-          as <strong>Editor</strong>. Exports append to this sheet only — masters in Connections are protected.
+          <span className="font-mono">
+            blue-dots-admin@blue-dots-project.iam.gserviceaccount.com
+          </span>{" "}
+          as <strong>Editor</strong>. Exports append to this sheet only — masters in Connections are
+          protected.
         </p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="sm:col-span-2">
-          <Label htmlFor="staging-sheet" className="text-xs">Staging sheet URL or ID</Label>
+          <Label htmlFor="staging-sheet" className="text-xs">
+            Staging sheet URL or ID
+          </Label>
           <Input
             id="staging-sheet"
             value={sheetUrl}
@@ -339,18 +424,18 @@ function ExportStagingPanel({ program }: { program: "seekers" | "providers" }) {
           />
         </div>
         <div>
-          <Label htmlFor="staging-tab" className="text-xs">Tab name</Label>
-          <Input
-            id="staging-tab"
-            value={tabName}
-            readOnly
-            placeholder="Sheet1"
-            className="mt-1"
-          />
-          <p className="mt-1 text-[11px] text-muted-foreground">Fixed staging tab for exports; no Staging tab is used.</p>
+          <Label htmlFor="staging-tab" className="text-xs">
+            Tab name
+          </Label>
+          <Input id="staging-tab" value={tabName} readOnly placeholder="Sheet1" className="mt-1" />
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Fixed staging tab for exports; no Staging tab is used.
+          </p>
         </div>
         <div>
-          <Label htmlFor="staging-label" className="text-xs">Label (optional)</Label>
+          <Label htmlFor="staging-label" className="text-xs">
+            Label (optional)
+          </Label>
           <Input
             id="staging-label"
             value={label}

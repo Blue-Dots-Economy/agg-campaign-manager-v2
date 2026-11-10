@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useRef, useState } from "react";
 import {
   Users,
   UserPlus,
@@ -21,7 +22,6 @@ import {
   Info,
   Network,
 } from "lucide-react";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Panel } from "@/components/Panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,6 +66,16 @@ import {
   type CsvMeta,
 } from "@/lib/upSeekersCsv";
 import { useProgram } from "@/programs/context";
+import { Bar, ConnectionCell, MetricTile } from "@/components/participants/ParticipantWidgets";
+import { SEEKERS_QUERY_KEY } from "@/hooks/useSeekers";
+import { useTimeout } from "@/hooks/useTimeout";
+import {
+  fieldCompletion,
+  filterParticipants,
+  formatJoined,
+  initials,
+  lifecycleCounts,
+} from "@/lib/user-level-analysis";
 import { useAuth } from "@/auth/context";
 import { canEditShared } from "@/auth/roles";
 import {
@@ -73,8 +83,6 @@ import {
   getProviderSummary,
   getSeekerParticipants,
   getSeekerSummary,
-  sumBreakdown,
-  type ConnectionBreakdown,
   getUserMetrics,
   type Lifecycle,
   type Participant,
@@ -139,138 +147,12 @@ const PROVIDER_DESCRIPTIONS: Record<Lifecycle, string> = {
   Inactive: "No activity for 90+ days",
 };
 
-const MONTHS = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
-
-function formatJoined(raw: string): string {
-  if (!raw) return "—";
-  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (iso) return `${MONTHS[Number(iso[2]) - 1]} ${Number(iso[3])}, ${iso[1]}`;
-  const parts = raw.trim().split("/");
-  if (parts.length === 3) {
-    const [m, d, y] = parts.map((p) => parseInt(p, 10));
-    if (m && d && y) return `${MONTHS[m - 1]} ${d}, ${y}`;
-  }
-  return raw;
-}
-
-function initials(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  if (!words.length) return "?";
-  return (words[0][0] + (words[1]?.[0] ?? "")).toUpperCase();
-}
-
-const SEGMENTS = [
-  { key: "requested" as const, label: "Requested", color: "bg-brand" },
-  { key: "accepted" as const, label: "Accepted", color: "bg-emerald-500" },
-  { key: "declined" as const, label: "Declined", color: "bg-rose-500" },
-  { key: "cancelled" as const, label: "Cancelled", color: "bg-muted-foreground/40" },
-];
-
-function SegmentedBar({ breakdown, max }: { breakdown: ConnectionBreakdown; max: number }) {
-  const total = sumBreakdown(breakdown);
-  const fill = max > 0 ? Math.max(0, Math.min(100, (total / max) * 100)) : 0;
-  return (
-    <div className="h-1.5 w-20 rounded-full bg-muted overflow-hidden">
-      {total > 0 && (
-        <div className="flex h-full" style={{ width: `${fill}%` }}>
-          {SEGMENTS.map((s) => {
-            const v = breakdown[s.key];
-            if (!v) return null;
-            return (
-              <div key={s.key} className={`h-full ${s.color}`} style={{ width: `${(v / total) * 100}%` }} />
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ConnectionCell({
-  breakdown,
-  max,
-}: {
-  breakdown: ConnectionBreakdown;
-  max: number;
-}) {
-  const total = sumBreakdown(breakdown);
-  return (
-    <HoverCard openDelay={150} closeDelay={100}>
-      <HoverCardTrigger asChild>
-        <div className="flex items-center gap-2 cursor-default outline-none" tabIndex={0}>
-          <span className="tabular-nums">{total}</span>
-          <SegmentedBar breakdown={breakdown} max={max} />
-        </div>
-      </HoverCardTrigger>
-      <HoverCardContent className="w-52">
-        <div className="space-y-1.5 text-xs">
-          {SEGMENTS.map((s) => (
-            <div key={s.key} className="flex items-center gap-2">
-              <span className={`h-2 w-2 rounded-full ${s.color}`} />
-              <span className="text-muted-foreground">{s.label}</span>
-              <span className="ml-auto tabular-nums">{breakdown[s.key]}</span>
-            </div>
-          ))}
-          <div className="border-t border-border pt-1.5 flex items-center">
-            <span className="font-medium">Total</span>
-            <span className="ml-auto font-medium tabular-nums">{total}</span>
-          </div>
-        </div>
-      </HoverCardContent>
-    </HoverCard>
-  );
-}
-
-function Bar({ pct }: { pct: number }) {
-  return (
-    <div className="h-1.5 w-20 rounded-full bg-muted overflow-hidden">
-      <div
-        className="h-full rounded-full bg-brand"
-        style={{ width: `${Math.max(0, Math.min(100, pct))}%` }}
-      />
-    </div>
-  );
-}
-
-function MetricTile({
-  label,
-  value,
-  description,
-  Icon,
-}: {
-  label: string;
-  value: string;
-  description: string;
-  Icon: typeof Users;
-}) {
-  return (
-    <div className="rounded-xl border border-border bg-card p-5">
-      <div className="flex items-start gap-3">
-        <div className="h-9 w-9 rounded-lg bg-brand-soft flex items-center justify-center text-brand">
-          <Icon className="h-4 w-4" />
-        </div>
-        <div className="text-sm font-medium leading-tight">{label}</div>
-      </div>
-      <div className="mt-4 text-3xl font-semibold tracking-tight">{value}</div>
-      <div className="mt-1 text-xs text-muted-foreground">
-        {description}
-      </div>
-    </div>
-  );
-}
+/** Rows shown in the participant table; the rest are counted but not rendered. */
+const MAX_TABLE_ROWS = 200;
+/** Shortest time the reload spinner shows, so a fast reload is still visible. */
+const MIN_REFRESH_SPIN_MS = 300;
+/** Query key for the seekers list with its CSV details; a child of the shared seekers key. */
+const SEEKERS_WITH_META_QUERY_KEY = [...SEEKERS_QUERY_KEY, "with-meta"] as const;
 
 function UserLevelAnalysis() {
   const { config } = useProgram();
@@ -279,41 +161,44 @@ function UserLevelAnalysis() {
   const isProviders = config.id === "providers";
   const entityLabel = isProviders ? "Service Providers" : "Seekers";
 
-  const initial = useMemo(() => loadSeekers(), []);
-  const [seekers, setSeekers] = useState<Seeker[]>(initial.seekers);
-  const [meta, setMeta] = useState<CsvMeta>(initial.meta);
+  const qc = useQueryClient();
+  const seekersQuery = useQuery({
+    queryKey: SEEKERS_WITH_META_QUERY_KEY,
+    queryFn: () => loadSeekersAsync(),
+    initialData: () => loadSeekers(),
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+  const { seekers, meta } = seekersQuery.data;
   const [isFetching, setIsFetching] = useState(false);
   const [search, setSearch] = useState("");
   const [lifecycleFilter, setLifecycleFilter] = useState<string>("all");
   const [minCompletion, setMinCompletion] = useState<number>(0);
   const [profileInfoOpen, setProfileInfoOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const later = useTimeout();
 
-  useEffect(() => {
-    loadSeekersAsync().then(({ seekers: s, meta: m }) => {
-      setSeekers(s);
-      setMeta(m);
-    });
-  }, []);
+  /** Shows a new seekers list here and makes the launch and request pages read the CSV again. */
+  const showSeekers = (next: { seekers: Seeker[]; meta: CsvMeta }) => {
+    qc.setQueryData(SEEKERS_WITH_META_QUERY_KEY, next);
+    void qc.invalidateQueries({ queryKey: SEEKERS_QUERY_KEY, exact: true });
+  };
 
   const refetch = async () => {
     setIsFetching(true);
-    const { seekers: s, meta: m } = await loadSeekersAsync();
-    setSeekers(s);
-    setMeta(m);
-    setTimeout(() => setIsFetching(false), 300);
+    await seekersQuery.refetch();
+    later(() => setIsFetching(false), MIN_REFRESH_SPIN_MS);
   };
 
   const handleUploadClick = () => fileRef.current?.click();
 
   const handleFileChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const file = e.currentTarget.files?.[0];
     if (!file) return;
     const text = await file.text();
     try {
       const { seekers: s, meta: m, persisted } = await saveUploadedCsv(file.name, text);
-      setSeekers(s);
-      setMeta(m);
+      showSeekers({ seekers: s, meta: m });
       if (!persisted) {
         alert(
           `Loaded ${s.length} rows from "${file.name}", but it couldn't be saved to browser storage. It will remain active until you reload the page.`,
@@ -327,9 +212,7 @@ function UserLevelAnalysis() {
   };
 
   const handleReset = async () => {
-    const { seekers: s, meta: m } = await resetToBundled();
-    setSeekers(s);
-    setMeta(m);
+    showSeekers(await resetToBundled());
   };
 
   const participants = useMemo<Participant[]>(
@@ -337,20 +220,10 @@ function UserLevelAnalysis() {
     [isProviders],
   );
 
-  const fieldCompletion = useMemo(() => {
-    const total = seekers.length;
-    const counts = new Array(PROFILE_FIELD_LABELS.length).fill(0) as number[];
-    for (const s of seekers) {
-      s.profileFieldChecks.forEach((c, i) => {
-        if (c.passed) counts[i]++;
-      });
-    }
-    return PROFILE_FIELD_LABELS.map((label, i) => ({
-      label,
-      count: counts[i],
-      pct: total ? Math.round((counts[i] / total) * 100) : 0,
-    }));
-  }, [seekers]);
+  const completionByField = useMemo(
+    () => fieldCompletion(PROFILE_FIELD_LABELS, seekers),
+    [seekers],
+  );
 
   const summary = useMemo(() => {
     const s = isProviders ? getProviderSummary() : getSeekerSummary();
@@ -359,23 +232,19 @@ function UserLevelAnalysis() {
 
   const userMetrics = getUserMetrics(config.id, participants);
 
-  const byLifecycle = useMemo(() => {
-    const counts: Record<Lifecycle, number> = { New: 0, Active: 0, "At Risk": 0, Inactive: 0 };
-    for (const p of participants) counts[p.lifecycle]++;
-    return counts;
-  }, [participants]);
+  const byLifecycle = useMemo(() => lifecycleCounts(participants), [participants]);
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return participants.filter((p) => {
-      if (lifecycleFilter !== "all" && p.lifecycle !== lifecycleFilter) return false;
-      if (p.profileCompletion < minCompletion) return false;
-      if (q && !(p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q))) return false;
-      return true;
-    });
-  }, [participants, search, lifecycleFilter, minCompletion]);
+  const filtered = useMemo(
+    () =>
+      filterParticipants(participants, {
+        search,
+        lifecycle: lifecycleFilter,
+        minCompletion,
+      }),
+    [participants, search, lifecycleFilter, minCompletion],
+  );
 
-  const visible = filtered.slice(0, 200);
+  const visible = filtered.slice(0, MAX_TABLE_ROWS);
   const maxInitiated = Math.max(1, ...participants.map((p) => p.initiated));
   const maxReceived = Math.max(1, ...participants.map((p) => p.received));
   const completePct = summary.registered
@@ -397,6 +266,7 @@ function UserLevelAnalysis() {
           <input
             ref={fileRef}
             type="file"
+            aria-label="Upload participants CSV"
             accept=".csv,text/csv"
             className="hidden"
             onChange={handleFileChosen}
@@ -576,7 +446,9 @@ function UserLevelAnalysis() {
               </PopoverTrigger>
               <PopoverContent align="end" className="w-64 space-y-3">
                 <div className="space-y-1.5">
-                  <div className="text-xs font-medium text-muted-foreground">Profile completion</div>
+                  <div className="text-xs font-medium text-muted-foreground">
+                    Profile completion
+                  </div>
                   <Select
                     value={String(minCompletion)}
                     onValueChange={(v) => setMinCompletion(Number(v))}
@@ -689,7 +561,10 @@ function UserLevelAnalysis() {
               ))}
               {filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-10">
+                  <TableCell
+                    colSpan={7}
+                    className="text-center text-sm text-muted-foreground py-10"
+                  >
                     No participants match your filters.
                   </TableCell>
                 </TableRow>
@@ -723,13 +598,16 @@ function UserLevelAnalysis() {
             <ol className="list-decimal pl-5 space-y-1.5 text-sm">
               {[
                 { label: "Name", desc: "not blank and not a placeholder (Unknown, अज्ञात, etc.)" },
-                { label: "Location", desc: "not blank and not just city / state / their combination" },
+                {
+                  label: "Location",
+                  desc: "not blank and not just city / state / their combination",
+                },
                 { label: "Email or Phone", desc: "at least one filled" },
                 { label: "Age", desc: "not blank" },
                 { label: "Role", desc: 'not blank and not "any"' },
                 { label: "Expected Salary", desc: "not blank" },
               ].map((f) => {
-                const fc = fieldCompletion.find((x) => x.label === f.label);
+                const fc = completionByField.find((x) => x.label === f.label);
                 return (
                   <li key={f.label}>
                     <div className="flex items-start justify-between gap-3">

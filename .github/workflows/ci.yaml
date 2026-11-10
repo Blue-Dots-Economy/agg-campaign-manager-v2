@@ -1,19 +1,13 @@
 name: CI
-# This repo had no CI. It is a Lovable-synced TanStack Start app: all 179 of its
-# commits are from the Lovable bot (178 gpt-engineer-app[bot], 1 Lovable) pushed
-# straight to `main`, so this runs on every one of them as well as on pull
-# requests.
+# Runs on every pull request and every push to `main`.
 #
-# What gates and what does not, measured on the untouched repo:
-#   * typecheck  BLOCKING  - 0 errors today
+# What gates and what does not:
+#   * typecheck  BLOCKING  - `bun run typecheck` (src, tests and scripts)
 #   * build      BLOCKING  - passes today with no secrets or env
-#   * lint       ADVISORY  - 2,696 problems today, so a blocking gate would be red
-#                            on day one. 2,536 are Prettier formatting (the bot does
-#                            not run Prettier, so its commits are unformatted by
-#                            construction) and 135 are real ESLint errors, mostly
-#                            `no-explicit-any`. Advisory jobs report through
-#                            annotations and the run summary rather than turning
-#                            green silently.
+#   * lint       BLOCKING  - ESLint errors and unformatted files (Prettier) fail
+#                            the job. Rules that still have findings are
+#                            warnings until their count reaches 0
+#                            (`bun run lint:report`).
 #   * smoke-image BLOCKING - builds the Dockerfile WITHOUT pushing, boots it and
 #                            probes it. Exercises the image on every PR so a broken
 #                            Dockerfile is caught in review, not when a release tag
@@ -29,11 +23,11 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, develop]
   workflow_dispatch:
 
 concurrency:
-  # Cancel superseded PR runs, but never a push to main: the Lovable bot commits
+  # Cancel superseded PR runs, but never a push to main: pushes can arrive
   # in bursts, and cancelling the earlier runs would leave those commits with no
   # result at all, which hides a red one. cancel-in-progress: false alone is not
   # enough for that: GitHub keeps only ONE pending run per group and cancels the
@@ -63,11 +57,7 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
-      # No `typecheck` script exists in package.json and it is deliberately not
-      # added: package.json is Lovable-managed, and an edit there can be
-      # overwritten by the next sync.
-      - name: tsc --noEmit
-        run: bun x tsc --noEmit
+      - run: bun run typecheck
 
   build:
     name: build
@@ -292,7 +282,7 @@ jobs:
           echo "::warning title=smoke-image skipped::No dhi.io credential on this run (fork or Dependabot PR, or DOCKERHUB_TOKEN is not set). The image build is still covered on the release-tag path in build-images.yaml."
 
   lint:
-    name: lint (advisory)
+    name: lint
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -306,43 +296,24 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
-      # Formatting is switched off here and checked separately below, so the
-      # ESLint number means "real problems" and is not buried under 2,536 style
-      # findings that --fix would remove in one pass.
-      - name: ESLint (all rules except formatting)
-        id: eslint
-        continue-on-error: true
-        run: |
-          bun x eslint . --rule 'prettier/prettier: off'
+      # Errors fail the job. Warnings are the ratchet backlog; the report below
+      # prints their counts per rule and block.
+      - name: ESLint
+        run: bun run lint
 
-      - name: Prettier check
-        id: prettier
-        continue-on-error: true
-        run: bun x prettier --check .
-
-      # A step that fails under continue-on-error leaves the job green, which is
-      # how an advisory check quietly becomes a check nobody looks at. Say it out
-      # loud instead.
-      - name: Report
+      - name: Lint report
         if: always()
-        env:
-          ESLINT: ${{ steps.eslint.outcome }}
-          PRETTIER: ${{ steps.prettier.outcome }}
         run: |
           {
-            echo "### Lint (advisory - does not fail the build)"
+            echo "### Lint findings by rule and block"
             echo
-            echo "| Check | Result |"
-            echo "| --- | --- |"
-            echo "| ESLint, excluding formatting | ${ESLINT} |"
-            echo "| Prettier | ${PRETTIER} |"
+            echo '```'
+            bun run --silent lint:report
+            echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-          if [ "${ESLINT}" = "failure" ]; then
-            echo "::warning title=ESLint reports problems::Advisory only. Baseline is 135 errors (127 no-explicit-any) and 25 warnings. See the ESLint step log."
-          fi
-          if [ "${PRETTIER}" = "failure" ]; then
-            echo "::warning title=Prettier would reformat files::Advisory only. Lovable commits are not Prettier-formatted, so this is expected on bot commits."
-          fi
+
+      - name: Prettier check
+        run: bun x prettier --check .
 
   sonar:
     name: sonar

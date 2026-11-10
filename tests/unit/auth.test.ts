@@ -11,9 +11,11 @@ import {
   temporaryPassword,
   verifyPassword,
 } from "../../src/server/auth/password.server";
+import type * as SessionModule from "../../src/server/auth/session.server";
 
 const SECRET = "test-secret-at-least-thirty-two-characters!";
-let session: typeof import("../../src/server/auth/session.server");
+// Loaded after SESSION_SECRET is set; the type import is erased at runtime.
+let session: typeof SessionModule;
 
 beforeAll(async () => {
   process.env.SESSION_SECRET = SECRET;
@@ -32,7 +34,9 @@ describe("session", () => {
 
   test("a tampered payload is rejected", async () => {
     const [h, , sig] = (await session.signSession("u-1")).split(".");
-    const forged = Buffer.from(JSON.stringify({ uid: "admin", exp: 9999999999 })).toString("base64url");
+    const forged = Buffer.from(JSON.stringify({ uid: "admin", exp: 9999999999 })).toString(
+      "base64url",
+    );
     expect(await session.verifySession(`${h}.${forged}.${sig}`)).toBeNull();
   });
 
@@ -77,7 +81,9 @@ describe("password", () => {
 
   test("no hash or no password never verifies", async () => {
     expect(await verifyPassword("x", null)).toBe(false);
-    expect(await verifyPassword("", "$2a$06$SahHZYM.mvVi7e/FRucq/.ProJd.75wqGhhOx6hWSwJnSg/QLbKLu")).toBe(false);
+    expect(
+      await verifyPassword("", "$2a$06$SahHZYM.mvVi7e/FRucq/.ProJd.75wqGhhOx6hWSwJnSg/QLbKLu"),
+    ).toBe(false);
   });
 
   test("at least 10 characters", () => {
@@ -98,7 +104,8 @@ describe("lockout", () => {
   test(`${MAX_FAILED_LOGINS} failures lock for ${LOCK_MINUTES} minutes`, () => {
     let count = 0;
     let lockedUntil: Date | null = null;
-    for (let i = 0; i < MAX_FAILED_LOGINS; i++) ({ failedLoginCount: count, lockedUntil } = afterFailedLogin(count, now));
+    for (let i = 0; i < MAX_FAILED_LOGINS; i++)
+      ({ failedLoginCount: count, lockedUntil } = afterFailedLogin(count, now));
     expect(lockedUntil).not.toBeNull();
     expect(isLocked(lockedUntil, now)).toBe(true);
     expect(isLocked(lockedUntil, new Date(now.getTime() + LOCK_MINUTES * 60_000 + 1))).toBe(false);
@@ -111,8 +118,27 @@ describe("lockout", () => {
 
 describe("roles", () => {
   const pages: Record<Role, string[]> = {
-    admin: ["/", "/campaigns", "/review", "/launch", "/ecosystem-view", "/campaign-requests", "/request-campaign", "/user-level-analysis", "/settings"],
-    jfc: ["/", "/campaigns", "/review", "/launch", "/ecosystem-view", "/campaign-requests", "/request-campaign", "/user-level-analysis"],
+    admin: [
+      "/",
+      "/campaigns",
+      "/review",
+      "/launch",
+      "/ecosystem-view",
+      "/campaign-requests",
+      "/request-campaign",
+      "/user-level-analysis",
+      "/settings",
+    ],
+    jfc: [
+      "/",
+      "/campaigns",
+      "/review",
+      "/launch",
+      "/ecosystem-view",
+      "/campaign-requests",
+      "/request-campaign",
+      "/user-level-analysis",
+    ],
     coordinator: ["/", "/campaigns", "/review", "/request-campaign", "/user-level-analysis"],
     user: ["/", "/campaigns", "/review", "/user-level-analysis"],
     owner: ["/", "/user-level-analysis"],
@@ -121,7 +147,8 @@ describe("roles", () => {
   const all = pages.admin;
 
   test.each(ROLES.map((r) => [r]))("%s opens exactly its pages", (role) => {
-    for (const page of all) expect([page, canAccess(role, page)]).toEqual([page, pages[role].includes(page)]);
+    for (const page of all)
+      expect([page, canAccess(role, page)]).toEqual([page, pages[role].includes(page)]);
   });
 
 

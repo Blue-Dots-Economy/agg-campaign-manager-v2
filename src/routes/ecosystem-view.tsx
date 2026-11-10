@@ -12,13 +12,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   Table,
   TableBody,
   TableCell,
@@ -30,19 +23,19 @@ import { Panel } from "@/components/Panel";
 import { MetricCard } from "@/components/metrics/MetricCard";
 import { RegionSelector, type RegionValue } from "@/components/ecosystem/RegionSelector";
 import { OnboardingTab } from "@/components/ecosystem/OnboardingTab";
+import { Actions, GapNumber, LevelBadge } from "@/components/ecosystem/GapCells";
+import { ProviderDrilldown, SeekerDrilldown } from "@/components/ecosystem/GapDrilldowns";
 import { REGION_TREE } from "@/lib/ecosystem-config";
 import {
-  actionGap,
-  demandSupplyGap,
-  gapLevel,
-  getAggregatorsForNeed,
   getEcosystemTotals,
   getProviderCategories,
-  getProvidersForCategory,
   getSeekerNeeds,
-  recommendedActions,
+  matchesGapLevel,
+  providerGapRows,
+  seekerGapRows,
   type GapLevelLabel,
 } from "@/lib/ecosystem-data";
+import { fmtCount as fmt, syncedAgo } from "@/components/ecosystem/ecosystemHelpers";
 
 export const Route = createFileRoute("/ecosystem-view")({
   component: EcosystemView,
@@ -58,59 +51,14 @@ export const Route = createFileRoute("/ecosystem-view")({
   }),
 });
 
-const fmt = (n: number) => n.toLocaleString("en-IN");
-
-const LEVEL_CLASSES: Record<GapLevelLabel, string> = {
-  High: "bg-red-500/15 text-red-700 dark:text-red-400 border-transparent",
-  Medium: "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-transparent",
-  Low: "bg-green-500/15 text-green-700 dark:text-green-400 border-transparent",
-};
-
-function LevelBadge({ level }: { level: GapLevelLabel }) {
-  return (
-    <Badge variant="outline" className={LEVEL_CLASSES[level]}>
-      {level}
-    </Badge>
-  );
-}
-
-function GapNumber({ value }: { value: number }) {
-  return <span className="tabular-nums text-red-600 dark:text-red-400">{fmt(value)}</span>;
-}
-
-function Actions({ items }: { items: string[] }) {
-  if (!items.length) return <span className="text-muted-foreground">—</span>;
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {items.map((a) => (
-        <Button
-          key={a}
-          variant="outline"
-          size="sm"
-          className="h-7 bg-brand-soft text-brand border-brand/20 text-xs font-normal hover:bg-brand-soft"
-        >
-          {a}
-        </Button>
-      ))}
-    </div>
-  );
-}
-
-function relativeAge(iso: string): string {
-  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  return `${Math.round(mins / 60)}h ago`;
-}
-
 function EcosystemView() {
   const [region, setRegion] = useState<RegionValue>({
-    state: REGION_TREE[0].state,
-    district: REGION_TREE[0].districts[0],
+    state: REGION_TREE[0]?.state ?? "",
+    district: REGION_TREE[0]?.districts[0] ?? "",
   });
   const [syncedAt, setSyncedAt] = useState(() => new Date().toISOString());
 
-  const totals = useMemo(() => getEcosystemTotals(region), [region, syncedAt]);
+  const totals = useMemo(() => getEcosystemTotals(region), [region]);
 
   return (
     <Tabs defaultValue="providers" className="space-y-6">
@@ -140,7 +88,7 @@ function EcosystemView() {
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="text-xs font-normal text-muted-foreground">
-            {`Synced ${relativeAge(syncedAt)}`}
+            {`Synced ${syncedAgo(syncedAt)}`}
           </Badge>
           <Button
             size="sm"
@@ -176,9 +124,21 @@ function EcosystemView() {
 function TotalsRow({ totals }: { totals: ReturnType<typeof getEcosystemTotals> }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-      <MetricCard label="Total seekers" value={totals.totalSeekers} sub="registered in this district" />
-      <MetricCard label="Total service providers" value={totals.totalProviders} sub="active organisations" />
-      <MetricCard label="Total connections" value={totals.totalConnections} sub="seeker ↔ provider links made" />
+      <MetricCard
+        label="Total seekers"
+        value={totals.totalSeekers}
+        sub="registered in this district"
+      />
+      <MetricCard
+        label="Total service providers"
+        value={totals.totalProviders}
+        sub="active organisations"
+      />
+      <MetricCard
+        label="Total connections"
+        value={totals.totalConnections}
+        sub="seeker ↔ provider links made"
+      />
     </div>
   );
 }
@@ -292,18 +252,10 @@ function ProvidersGapPanel({ region }: { region: RegionValue }) {
   const [level, setLevel] = useState("All");
   const [open, setOpen] = useState<string | null>(null);
 
-  const enriched = rows.map((r) => {
-    const ag = actionGap(r.matching, r.connections);
-    const ds = demandSupplyGap(r.matching, r.capacity);
-    const agL = gapLevel(ag, r.matching);
-    const dsL = gapLevel(ds, r.matching);
-    return { ...r, ag, ds, agL, dsL, actions: recommendedActions("provider", agL, dsL) };
-  });
+  const enriched = providerGapRows(rows);
 
   const filtered = enriched.filter(
-    (r) =>
-      (cat === "All" || r.category === cat) &&
-      (level === "All" || r.agL === level || r.dsL === level),
+    (r) => (cat === "All" || r.category === cat) && matchesGapLevel(r, level),
   );
 
   return (
@@ -333,8 +285,10 @@ function ProvidersGapPanel({ region }: { region: RegionValue }) {
               <TableHead>Service category</TableHead>
               <TableHead className="text-right">Service providers</TableHead>
               <TableHead className="text-right">
-                Can service upto
-                <span className="block text-[10px] font-normal text-muted-foreground">count of seekers</span>
+                Can service upto{" "}
+                <span className="block text-[10px] font-normal text-muted-foreground">
+                  count of seekers
+                </span>
               </TableHead>
               <TableHead className="text-right">Matching seekers</TableHead>
               <TableHead className="text-right">Connections</TableHead>
@@ -354,11 +308,21 @@ function ProvidersGapPanel({ region }: { region: RegionValue }) {
                 <TableCell className="text-right tabular-nums">{fmt(r.capacity)}</TableCell>
                 <TableCell className="text-right tabular-nums">{fmt(r.matching)}</TableCell>
                 <TableCell className="text-right tabular-nums">{fmt(r.connections)}</TableCell>
-                <TableCell className="text-right"><GapNumber value={r.ag} /></TableCell>
-                <TableCell><LevelBadge level={r.agL} /></TableCell>
-                <TableCell className="text-right"><GapNumber value={r.ds} /></TableCell>
-                <TableCell><LevelBadge level={r.dsL} /></TableCell>
-                <TableCell><Actions items={r.actions} /></TableCell>
+                <TableCell className="text-right">
+                  <GapNumber value={r.ag} />
+                </TableCell>
+                <TableCell>
+                  <LevelBadge level={r.agL} />
+                </TableCell>
+                <TableCell className="text-right">
+                  <GapNumber value={r.ds} />
+                </TableCell>
+                <TableCell>
+                  <LevelBadge level={r.dsL} />
+                </TableCell>
+                <TableCell>
+                  <Actions items={r.actions} />
+                </TableCell>
                 <TableCell>
                   <Button
                     variant="ghost"
@@ -394,18 +358,10 @@ function SeekersGapPanel({ region }: { region: RegionValue }) {
   const [level, setLevel] = useState("All");
   const [open, setOpen] = useState<string | null>(null);
 
-  const enriched = rows.map((r) => {
-    const ag = actionGap(r.matching, r.connections);
-    const ds = demandSupplyGap(r.matching, r.reach);
-    const agL = gapLevel(ag, r.matching);
-    const dsL = gapLevel(ds, r.matching);
-    return { ...r, ag, ds, agL, dsL, actions: recommendedActions("seeker", agL, dsL) };
-  });
+  const enriched = seekerGapRows(rows);
 
   const filtered = enriched.filter(
-    (r) =>
-      (need === "All" || r.area === need) &&
-      (level === "All" || r.agL === level || r.dsL === level),
+    (r) => (need === "All" || r.area === need) && matchesGapLevel(r, level),
   );
 
   return (
@@ -435,8 +391,10 @@ function SeekersGapPanel({ region }: { region: RegionValue }) {
               <TableHead>Seeker need area</TableHead>
               <TableHead className="text-right">Aggregators</TableHead>
               <TableHead className="text-right">
-                Can reach upto
-                <span className="block text-[10px] font-normal text-muted-foreground">count of seekers</span>
+                Can reach upto{" "}
+                <span className="block text-[10px] font-normal text-muted-foreground">
+                  count of seekers
+                </span>
               </TableHead>
               <TableHead className="text-right">Matching providers</TableHead>
               <TableHead className="text-right">Connections</TableHead>
@@ -456,11 +414,21 @@ function SeekersGapPanel({ region }: { region: RegionValue }) {
                 <TableCell className="text-right tabular-nums">{fmt(r.reach)}</TableCell>
                 <TableCell className="text-right tabular-nums">{fmt(r.matching)}</TableCell>
                 <TableCell className="text-right tabular-nums">{fmt(r.connections)}</TableCell>
-                <TableCell className="text-right"><GapNumber value={r.ag} /></TableCell>
-                <TableCell><LevelBadge level={r.agL} /></TableCell>
-                <TableCell className="text-right"><GapNumber value={r.ds} /></TableCell>
-                <TableCell><LevelBadge level={r.dsL} /></TableCell>
-                <TableCell><Actions items={r.actions} /></TableCell>
+                <TableCell className="text-right">
+                  <GapNumber value={r.ag} />
+                </TableCell>
+                <TableCell>
+                  <LevelBadge level={r.agL} />
+                </TableCell>
+                <TableCell className="text-right">
+                  <GapNumber value={r.ds} />
+                </TableCell>
+                <TableCell>
+                  <LevelBadge level={r.dsL} />
+                </TableCell>
+                <TableCell>
+                  <Actions items={r.actions} />
+                </TableCell>
                 <TableCell>
                   <Button
                     variant="ghost"
@@ -487,139 +455,5 @@ function SeekersGapPanel({ region }: { region: RegionValue }) {
 
       <SeekerDrilldown region={region} area={open} onClose={() => setOpen(null)} />
     </Panel>
-  );
-}
-
-const contactCls = "font-mono text-xs text-muted-foreground";
-
-function ProviderDrilldown({
-  region,
-  category,
-  onClose,
-}: {
-  region: RegionValue;
-  category: string | null;
-  onClose: () => void;
-}) {
-  const orgs = category ? getProvidersForCategory(region, category) : [];
-  return (
-    <Dialog open={!!category} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-5xl">
-        <DialogHeader>
-          <DialogTitle>{category}</DialogTitle>
-          <DialogDescription>
-            {orgs.length} service provider{orgs.length === 1 ? "" : "s"} in this category.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="max-h-[65vh] overflow-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Organisation</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead className="text-right">Can service upto</TableHead>
-                <TableHead className="text-right">Matching</TableHead>
-                <TableHead className="text-right">Connections</TableHead>
-                <TableHead className="text-right">Action gap</TableHead>
-                <TableHead>Action level</TableHead>
-                <TableHead className="text-right">D-S gap</TableHead>
-                <TableHead>D-S level</TableHead>
-                <TableHead>Recommended actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {orgs.map((o) => {
-                const ag = actionGap(o.matching, o.connections);
-                const ds = demandSupplyGap(o.matching, o.capacity);
-                const agL = gapLevel(ag, o.matching);
-                const dsL = gapLevel(ds, o.matching);
-                return (
-                  <TableRow key={o.org}>
-                    <TableCell className="font-medium">{o.org}</TableCell>
-                    <TableCell className={contactCls}>{o.email}</TableCell>
-                    <TableCell className={contactCls}>{o.phone}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmt(o.capacity)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmt(o.matching)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmt(o.connections)}</TableCell>
-                    <TableCell className="text-right"><GapNumber value={ag} /></TableCell>
-                    <TableCell><LevelBadge level={agL} /></TableCell>
-                    <TableCell className="text-right"><GapNumber value={ds} /></TableCell>
-                    <TableCell><LevelBadge level={dsL} /></TableCell>
-                    <TableCell><Actions items={recommendedActions("provider", agL, dsL)} /></TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function SeekerDrilldown({
-  region,
-  area,
-  onClose,
-}: {
-  region: RegionValue;
-  area: string | null;
-  onClose: () => void;
-}) {
-  const orgs = area ? getAggregatorsForNeed(region, area) : [];
-  return (
-    <Dialog open={!!area} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-5xl">
-        <DialogHeader>
-          <DialogTitle>{area}</DialogTitle>
-          <DialogDescription>
-            {orgs.length} aggregator{orgs.length === 1 ? "" : "s"} reaching seekers in this need area.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="max-h-[65vh] overflow-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Organisation</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead className="text-right">Can reach upto</TableHead>
-                <TableHead className="text-right">Matching</TableHead>
-                <TableHead className="text-right">Connections</TableHead>
-                <TableHead className="text-right">Action gap</TableHead>
-                <TableHead>Action level</TableHead>
-                <TableHead className="text-right">D-S gap</TableHead>
-                <TableHead>D-S level</TableHead>
-                <TableHead>Recommended actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {orgs.map((o) => {
-                const ag = actionGap(o.matching, o.connections);
-                const ds = demandSupplyGap(o.matching, o.reach);
-                const agL = gapLevel(ag, o.matching);
-                const dsL = gapLevel(ds, o.matching);
-                return (
-                  <TableRow key={o.org}>
-                    <TableCell className="font-medium">{o.org}</TableCell>
-                    <TableCell className={contactCls}>{o.email}</TableCell>
-                    <TableCell className={contactCls}>{o.phone}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmt(o.reach)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmt(o.matching)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmt(o.connections)}</TableCell>
-                    <TableCell className="text-right"><GapNumber value={ag} /></TableCell>
-                    <TableCell><LevelBadge level={agL} /></TableCell>
-                    <TableCell className="text-right"><GapNumber value={ds} /></TableCell>
-                    <TableCell><LevelBadge level={dsL} /></TableCell>
-                    <TableCell><Actions items={recommendedActions("seeker", agL, dsL)} /></TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      </DialogContent>
-    </Dialog>
   );
 }

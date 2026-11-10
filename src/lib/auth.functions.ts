@@ -1,13 +1,20 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { FN_ROLES, ROLES, type Role } from "@/auth/roles";
+import { FN_ROLES, isRole, type Role } from "@/auth/roles";
 import { publicMiddleware, requireRole, sessionMiddleware } from "@/auth/middleware";
 import { actionAllowed, userState, type UserAction, type UserState } from "@/auth/user-state";
+import { parseInput } from "@/lib/validation";
 
+/** Answer to any password call: sign-in is through Keycloak only. */
 export const PASSWORDS_OFF = "Sign in with Keycloak. Passwords are not used.";
 
 const email = z.string().trim().toLowerCase().email().max(320);
-const optText = z.string().trim().max(200).optional().transform((v) => (v ? v : null));
+const optText = z
+  .string()
+  .trim()
+  .max(200)
+  .optional()
+  .transform((v) => (v ? v : null));
 
 async function db() {
   const [{ getDb }, schema, orm] = await Promise.all([
@@ -18,6 +25,7 @@ async function db() {
   return { db: getDb(), appUsers: schema.appUsers, adminActions: schema.adminActions, ...orm };
 }
 
+/** The signed-in user, as the browser sees it. */
 export interface MeResult {
   email: string;
   name: string | null;
@@ -28,8 +36,7 @@ export interface MeResult {
   nodeName: string | null;
 }
 
-// Password login is switched off: people sign in through Keycloak
-// (/auth/keycloak/login). Kept so an old client gets a clear answer.
+/** Refuses password login with a clear message; people sign in through Keycloak. */
 export const login = createServerFn({ method: "POST" })
   .middleware([publicMiddleware])
   .handler(async (): Promise<never> => refusePasswords());
@@ -40,8 +47,10 @@ async function refusePasswords(): Promise<never> {
   throw new Error(PASSWORDS_OFF);
 }
 
-// Works without a valid session, so an expired one can still clear its cookie.
-// Ends the Campaign Manager session only; the Keycloak session stays.
+/**
+ * Ends the Campaign Manager session; the Keycloak session stays.
+ * Public, so an expired session can still clear its cookie.
+ */
 export const logout = createServerFn({ method: "POST" })
   .middleware([publicMiddleware])
   .handler(async () => {
@@ -50,7 +59,7 @@ export const logout = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-// Public, so the login screen can load: null when nobody is signed in.
+/** Returns the signed-in user, or null when nobody is signed in; public so the login screen can load. */
 export const me = createServerFn({ method: "GET" })
   .middleware([publicMiddleware])
   .handler(async (): Promise<MeResult | null> => {
@@ -61,13 +70,17 @@ export const me = createServerFn({ method: "GET" })
     return rest;
   });
 
+/** Refuses password changes; passwords are not used. */
 export const changePassword = createServerFn({ method: "POST" })
   .middleware([sessionMiddleware])
-  .inputValidator((d: unknown) =>
-    z.object({ currentPassword: z.string().max(200), newPassword: z.string().max(200) }).parse(d),
+  .validator(
+    parseInput(
+      z.object({ currentPassword: z.string().max(200), newPassword: z.string().max(200) }),
+    ),
   )
   .handler(async (): Promise<never> => refusePasswords());
 
+/** A user as the settings page lists it. */
 export interface AppUser {
   email: string;
   name: string | null;
@@ -86,13 +99,14 @@ export interface AppUser {
 const profile = z.object({
   email,
   name: optText,
-  role: z.enum(ROLES),
+  role: z.string().refine(isRole, "Unknown role"),
   district: optText,
   program: optText,
   node_type: optText,
   node_name: optText,
 });
 
+/** Lists every user, with their approval state and Keycloak link, for the settings page. */
 export const listAppUsers = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.admin)])
   .handler(async (): Promise<AppUser[]> => {
@@ -127,20 +141,31 @@ async function keycloakAccountFor(
   forUserId: string | null,
   operator: string,
 ): Promise<string> {
-  const { keycloakAdmin, ACCOUNT_MESSAGES, KeycloakHttpError } = await import("@/server/auth/keycloak-admin.server");
+  const { keycloakAdmin, ACCOUNT_MESSAGES, KeycloakHttpError } =
+    await import("@/server/auth/keycloak-admin.server");
   let account: Awaited<ReturnType<Awaited<ReturnType<typeof keycloakAdmin>>["ensureAccount"]>>;
   try {
     account = await (await keycloakAdmin()).ensureAccount(emailAddress, name);
   } catch (e) {
-    console.error(`[keycloak] ${e instanceof Error ? e.message : String(e)}`);
+    const { logEvent } = await import("@/server/log.server");
+    logEvent("error", { operation: "keycloak.ensureAccount", status: "failure", error: e });
     throw new Error(e instanceof KeycloakHttpError && e.denied ? KEYCLOAK_DENIED : KEYCLOAK_DOWN);
   }
   if (account.kind === "refused") throw new Error(ACCOUNT_MESSAGES[account.reason]);
   const { db: d, appUsers, adminActions, eq } = await db();
   if (account.created) {
-    await d.insert(adminActions).values({ action: "create_keycloak_account", email: emailAddress, keycloakUserId: account.id, operator });
+    await d.insert(adminActions).values({
+      action: "create_keycloak_account",
+      email: emailAddress,
+      keycloakUserId: account.id,
+      operator,
+    });
   }
-  const [owner] = await d.select({ id: appUsers.id }).from(appUsers).where(eq(appUsers.keycloakSub, account.id)).limit(1);
+  const [owner] = await d
+    .select({ id: appUsers.id })
+    .from(appUsers)
+    .where(eq(appUsers.keycloakSub, account.id))
+    .limit(1);
   if (owner && owner.id !== forUserId) throw new Error(ACCOUNT_MESSAGES["linked-elsewhere"]);
   return account.id;
 }
@@ -152,23 +177,28 @@ async function findUser(emailAddress: string) {
   return u;
 }
 
-function refuseUnless(u: { active: boolean; role: string | null; rejectedAt: string | null }, action: UserAction): UserState {
+function refuseUnless(
+  u: { active: boolean; role: string | null; rejectedAt: string | null },
+  action: UserAction,
+): UserState {
   const state = userState(u);
   if (!actionAllowed(state, action)) throw new Error(`Can't ${action} a user who is ${state}.`);
   return state;
 }
 
-// No password: the user signs in with the Keycloak account for this email.
+/** Adds a user and links the Keycloak account for their email, creating it when needed. */
 export const createAppUser = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator((d: unknown) => profile.parse(d))
+  .validator(parseInput(profile))
   .handler(async ({ data, context }) => {
     const { db: d, appUsers, eq } = await db();
     const [exists] = await d.select().from(appUsers).where(eq(appUsers.email, data.email)).limit(1);
     if (exists) {
       const state = userState(exists);
-      if (state === "pending") throw new Error("This person is waiting for approval. Approve them in the list instead.");
-      if (state === "rejected") throw new Error("This person was rejected. Approve them in the list instead.");
+      if (state === "pending")
+        throw new Error("This person is waiting for approval. Approve them in the list instead.");
+      if (state === "rejected")
+        throw new Error("This person was rejected. Approve them in the list instead.");
       throw new Error("A user with this email already exists.");
     }
     const keycloakSub = await keycloakAccountFor(data.email, data.name, null, context.user.email);
@@ -185,29 +215,37 @@ export const createAppUser = createServerFn({ method: "POST" })
       });
     } catch (e) {
       const { isUniqueViolation } = await import("@/server/db/errors");
-      if (isUniqueViolation(e)) throw new Error("Someone else just added this user or linked this Keycloak account. Refresh the list.");
-      console.error(`[users] adding ${data.email} failed: ${e instanceof Error ? e.message : String(e)}`);
+      if (isUniqueViolation(e))
+        throw new Error(
+          "Someone else just added this user or linked this Keycloak account. Refresh the list.",
+        );
+      const { logEvent } = await import("@/server/log.server");
+      logEvent("error", { operation: "users.create", status: "failure", error: e });
       throw new Error("Saving the user failed. Try again; the Keycloak account is reused.");
     }
     return { ok: true };
   });
 
-// For a user from before Keycloak login: reuse or create their Keycloak account.
+/** Links a user who has no Keycloak login to the account for their email, creating it when needed. */
 export const setUpKeycloakLogin = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator((d: unknown) => z.object({ email }).parse(d))
+  .validator(parseInput(z.object({ email })))
   .handler(async ({ data, context }) => {
     const u = await findUser(data.email);
     if (u.keycloakSub) throw new Error("This user already has a Keycloak login.");
     const keycloakSub = await keycloakAccountFor(u.email, u.name, u.id, context.user.email);
     const { db: d, appUsers, eq } = await db();
-    await d.update(appUsers).set({ keycloakSub, updatedAt: new Date().toISOString() }).where(eq(appUsers.id, u.id));
+    await d
+      .update(appUsers)
+      .set({ keycloakSub, updatedAt: new Date().toISOString() })
+      .where(eq(appUsers.id, u.id));
     return { ok: true };
   });
 
+/** Approves a pending or rejected user with the given role. */
 export const approveAppUser = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator((d: unknown) => z.object({ email, role: z.enum(ROLES) }).parse(d))
+  .validator(parseInput(z.object({ email, role: z.string().refine(isRole, "Unknown role") })))
   .handler(async ({ data }) => {
     const u = await findUser(data.email);
     refuseUnless(u, "approve");
@@ -219,9 +257,10 @@ export const approveAppUser = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/** Rejects a pending user; rejecting a rejected user does nothing. */
 export const rejectAppUser = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator((d: unknown) => z.object({ email }).parse(d))
+  .validator(parseInput(z.object({ email })))
   .handler(async ({ data }) => {
     const u = await findUser(data.email);
     if (refuseUnless(u, "reject") === "rejected") return { ok: true };
@@ -231,33 +270,48 @@ export const rejectAppUser = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-// Their next login links again by verified email: fixes a recreated Keycloak account.
-// An admin isn't linked at login, so another admin then uses Set up login.
+/**
+ * Removes a user's Keycloak link so their next login links again by verified email, which fixes a
+ * recreated Keycloak account. An admin is not linked at login, so another admin then uses Set up login.
+ */
 export const unlinkKeycloakAccount = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator((d: unknown) => z.object({ email }).parse(d))
+  .validator(parseInput(z.object({ email })))
   .handler(async ({ data, context }) => {
-    if (data.email === context.user.email) throw new Error("You cannot unlink your own Keycloak login.");
+    if (data.email === context.user.email)
+      throw new Error("You cannot unlink your own Keycloak login.");
     const u = await findUser(data.email);
     const { db: d, appUsers, eq } = await db();
-    await d.update(appUsers).set({ keycloakSub: null, updatedAt: new Date().toISOString() }).where(eq(appUsers.id, u.id));
+    await d
+      .update(appUsers)
+      .set({ keycloakSub: null, updatedAt: new Date().toISOString() })
+      .where(eq(appUsers.id, u.id));
     return { ok: true };
   });
 
 async function activeAdminCount(): Promise<number> {
   const { db: d, appUsers, and, eq, count } = await db();
-  const [r] = await d.select({ n: count() }).from(appUsers).where(and(eq(appUsers.role, "admin"), eq(appUsers.active, true)));
+  const [r] = await d
+    .select({ n: count() })
+    .from(appUsers)
+    .where(and(eq(appUsers.role, "admin"), eq(appUsers.active, true)));
   return r?.n ?? 0;
 }
 
+/** Updates a user's profile and role; refuses to demote the last active admin. */
 export const updateAppUser = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator((d: unknown) => profile.parse(d))
+  .validator(parseInput(profile))
   .handler(async ({ data }) => {
     const u = await findUser(data.email);
     refuseUnless(u, "edit");
     const { db: d, appUsers, eq } = await db();
-    if (u.role === "admin" && u.active && data.role !== "admin" && (await activeAdminCount()) <= 1) {
+    if (
+      u.role === "admin" &&
+      u.active &&
+      data.role !== "admin" &&
+      (await activeAdminCount()) <= 1
+    ) {
       throw new Error("Cannot demote the last active admin.");
     }
     await d
@@ -275,20 +329,23 @@ export const updateAppUser = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/** Refuses password resets; passwords are not used. */
 export const resetAppUserPassword = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator((d: unknown) => z.object({ email }).parse(d))
+  .validator(parseInput(z.object({ email })))
   .handler(async (): Promise<never> => refusePasswords());
 
+/** Activates or deactivates a user; refuses to deactivate yourself or the last active admin. */
 export const setAppUserActive = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator((d: unknown) => z.object({ email, active: z.boolean() }).parse(d))
+  .validator(parseInput(z.object({ email, active: z.boolean() })))
   .handler(async ({ data, context }) => {
     const u = await findUser(data.email);
     refuseUnless(u, data.active ? "activate" : "deactivate");
     if (!data.active) {
       if (data.email === context.user.email) throw new Error("You cannot deactivate yourself.");
-      if (u.role === "admin" && (await activeAdminCount()) <= 1) throw new Error("Cannot deactivate the last active admin.");
+      if (u.role === "admin" && (await activeAdminCount()) <= 1)
+        throw new Error("Cannot deactivate the last active admin.");
     }
     const { db: d, appUsers, eq } = await db();
     await d

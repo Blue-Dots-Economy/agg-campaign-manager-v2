@@ -1,7 +1,20 @@
 import { useMemo } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { Application } from "./mockData";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import type { Application } from "./types";
 import { APP_AGE_LABEL, appAgeBucket, relativeAge } from "./ecosystemHelpers";
 
 export function ApplicationsDrilldown({
@@ -21,7 +34,7 @@ export function ApplicationsDrilldown({
 
   const sorted = useMemo(
     () => [...applications].sort((a, b) => (a.applied_date < b.applied_date ? 1 : -1)),
-    [applications]
+    [applications],
   );
 
   return (
@@ -57,7 +70,9 @@ export function ApplicationsDrilldown({
                 <TableRow key={a.id}>
                   <TableCell>{a.seeker_role}</TableCell>
                   <TableCell>{a.location}</TableCell>
-                  <TableCell className="text-muted-foreground">{relativeAge(a.applied_date)}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {relativeAge(a.applied_date)}
+                  </TableCell>
                 </TableRow>
               ))}
               {sorted.length === 0 && (

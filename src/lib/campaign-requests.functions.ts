@@ -4,82 +4,81 @@ import { z } from "zod";
 import { requireRole } from "@/auth/middleware";
 import { FN_ROLES } from "@/auth/roles";
 import { getDb } from "@/server/db/client.server";
-import { fromSqlNames, sqlNamed } from "@/server/db/columns";
+import { fromSqlNames, sqlNamed, type SqlNamedInsert } from "@/server/db/columns";
 import { campaignRequests } from "@/server/db/schema";
+import { parseInput } from "@/lib/validation";
+import {
+  campaignRequestListSchema,
+  campaignRequestPatchSchema,
+  campaignRequestSchema,
+  campaignRequestStatusSchema,
+} from "./campaign-request-input";
 
-export interface CampaignRequestInput {
-  program: string;
-  agent_id: string;
-  agent_name?: string | null;
-  batch_name: string;
-  campaign_day?: string | null;
-  campaign_date?: string | null;
-  campaign_type?: string | null;
-  region?: string | null;
-  language?: string | null;
-  city_campaign?: string | null;
-  channel?: string | null;
-  source?: string | null;
-  cohort_intent?: string | null;
-  cohort_filters?: Record<string, unknown> | null;
-  contacts: Array<Record<string, unknown>>;
-  schedule?: Record<string, unknown> | null;
-  concurrency?: number | null;
-  max_retries?: number | null;
-  retry_after_hrs?: number | null;
-  selected_statuses?: string[] | null;
-  note?: string | null;
-}
+export type { CampaignRequestInput } from "./campaign-request-input";
 
+type CampaignRequestPatch = Partial<SqlNamedInsert<typeof campaignRequests>>;
+
+/** Stores a campaign request for a JFC or admin to review. */
 export const submitCampaignRequest = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.requestCampaign)])
-  .inputValidator((data: { request: CampaignRequestInput }) => data)
+  .validator(parseInput(z.object({ request: campaignRequestSchema })))
   .handler(async ({ data, context }): Promise<{ ok: boolean; id: string | null }> => {
     const r = data.request;
-    if (!r.agent_id) throw new Error("Missing agent.");
-    if (!r.contacts?.length) throw new Error("No contacts to request.");
-    const row = {
-      program: r.program, agent_id: r.agent_id, agent_name: r.agent_name ?? null,
-      batch_name: r.batch_name, campaign_day: r.campaign_day ?? null, campaign_date: r.campaign_date ?? null,
-      campaign_type: r.campaign_type ?? null, region: r.region ?? null, language: r.language ?? null,
-      city_campaign: r.city_campaign ?? null, channel: r.channel ?? "outbound",
-      source: r.source ?? null, cohort_intent: r.cohort_intent ?? null, cohort_filters: r.cohort_filters ?? null,
-      contacts: r.contacts, contact_count: r.contacts.length, schedule: r.schedule ?? null,
-      concurrency: r.concurrency ?? null, max_retries: r.max_retries ?? null, retry_after_hrs: r.retry_after_hrs ?? null,
-      selected_statuses: r.selected_statuses ?? null, requested_by: context.user.email, status: "pending",
-      note: r.note ?? null,
-    };
     const [ins] = await getDb()
       .insert(campaignRequests)
-      .values(fromSqlNames(campaignRequests, row) as typeof campaignRequests.$inferInsert)
+      .values({
+        program: r.program,
+        agentId: r.agent_id,
+        agentName: r.agent_name ?? null,
+        batchName: r.batch_name,
+        campaignDay: r.campaign_day ?? null,
+        campaignDate: r.campaign_date ?? null,
+        campaignType: r.campaign_type ?? null,
+        region: r.region ?? null,
+        language: r.language ?? null,
+        cityCampaign: r.city_campaign ?? null,
+        channel: r.channel ?? "outbound",
+        source: r.source ?? null,
+        cohortIntent: r.cohort_intent ?? null,
+        cohortFilters: r.cohort_filters ?? null,
+        contacts: r.contacts,
+        contactCount: r.contacts.length,
+        schedule: r.schedule ?? null,
+        concurrency: r.concurrency ?? null,
+        maxRetries: r.max_retries ?? null,
+        retryAfterHrs: r.retry_after_hrs ?? null,
+        selectedStatuses: r.selected_statuses ?? null,
+        requestedBy: context.user.email,
+        status: "pending",
+        note: r.note ?? null,
+      })
       .returning({ id: campaignRequests.id });
-    return { ok: true, id: ins.id };
+    return { ok: true, id: ins?.id ?? null };
   });
 
+/** Lists campaign requests, newest first, optionally by status and program. */
 export const listCampaignRequests = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.launch)])
-  .inputValidator((data: { status?: string; program?: string }) => data)
+  .validator(parseInput(campaignRequestListSchema))
   .handler(async ({ data }) => {
     return getDb()
       .select(sqlNamed(campaignRequests))
       .from(campaignRequests)
       .where(
         and(
-          data?.status ? eq(campaignRequests.status, data.status) : undefined,
-          data?.program ? eq(campaignRequests.program, data.program) : undefined,
+          data.status ? eq(campaignRequests.status, data.status) : undefined,
+          data.program ? eq(campaignRequests.program, data.program) : undefined,
         ),
       )
       .orderBy(desc(campaignRequests.createdAt));
   });
 
+/** Changes the editable fields of a pending campaign request. */
 export const updateCampaignRequest = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.launch)])
-  .inputValidator((data: { id: string; patch: Record<string, unknown> }) => data)
+  .validator(parseInput(z.object({ id: z.string().uuid(), patch: campaignRequestPatchSchema })))
   .handler(async ({ data }): Promise<{ ok: boolean }> => {
-    const allowed = ["schedule", "concurrency", "max_retries", "retry_after_hrs", "selected_statuses", "batch_name", "campaign_day", "campaign_date"];
-    const patch: Record<string, unknown> = {};
-    for (const k of allowed) if (k in data.patch) patch[k] = (data.patch as Record<string, unknown>)[k];
-    patch["updated_at"] = new Date().toISOString();
+    const patch: CampaignRequestPatch = { ...data.patch, updated_at: new Date().toISOString() };
     await getDb()
       .update(campaignRequests)
       .set(fromSqlNames(campaignRequests, patch))
@@ -87,21 +86,21 @@ export const updateCampaignRequest = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-const statusInput = z.object({
-  id: z.string().uuid(),
-  status: z.enum(["pending", "approved", "declined"]),
-  batch_id: z.string().max(200).optional(),
-  decline_reason: z.string().max(1000).optional(),
-});
-
+/** Approves or declines a campaign request and records the reviewer. */
 export const setCampaignRequestStatus = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.launch)])
-  .inputValidator((data: z.input<typeof statusInput>) => statusInput.parse(data))
+  .validator(parseInput(campaignRequestStatusSchema))
   .handler(async ({ data, context }): Promise<{ ok: boolean }> => {
-    const patch: Record<string, unknown> = { status: data.status, updated_at: new Date().toISOString() };
-    patch["reviewer_email"] = context.user.email;
-    if (data.batch_id) patch["batch_id"] = data.batch_id;
-    if (data.decline_reason) patch["decline_reason"] = data.decline_reason;
-    await getDb().update(campaignRequests).set(fromSqlNames(campaignRequests, patch)).where(eq(campaignRequests.id, data.id));
+    const patch: CampaignRequestPatch = {
+      status: data.status,
+      updated_at: new Date().toISOString(),
+      reviewer_email: context.user.email,
+    };
+    if (data.batch_id) patch.batch_id = data.batch_id;
+    if (data.decline_reason) patch.decline_reason = data.decline_reason;
+    await getDb()
+      .update(campaignRequests)
+      .set(fromSqlNames(campaignRequests, patch))
+      .where(eq(campaignRequests.id, data.id));
     return { ok: true };
   });

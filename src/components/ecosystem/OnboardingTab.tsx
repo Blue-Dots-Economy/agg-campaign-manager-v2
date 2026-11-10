@@ -1,28 +1,12 @@
 import { useMemo, useRef, useState } from "react";
-import {
-  AlertTriangle,
-  BadgeCheck,
-  Check,
-  Copy,
-  Download,
-  QrCode,
-  Upload,
-  Users,
-  X,
-} from "lucide-react";
+import { useTimeout } from "@/hooks/useTimeout";
+import { AlertTriangle, BadgeCheck, Check, Copy, Download, Upload, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import { Panel } from "@/components/Panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Sheet,
   SheetContent,
@@ -46,15 +30,8 @@ import {
   type RegistrationLink,
 } from "@/lib/ecosystem-data";
 import type { RegionValue } from "@/components/ecosystem/RegionSelector";
-
-const slugify = (s: string) =>
-  s
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .trim()
-    .replace(/\s+/g, "-");
-
-const Req = () => <span className="text-red-600 dark:text-red-400"> *</span>;
+import { ShareLink } from "@/components/ecosystem/ShareLink";
+import { fieldFromIssue } from "@/components/ecosystem/onboarding-helpers";
 
 export function OnboardingTab({ region }: { region: RegionValue }) {
   return (
@@ -93,7 +70,9 @@ function HealthCard({
     <div className="rounded-xl border bg-card p-5 flex items-center gap-4">
       <div className={`h-10 w-10 shrink-0 rounded-lg grid place-items-center ${tile}`}>{icon}</div>
       <div className="min-w-0 flex-1">
-        <p className="text-2xl font-semibold tracking-tight tabular-nums text-foreground">{value}</p>
+        <p className="text-2xl font-semibold tracking-tight tabular-nums text-foreground">
+          {value}
+        </p>
         <p className="mt-0.5 text-xs text-muted-foreground">{caption}</p>
       </div>
       {action}
@@ -134,12 +113,16 @@ function HealthRow({ region }: { region: RegionValue }) {
 
 /* 2. Add participants */
 
+/** How long the placeholder upload takes before it reports success. */
+const SIMULATED_UPLOAD_MS = 2000;
+
 function AddParticipants() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [done, setDone] = useState(false);
+  const later = useTimeout();
 
   const pick = (f: File | null | undefined) => {
     if (!f) return;
@@ -150,11 +133,11 @@ function AddParticipants() {
   const upload = () => {
     setUploading(true);
     setDone(false);
-    window.setTimeout(() => {
+    later(() => {
       setUploading(false);
       setDone(true);
       toast.success("Participants uploaded");
-    }, 2000);
+    }, SIMULATED_UPLOAD_MS);
   };
 
   return (
@@ -189,14 +172,17 @@ function AddParticipants() {
       >
         <Upload className="h-6 w-6 mx-auto text-muted-foreground" />
         <p className="mt-3 text-sm text-foreground">Drag your CSV here or click to browse</p>
-        <p className="mt-1 text-xs text-muted-foreground">.csv files only · max 500 rows per upload</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          .csv files only · max 500 rows per upload
+        </p>
         {file ? <p className="mt-3 text-xs text-brand font-medium">{file.name}</p> : null}
         <input
           ref={inputRef}
           type="file"
+          aria-label="Participants CSV file"
           accept=".csv"
           className="hidden"
-          onChange={(e) => pick(e.target.files?.[0])}
+          onChange={(e) => pick(e.currentTarget.files?.[0])}
         />
       </div>
 
@@ -214,213 +200,6 @@ function AddParticipants() {
             <Check className="h-4 w-4" /> Upload complete
           </span>
         ) : null}
-      </div>
-    </Panel>
-  );
-}
-
-/* 3. Share a registration link */
-
-function ShareLink({ region }: { region: RegionValue }) {
-  const [org, setOrg] = useState("Purple Dots Aggregator");
-  const [instance, setInstance] = useState(region.state);
-  const [lever, setLever] = useState("");
-  const [eventDate, setEventDate] = useState("");
-  const [eventLocation, setEventLocation] = useState("");
-  const [district, setDistrict] = useState(region.district);
-  const [domain, setDomain] = useState("Seeker");
-  const [signalSource, setSignalSource] = useState("");
-  const [signalSubSource, setSignalSubSource] = useState("");
-  const [sourceFullName, setSourceFullName] = useState("");
-  const [sourceType, setSourceType] = useState("Government");
-  const [active, setActive] = useState(true);
-  const [copied, setCopied] = useState(false);
-
-  const url = `purpledots.in/join/${slugify(district) || "district"}/${slugify(org) || "org"}`;
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(`https://${url}`);
-    } catch {
-      /* clipboard unavailable */
-    }
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1500);
-  };
-
-  return (
-    <Panel
-      title="Share a registration link"
-      description="Generate a link participants can use to join your network."
-      action={
-        <Badge
-          variant="outline"
-          className={
-            active
-              ? "bg-green-500/15 text-green-700 dark:text-green-400 border-transparent"
-              : "bg-muted text-muted-foreground border-transparent"
-          }
-        >
-          {active ? "Live" : "Inactive"}
-        </Badge>
-      }
-    >
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_240px] gap-6">
-        <div className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="org">Organisation name</Label>
-            <Input id="org" value={org} onChange={(e) => setOrg(e.target.value)} />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="instance">
-                Instance (state name)
-                <Req />
-              </Label>
-              <Input id="instance" value={instance} onChange={(e) => setInstance(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="lever">Lever / event</Label>
-              <Input id="lever" value={lever} onChange={(e) => setLever(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="event-date">Event date</Label>
-              <Input
-                id="event-date"
-                type="date"
-                value={eventDate}
-                onChange={(e) => setEventDate(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="event-location">Event location</Label>
-              <Input
-                id="event-location"
-                value={eventLocation}
-                onChange={(e) => setEventLocation(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="district">
-                District
-                <Req />
-              </Label>
-              <Input id="district" value={district} onChange={(e) => setDistrict(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>
-                Domain
-                <Req />
-              </Label>
-              <Select value={domain} onValueChange={setDomain}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Seeker">Seeker</SelectItem>
-                  <SelectItem value="Provider">Provider</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="signal-source">Signal source</Label>
-              <Input
-                id="signal-source"
-                value={signalSource}
-                onChange={(e) => setSignalSource(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="signal-sub">Signal sub-source</Label>
-              <Input
-                id="signal-sub"
-                value={signalSubSource}
-                onChange={(e) => setSignalSubSource(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="source-full">Source or sub-source full name</Label>
-              <Input
-                id="source-full"
-                value={sourceFullName}
-                onChange={(e) => setSourceFullName(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Source type</Label>
-              <Select value={sourceType} onValueChange={setSourceType}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {["Government", "Private", "NGO", "Other"].map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {t}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Generated URL</Label>
-            <div className="rounded-md bg-muted px-3 py-2 font-mono text-xs text-muted-foreground break-all">
-              {url}
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="share-url">Shareable link</Label>
-            <div className="flex items-center gap-2">
-              <Input id="share-url" readOnly value={`https://${url}`} />
-              <Button className="shrink-0" onClick={copy}>
-                {copied ? "Copied" : "Copy"}
-              </Button>
-            </div>
-          </div>
-
-          <p className="text-xs text-muted-foreground">
-            Participants who register via this link are added to your network automatically.
-          </p>
-
-          <Button
-            variant="outline"
-            size="sm"
-            className={
-              active
-                ? "text-red-700 dark:text-red-400 border-red-500/30 hover:bg-red-500/10"
-                : "text-green-700 dark:text-green-400 border-green-500/30 hover:bg-green-500/10"
-            }
-            onClick={() => setActive((a) => !a)}
-          >
-            {active ? "Deactivate link" : "Activate link"}
-          </Button>
-        </div>
-
-        <div className="flex flex-col items-center gap-3">
-          <div className="flex items-center gap-1.5 text-sm text-foreground">
-            <QrCode className="h-4 w-4 text-brand" />
-            QR code
-          </div>
-          <div
-            className="grid place-items-center rounded-xl bg-brand text-primary-foreground text-lg font-semibold"
-            style={{ width: 148, height: 148 }}
-          >
-            QR
-          </div>
-          <p className="text-center text-xs text-muted-foreground">
-            Scan or click to open the registration page
-          </p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => toast.success("QR downloaded")}
-          >
-            Download QR
-          </Button>
-        </div>
       </div>
     </Panel>
   );
@@ -558,11 +337,6 @@ function YourLinks({ region }: { region: RegionValue }) {
 
 /* 5. Flagged profiles */
 
-function fieldFromIssue(issue: string): string {
-  const m = issue.match(/(?:Missing|Format error):\s*(.+)/i);
-  return m ? m[1].trim() : "Field";
-}
-
 function FlaggedSection({ region }: { region: RegionValue }) {
   const profiles = useMemo(() => getFlaggedProfiles(region), [region]);
   const [fixing, setFixing] = useState<FlaggedProfile | null>(null);
@@ -575,7 +349,10 @@ function FlaggedSection({ region }: { region: RegionValue }) {
   };
 
   return (
-    <Panel title="Flagged profiles" description="Profiles that need correction before they go live.">
+    <Panel
+      title="Flagged profiles"
+      description="Profiles that need correction before they go live."
+    >
       <div className="hidden md:block overflow-x-auto">
         <Table>
           <TableHeader>
@@ -598,7 +375,12 @@ function FlaggedSection({ region }: { region: RegionValue }) {
                 <TableCell className="text-right tabular-nums">{p.daysFlagged}</TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-1.5">
-                    <Button variant="ghost" size="sm" className="text-brand" onClick={() => notify(p)}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-brand"
+                      onClick={() => notify(p)}
+                    >
                       Notify
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => openFix(p)}>

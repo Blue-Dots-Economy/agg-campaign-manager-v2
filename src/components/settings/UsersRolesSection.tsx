@@ -120,14 +120,19 @@ export function UsersRolesSection() {
       else await createFn({ data });
     },
     onSuccess: () => {
-      toast.success(editingEmail ? "User updated" : "User added. They can sign in with Keycloak now.");
+      toast.success(
+        editingEmail ? "User updated" : "User added. They can sign in with Keycloak now.",
+      );
       setOpen(false);
       refresh();
     },
     onError: (e) => toast.error(errorText(e, "Failed to save user")),
   });
 
-  const useUserAction = (run: (email: string) => Promise<unknown>, done: string | ((email: string) => string)) =>
+  const useUserAction = (
+    run: (email: string) => Promise<unknown>,
+    done: string | ((email: string) => string),
+  ) =>
     useMutation({
       mutationFn: run,
       onSuccess: (_d, email) => {
@@ -208,7 +213,9 @@ export function UsersRolesSection() {
                   <TableRow key={u.email}>
                     <TableCell className="font-mono text-xs">{u.email}</TableCell>
                     <TableCell className="text-sm">{u.name || "—"}</TableCell>
-                    <TableCell className="text-xs">{u.state === "rejected" ? "Rejected" : "Signed in, waiting for approval"}</TableCell>
+                    <TableCell className="text-xs">
+                      {u.state === "rejected" ? "Rejected" : "Signed in, waiting for approval"}
+                    </TableCell>
                     <TableCell className="text-right whitespace-nowrap">
                       <Button
                         variant="ghost"
@@ -221,7 +228,12 @@ export function UsersRolesSection() {
                         Approve
                       </Button>
                       {u.state === "pending" && (
-                        <Button variant="ghost" size="sm" disabled={reject.isPending} onClick={() => reject.mutate(u.email)}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={reject.isPending}
+                          onClick={() => reject.mutate(u.email)}
+                        >
                           Reject
                         </Button>
                       )}
@@ -290,12 +302,22 @@ export function UsersRolesSection() {
                   </Button>
                   {u.keycloak_linked ? (
                     u.email !== session?.email && (
-                      <Button variant="ghost" size="sm" disabled={unlink.isPending} onClick={() => unlink.mutate(u.email)}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={unlink.isPending}
+                        onClick={() => unlink.mutate(u.email)}
+                      >
                         Unlink Keycloak
                       </Button>
                     )
                   ) : (
-                    <Button variant="ghost" size="sm" disabled={setUp.isPending} onClick={() => setUp.mutate(u.email)}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={setUp.isPending}
+                      onClick={() => setUp.mutate(u.email)}
+                    >
                       Set up login
                     </Button>
                   )}
@@ -303,7 +325,9 @@ export function UsersRolesSection() {
                     variant="ghost"
                     size="sm"
                     disabled={toggleActive.isPending}
-                    onClick={() => toggleActive.mutate({ email: u.email, active: u.state !== "active" })}
+                    onClick={() =>
+                      toggleActive.mutate({ email: u.email, active: u.state !== "active" })
+                    }
                   >
                     {u.state === "active" ? "Deactivate" : "Reactivate"}
                   </Button>
@@ -321,7 +345,9 @@ export function UsersRolesSection() {
           </DialogHeader>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="sm:col-span-2">
-              <Label htmlFor="u-email" className="text-xs">Email</Label>
+              <Label htmlFor="u-email" className="text-xs">
+                Email
+              </Label>
               <Input
                 id="u-email"
                 value={form.email}
@@ -332,7 +358,9 @@ export function UsersRolesSection() {
               />
             </div>
             <div>
-              <Label htmlFor="u-name" className="text-xs">Name</Label>
+              <Label htmlFor="u-name" className="text-xs">
+                Name
+              </Label>
               <Input
                 id="u-name"
                 value={form.name}
@@ -343,18 +371,27 @@ export function UsersRolesSection() {
             <div>
               <Label className="text-xs">Role</Label>
               <Select value={form.role} onValueChange={(v) => setForm({ ...form, role: v })}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   {ROLE_OPTIONS.map((r) => (
-                    <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                    <SelectItem key={r.value} value={r.value}>
+                      {r.label}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label className="text-xs">District</Label>
-              <Select value={form.district} onValueChange={(v) => setForm({ ...form, district: v })}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+              <Select
+                value={form.district}
+                onValueChange={(v) => setForm({ ...form, district: v })}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NONE}>None</SelectItem>
                   <SelectItem value="KA">KA</SelectItem>
@@ -365,19 +402,28 @@ export function UsersRolesSection() {
             <div>
               <Label className="text-xs">Program</Label>
               <Select value={form.program} onValueChange={(v) => setForm({ ...form, program: v })}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NONE}>None</SelectItem>
                   {Object.values(registry).map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.label}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label className="text-xs">Node type</Label>
-              <Select value={form.node_type} onValueChange={(v) => setForm({ ...form, node_type: v })}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+              <Select
+                value={form.node_type}
+                onValueChange={(v) => setForm({ ...form, node_type: v })}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NONE}>None</SelectItem>
                   <SelectItem value="College">College</SelectItem>
@@ -386,7 +432,9 @@ export function UsersRolesSection() {
               </Select>
             </div>
             <div>
-              <Label htmlFor="u-node" className="text-xs">Node name</Label>
+              <Label htmlFor="u-node" className="text-xs">
+                Node name
+              </Label>
               <Input
                 id="u-node"
                 value={form.node_name}
@@ -396,13 +444,15 @@ export function UsersRolesSection() {
             </div>
             {!editingEmail && (
               <p className="sm:col-span-2 text-xs text-muted-foreground">
-                They sign in with Keycloak using this email and a one-time code. If they have no Keycloak account, one is
-                created with this email.
+                They sign in with Keycloak using this email and a one-time code. If they have no
+                Keycloak account, one is created with this email.
               </p>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
             <Button
               className="bg-brand text-brand-foreground hover:bg-brand/90"
               disabled={save.isPending || !form.email.trim()}
@@ -419,23 +469,32 @@ export function UsersRolesSection() {
           <DialogHeader>
             <DialogTitle>Approve access</DialogTitle>
             <DialogDescription>
-              Choose a role for <span className="font-mono text-foreground">{approving?.email}</span>. They can sign in
-              as soon as you approve.
+              Choose a role for{" "}
+              <span className="font-mono text-foreground">{approving?.email}</span>. They can sign
+              in as soon as you approve.
             </DialogDescription>
           </DialogHeader>
           <Select value={approveRole} onValueChange={(v) => isRole(v) && setApproveRole(v)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               {ROLE_OPTIONS.map((r) => (
-                <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                <SelectItem key={r.value} value={r.value}>
+                  {r.label}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setApproving(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setApproving(null)}>
+              Cancel
+            </Button>
             <Button
               disabled={approve.isPending}
-              onClick={() => approving && approve.mutate({ email: approving.email, role: approveRole })}
+              onClick={() =>
+                approving && approve.mutate({ email: approving.email, role: approveRole })
+              }
             >
               {approve.isPending ? "Approving…" : "Approve"}
             </Button>

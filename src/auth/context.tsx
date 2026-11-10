@@ -1,13 +1,13 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { createContext, useContext, type ReactNode } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { logout as logoutFn, me as meFn, type MeResult } from "@/lib/auth.functions";
 import type { Role } from "@/auth/roles";
+import { SESSION_QUERY_KEY, isNotSessionQuery, loadSessionOrNull } from "@/auth/session-query";
 
 export type { Role };
 
-// Session is the httpOnly cm_session cookie, set by the Keycloak callback; the
-// user comes from me().
+// Session is the httpOnly cm_session cookie, set by the Keycloak callback; the user comes from me().
 export type Session = MeResult;
 
 type AuthContextValue = {
@@ -21,41 +21,52 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+/** Provides the signed-in session, read once through React Query and updated on sign-in and sign-out. */
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
-  const [hydrated, setHydrated] = useState(false);
   const queryClient = useQueryClient();
   const callMe = useServerFn(meFn);
   const callLogout = useServerFn(logoutFn);
 
-  const refresh = useCallback(async () => {
-    let s: Session | null = null;
-    try {
-      s = await callMe();
-    } catch {
-      /* server unreachable: treated as signed out */
-    }
-    setSession(s);
-    return s;
-  }, [callMe]);
+  const sessionQuery = useQuery({
+    queryKey: SESSION_QUERY_KEY,
+    queryFn: () => loadSessionOrNull(() => callMe()),
+    staleTime: Infinity,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+  const session = sessionQuery.data ?? null;
+  const hydrated = !sessionQuery.isPending;
 
-  useEffect(() => {
-    void refresh().finally(() => setHydrated(true));
-  }, [refresh]);
+  const refresh = async () => {
+    const s = await loadSessionOrNull(() => callMe());
+    queryClient.setQueryData(SESSION_QUERY_KEY, s);
+    return s;
+  };
+
+  // Drops every cached query except the session, so no data from the previous user stays on screen.
+  const clearUserData = () => queryClient.removeQueries({ predicate: isNotSessionQuery });
 
   const logout = async () => {
     try {
       await callLogout();
     } catch {
-      /* already signed out */
+      // Already signed out.
     }
-    setSession(null);
-    queryClient.clear();
+    queryClient.setQueryData(SESSION_QUERY_KEY, null);
+    clearUserData();
   };
 
   return (
     <AuthContext.Provider
-      value={{ session, isAuthenticated: !!session, isAdmin: session?.role === "admin", hydrated, logout, refresh }}
+      value={{
+        session,
+        isAuthenticated: !!session,
+        isAdmin: session?.role === "admin",
+        hydrated,
+        logout,
+        refresh,
+      }}
     >
       {children}
     </AuthContext.Provider>

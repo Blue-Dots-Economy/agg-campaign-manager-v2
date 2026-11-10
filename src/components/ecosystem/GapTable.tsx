@@ -9,14 +9,31 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { JobPost } from "./mockData";
-import { GAP_LEVEL_CLASSES, ROLE_CATEGORIES, fmtInt, gapLevel, roleCategory, type GapLevel } from "./ecosystemHelpers";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import type { JobPost } from "./types";
+import {
+  GAP_LEVEL_CLASSES,
+  ROLE_CATEGORIES,
+  fmtInt,
+  gapLevel,
+  roleCategory,
+  type GapLevel,
+} from "./ecosystemHelpers";
 import { GapDrilldownDialog } from "./GapDrilldownDialog";
 import { BalanceStrip, type BalanceRow, type BalanceGroup } from "./BalanceStrip";
+import { isOneOf } from "@/lib/guards";
 
-type Mode = "role" | "location";
-type View = "balance" | "table";
+const MODES = ["role", "location"] as const;
+type Mode = (typeof MODES)[number];
+const VIEWS = ["balance", "table"] as const;
+type View = (typeof VIEWS)[number];
 
 const GAP_LEVELS: GapLevel[] = ["Supply gap", "Borderline", "Balanced", "Good supply", "Excellent"];
 
@@ -33,8 +50,9 @@ export function GapTable({ jobs }: { jobs: JobPost[] }) {
     const groups = new Map<string, JobPost[]>();
     for (const j of openJobs) {
       const k = mode === "role" ? j.title : j.area;
-      if (!groups.has(k)) groups.set(k, []);
-      groups.get(k)!.push(j);
+      const group = groups.get(k);
+      if (group) group.push(j);
+      else groups.set(k, [j]);
     }
     const out: BalanceRow[] = [];
     for (const [k, arr] of groups) {
@@ -69,8 +87,9 @@ export function GapTable({ jobs }: { jobs: JobPost[] }) {
     const byCat = new Map<string, BalanceRow[]>();
     for (const r of filtered) {
       const cat = roleCategory(r.key);
-      if (!byCat.has(cat)) byCat.set(cat, []);
-      byCat.get(cat)!.push(r);
+      const catRows = byCat.get(cat);
+      if (catRows) catRows.push(r);
+      else byCat.set(cat, [r]);
     }
     const out: BalanceGroup[] = [];
     for (const cat of ROLE_CATEGORIES) {
@@ -85,7 +104,16 @@ export function GapTable({ jobs }: { jobs: JobPost[] }) {
       out.push({
         key: cat,
         rows: rs,
-        rollup: { key: cat, openings, applications, gap, partial, right, level: gapLevel(gap), jobs: rs.flatMap((r) => r.jobs) },
+        rollup: {
+          key: cat,
+          openings,
+          applications,
+          gap,
+          partial,
+          right,
+          level: gapLevel(gap),
+          jobs: rs.flatMap((r) => r.jobs),
+        },
       });
     }
     return out;
@@ -102,10 +130,25 @@ export function GapTable({ jobs }: { jobs: JobPost[] }) {
       description="Where role/area demand outpaces available supply."
       action={
         <div className="flex items-center gap-3">
-          <Tabs value={view} onValueChange={(v) => setView(v as View)}>
+          <Tabs
+            value={view}
+            onValueChange={(v) => {
+              if (isOneOf(VIEWS, v)) setView(v);
+            }}
+          >
             <TabsList>
-              <TabsTrigger value="balance" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Balance</TabsTrigger>
-              <TabsTrigger value="table" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Table</TabsTrigger>
+              <TabsTrigger
+                value="balance"
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              >
+                Balance
+              </TabsTrigger>
+              <TabsTrigger
+                value="table"
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              >
+                Table
+              </TabsTrigger>
             </TabsList>
           </Tabs>
           <div className="text-xs text-muted-foreground tabular-nums">
@@ -115,10 +158,27 @@ export function GapTable({ jobs }: { jobs: JobPost[] }) {
       }
     >
       <div className="flex flex-wrap items-center gap-3 mb-4">
-        <Tabs value={mode} onValueChange={(v) => { setMode(v as Mode); setKeyFilter("all"); }}>
+        <Tabs
+          value={mode}
+          onValueChange={(v) => {
+            if (!isOneOf(MODES, v)) return;
+            setMode(v);
+            setKeyFilter("all");
+          }}
+        >
           <TabsList>
-            <TabsTrigger value="role" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">By Role</TabsTrigger>
-            <TabsTrigger value="location" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">By Location</TabsTrigger>
+            <TabsTrigger
+              value="role"
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            >
+              By Role
+            </TabsTrigger>
+            <TabsTrigger
+              value="location"
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            >
+              By Location
+            </TabsTrigger>
           </TabsList>
         </Tabs>
         <Select value={keyFilter} onValueChange={setKeyFilter}>
@@ -128,7 +188,9 @@ export function GapTable({ jobs }: { jobs: JobPost[] }) {
           <SelectContent>
             <SelectItem value="all">{mode === "role" ? "All roles" : "All areas"}</SelectItem>
             {keyOptions.map((k) => (
-              <SelectItem key={k} value={k}>{k}</SelectItem>
+              <SelectItem key={k} value={k}>
+                {k}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -139,7 +201,9 @@ export function GapTable({ jobs }: { jobs: JobPost[] }) {
           <SelectContent>
             <SelectItem value="all">All gap levels</SelectItem>
             {GAP_LEVELS.map((l) => (
-              <SelectItem key={l} value={l}>{l}</SelectItem>
+              <SelectItem key={l} value={l}>
+                {l}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -170,7 +234,9 @@ export function GapTable({ jobs }: { jobs: JobPost[] }) {
                 >
                   <TableCell className="font-medium">{r.key}</TableCell>
                   <TableCell className="text-right tabular-nums">{fmtInt(r.openings)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{fmtInt(r.applications)}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {fmtInt(r.applications)}
+                  </TableCell>
                   <TableCell className="text-right tabular-nums">{r.gap}</TableCell>
                   <TableCell>
                     <Badge variant="outline" className={GAP_LEVEL_CLASSES[r.level]}>
@@ -204,4 +270,3 @@ export function GapTable({ jobs }: { jobs: JobPost[] }) {
     </Panel>
   );
 }
-

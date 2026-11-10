@@ -1,15 +1,15 @@
 import * as React from "react";
 import {
-  IconPhone,
-  IconPhoneOff,
-  IconPhoneCall,
-  IconClock,
-  IconFileCheck,
-  IconUserOff,
-  IconAlertTriangle,
-  IconSparkles,
-  IconBriefcase,
-} from "@tabler/icons-react";
+  Briefcase,
+  Clock,
+  FileCheck,
+  Phone,
+  PhoneCall,
+  PhoneOff,
+  Sparkles,
+  TriangleAlert,
+  UserX,
+} from "lucide-react";
 
 export type Accent = "green" | "amber" | "red" | "blue";
 
@@ -36,15 +36,15 @@ const fmtNum = (n: number) => Math.round(n).toLocaleString();
 const fmtPct = (n: number) => `${n.toFixed(1)}%`;
 
 const ICONS = {
-  IconPhone,
-  IconPhoneOff,
-  IconPhoneCall,
-  IconClock,
-  IconFileCheck,
-  IconUserOff,
-  IconAlertTriangle,
-  IconSparkles,
-  IconBriefcase,
+  IconPhone: Phone,
+  IconPhoneOff: PhoneOff,
+  IconPhoneCall: PhoneCall,
+  IconClock: Clock,
+  IconFileCheck: FileCheck,
+  IconUserOff: UserX,
+  IconAlertTriangle: TriangleAlert,
+  IconSparkles: Sparkles,
+  IconBriefcase: Briefcase,
 } as const;
 export type IconName = keyof typeof ICONS;
 
@@ -67,8 +67,10 @@ export function StatTile({
     <div className="relative overflow-hidden rounded-xl border bg-card p-5">
       <div className={`absolute inset-y-0 left-0 w-1 ${ACCENT_BAR[accent]}`} aria-hidden />
       <div className="flex items-center gap-3">
-        <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${ACCENT_SOFT[accent]}`}>
-          <Icon className={`h-4 w-4 ${ACCENT_TEXT[accent]}`} stroke={2} />
+        <div
+          className={`flex h-9 w-9 items-center justify-center rounded-lg ${ACCENT_SOFT[accent]}`}
+        >
+          <Icon className={`h-4 w-4 ${ACCENT_TEXT[accent]}`} />
         </div>
         <p className="text-xs font-medium text-muted-foreground">{label}</p>
       </div>
@@ -110,7 +112,13 @@ export function RateDial({
     <div className="flex items-center gap-5 rounded-xl border bg-card p-5">
       <div className="relative shrink-0" style={{ width: size, height: size }}>
         <svg width={size} height={size} className="-rotate-90">
-          <circle cx={size / 2} cy={size / 2} r={radius} className="fill-none stroke-muted" strokeWidth={stroke} />
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            className="fill-none stroke-muted"
+            strokeWidth={stroke}
+          />
           <circle
             cx={size / 2}
             cy={size / 2}
@@ -124,7 +132,9 @@ export function RateDial({
           />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className={`text-2xl font-semibold tracking-tight ${ACCENT_TEXT[accent]}`}>{fmtPct(pct)}</span>
+          <span className={`text-2xl font-semibold tracking-tight ${ACCENT_TEXT[accent]}`}>
+            {fmtPct(pct)}
+          </span>
         </div>
       </div>
       <div className="min-w-0">
@@ -162,12 +172,12 @@ export function SegmentedBar({
       </div>
       <p className="mt-1 text-3xl font-semibold tracking-tight text-foreground">{fmtNum(total)}</p>
       <div className="mt-4 flex h-3 w-full overflow-hidden rounded-full bg-muted">
-        {segments.map((s, i) => {
+        {segments.map((s) => {
           const w = (s.value / safeTotal) * 100;
           if (w <= 0) return null;
           return (
             <div
-              key={i}
+              key={s.label}
               className={ACCENT_BAR[s.color]}
               style={{ width: `${w}%` }}
               title={`${s.label}: ${fmtNum(s.value)} (${fmtPct(w)})`}
@@ -176,10 +186,10 @@ export function SegmentedBar({
         })}
       </div>
       <ul className="mt-4 space-y-2">
-        {segments.map((s, i) => {
+        {segments.map((s) => {
           const pct = (s.value / safeTotal) * 100;
           return (
-            <li key={i} className="flex items-center justify-between text-xs">
+            <li key={s.label} className="flex items-center justify-between text-xs">
               <span className="flex items-center gap-2 text-muted-foreground">
                 <span className={`h-2 w-2 rounded-full ${ACCENT_BAR[s.color]}`} />
                 {s.label}
@@ -239,14 +249,18 @@ export function SplitBar({
                 <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
                 Answered
               </span>
-              <span className="font-medium tabular-nums text-emerald-600 dark:text-emerald-400">{fmtNum(answered)}</span>
+              <span className="font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
+                {fmtNum(answered)}
+              </span>
             </div>
             <div className="flex items-center justify-between rounded-md bg-rose-500/10 px-3 py-2 text-xs">
               <span className="flex items-center gap-2 text-muted-foreground">
                 <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />
                 Unanswered
               </span>
-              <span className="font-medium tabular-nums text-rose-600 dark:text-rose-400">{fmtNum(unanswered)}</span>
+              <span className="font-medium tabular-nums text-rose-600 dark:text-rose-400">
+                {fmtNum(unanswered)}
+              </span>
             </div>
           </div>
         </div>
@@ -302,13 +316,7 @@ export interface FunnelStage {
   color: Accent;
 }
 
-export function ConversionFunnel({
-  title,
-  stages,
-}: {
-  title?: string;
-  stages: FunnelStage[];
-}) {
+export function ConversionFunnel({ title, stages }: { title?: string; stages: FunnelStage[] }) {
   const max = Math.max(...stages.map((s) => s.value), 1);
   return (
     <div className="rounded-xl border bg-card p-5">
@@ -337,7 +345,9 @@ export function ConversionFunnel({
                     {fmtNum(s.value)}
                   </span>
                 </div>
-                <div className={`absolute left-0 top-0 h-full w-1 rounded-l-lg ${ACCENT_BAR[s.color]}`} />
+                <div
+                  className={`absolute left-0 top-0 h-full w-1 rounded-l-lg ${ACCENT_BAR[s.color]}`}
+                />
               </div>
             </React.Fragment>
           );

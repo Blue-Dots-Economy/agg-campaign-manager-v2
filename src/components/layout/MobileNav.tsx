@@ -14,13 +14,7 @@ import {
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { useProgram } from "@/programs/context";
 import { useAuth } from "@/auth/context";
@@ -35,11 +29,23 @@ type NavItem = {
   children?: Omit<NavItem, "sub" | "children">[];
 };
 
+const USER_LEVEL_ITEM: NavItem = {
+  to: "/user-level-analysis",
+  label: "My Purple Dots",
+  icon: Users,
+};
+const ECOSYSTEM_ITEM: NavItem = {
+  to: "/ecosystem-view",
+  label: "Ecosystem View",
+  icon: Briefcase,
+  sub: "Coming soon",
+};
+
 const GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: "",
     items: [
-      { to: "/user-level-analysis", label: "My Purple Dots", icon: Users },
+      USER_LEVEL_ITEM,
       {
         to: "/",
         label: "Campaign Overview",
@@ -50,7 +56,19 @@ const GROUPS: { title: string; items: NavItem[] }[] = [
         ],
       },
       { to: "/launch", label: "Launch a campaign", icon: Rocket },
-      { to: "/ecosystem-view", label: "Ecosystem View", icon: Briefcase, sub: "Coming soon" },
+      ECOSYSTEM_ITEM,
+    ],
+  },
+];
+
+/** Menu for the ecosystem role: the ecosystem view first, without campaign sub-pages. */
+const ECOSYSTEM_GROUPS: { title: string; items: NavItem[] }[] = [
+  {
+    title: "",
+    items: [
+      ECOSYSTEM_ITEM,
+      USER_LEVEL_ITEM,
+      { to: "/", label: "Campaign Overview", icon: LayoutDashboard },
     ],
   },
 ];
@@ -70,10 +88,11 @@ function NavLink({
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
-  const hasChildren = (item.children?.length ?? 0) > 0;
+  const children = item.children ?? [];
+  const hasChildren = children.length > 0;
   const groupActive =
     hasChildren &&
-    item.children!.some((c) => (c.to === "/" ? pathname === "/" : pathname.startsWith(c.to)));
+    children.some((c) => (c.to === "/" ? pathname === "/" : pathname.startsWith(c.to)));
 
   return (
     <div>
@@ -82,7 +101,7 @@ function NavLink({
           "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
           active || groupActive
             ? "bg-accent text-accent-foreground"
-            : "text-foreground/85 hover:bg-accent/70"
+            : "text-foreground/85 hover:bg-accent/70",
         )}
       >
         <Link
@@ -94,9 +113,7 @@ function NavLink({
           <item.icon className="h-4 w-4 shrink-0" />
           <div className="flex flex-col">
             <span>{item.label}</span>
-            {item.sub && (
-              <span className="text-[11px] leading-tight opacity-70">{item.sub}</span>
-            )}
+            {item.sub && <span className="text-[11px] leading-tight opacity-70">{item.sub}</span>}
           </div>
         </Link>
         {hasChildren && (
@@ -106,19 +123,14 @@ function NavLink({
             aria-label={collapsed ? "Expand section" : "Collapse section"}
             className="p-1 rounded-md hover:bg-accent/70 text-accent-foreground/70"
           >
-            {collapsed ? (
-              <ChevronRight className="h-4 w-4" />
-            ) : (
-              <ChevronDown className="h-4 w-4" />
-            )}
+            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </button>
         )}
       </div>
       {hasChildren && !collapsed && (
         <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border pl-3">
-          {item.children!.map((child) => {
-            const childActive =
-              child.to === "/" ? pathname === "/" : pathname.startsWith(child.to);
+          {children.map((child) => {
+            const childActive = child.to === "/" ? pathname === "/" : pathname.startsWith(child.to);
             const ChildIcon = child.icon;
             return (
               <Link
@@ -130,7 +142,7 @@ function NavLink({
                   "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
                   childActive
                     ? "bg-accent text-accent-foreground"
-                    : "text-foreground/85 hover:bg-accent/70"
+                    : "text-foreground/85 hover:bg-accent/70",
                 )}
               >
                 <ChildIcon className="h-4 w-4 shrink-0" />
@@ -151,25 +163,14 @@ export function MobileNav() {
   const navigate = useNavigate();
   const { logout, session } = useAuth();
   const isEcosystem = session?.role === "ecosystem";
-  const groups = isEcosystem
-    ? [{
-        title: "",
-        items: [
-          GROUPS[0].items[3],
-          GROUPS[0].items[0],
-          { to: "/", label: "Campaign Overview", icon: LayoutDashboard },
-        ] as NavItem[],
-      }]
-    : GROUPS;
+  const groups = isEcosystem ? ECOSYSTEM_GROUPS : GROUPS;
 
   const [expanded, setExpanded] = useState<Set<string>>(() => {
     const initial = new Set<string>();
     for (const group of GROUPS) {
       for (const item of group.items) {
         if (
-          item.children?.some((c) =>
-            c.to === "/" ? pathname === "/" : pathname.startsWith(c.to)
-          )
+          item.children?.some((c) => (c.to === "/" ? pathname === "/" : pathname.startsWith(c.to)))
         ) {
           initial.add(item.to);
         }
@@ -177,6 +178,11 @@ export function MobileNav() {
     }
     return initial;
   });
+
+  const signOut = async () => {
+    await logout();
+    await navigate({ to: "/login" });
+  };
 
   const toggle = (to: string) => {
     setExpanded((prev) => {
@@ -215,7 +221,7 @@ export function MobileNav() {
                   "flex-1 text-xs font-medium py-1.5 rounded-md uppercase tracking-wide transition-colors",
                   programId === id
                     ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 {registry[id].label}
@@ -260,7 +266,7 @@ export function MobileNav() {
                     "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
                     active
                       ? "bg-accent text-accent-foreground"
-                      : "text-foreground/85 hover:bg-accent/70"
+                      : "text-foreground/85 hover:bg-accent/70",
                   )}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
@@ -275,7 +281,7 @@ export function MobileNav() {
           <button
             onClick={() => {
               setOpen(false);
-              void logout().then(() => navigate({ to: "/login" }));
+              void signOut();
             }}
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
