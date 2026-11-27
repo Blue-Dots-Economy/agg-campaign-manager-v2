@@ -9,7 +9,7 @@ const KEY = "rozgar.concurrencyCap";
 export function getConcurrencyCap(): number {
   if (typeof window === "undefined") return CONCURRENCY_CAP_DEFAULT;
   const raw = localStorage.getItem(KEY);
-  const n = raw ? Number(raw) : NaN;
+  const n = raw ? Number(raw) : Number.NaN;
   return Number.isFinite(n) && n > 0 ? n : CONCURRENCY_CAP_DEFAULT;
 }
 

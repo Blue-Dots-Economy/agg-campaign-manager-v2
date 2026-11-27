@@ -195,6 +195,8 @@ export function FunnelSankey({
   return (
     <div ref={containerRef} className="w-full">
       <svg
+        role="img"
+        aria-label="Call drop-off funnel"
         viewBox={`0 0 ${width} ${height}`}
         width="100%"
         height={height}

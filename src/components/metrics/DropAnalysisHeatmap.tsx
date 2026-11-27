@@ -97,6 +97,7 @@ export function DropAnalysisHeatmap({ data }: { data?: KkbDropAnalysisPayload })
               >
                 <div className="flex items-center gap-2 px-2 py-2 text-sm font-medium text-foreground">
                   <svg
+                    aria-hidden="true"
                     width="10"
                     height="10"
                     viewBox="0 0 10 10"
