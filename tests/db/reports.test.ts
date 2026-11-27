@@ -2,6 +2,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import pg from "pg";
 import { runMigrations } from "../../src/server/db/migrate";
+import type * as ReportsModule from "../../src/server/db/reports.server";
 
 const URL = process.env.TEST_DATABASE_URL;
 
@@ -16,7 +17,7 @@ const CALLS = [
 ];
 
 describe.skipIf(!URL)("reports", () => {
-  let reports: typeof import("../../src/server/db/reports.server");
+  let reports: typeof ReportsModule;
   let owner: pg.Client;
 
   beforeAll(async () => {
@@ -67,20 +68,31 @@ describe.skipIf(!URL)("reports", () => {
 
   test("the channel filter matches the lower-cased channel", async () => {
     const count = async (channel: string) =>
-      ((await reports.programAggregates({ ...seekers, channel })) as { kpis: { total_rows: number } }).kpis.total_rows;
+      (
+        (await reports.programAggregates({ ...seekers, channel })) as {
+          kpis: { total_rows: number };
+        }
+      ).kpis.total_rows;
     expect(await count("outbound")).toBe(2);
     expect(await count("inbound")).toBe(1);
     expect(await count("all")).toBe(3);
   });
 
   test("filter options list the campaign and lower-case channels", async () => {
-    const o = (await reports.programFilterOptions({ program: "seekers" })) as { campaignTypes: string[]; channels: string[] };
+    const o = (await reports.programFilterOptions({ program: "seekers" })) as {
+      campaignTypes: string[];
+      channels: string[];
+    };
     expect(o.campaignTypes).toContain("Reports Test");
     expect(o.channels.sort()).toEqual(["inbound", "outbound"]);
   });
 
   test("a date filter outside the data returns nothing", async () => {
-    const p = (await reports.programAggregates({ ...seekers, dateFrom: "2025-01-01", dateTo: "2025-01-02" })) as {
+    const p = (await reports.programAggregates({
+      ...seekers,
+      dateFrom: "2025-01-01",
+      dateTo: "2025-01-02",
+    })) as {
       kpis: { total_rows: number };
     };
     expect(p.kpis.total_rows).toBe(0);

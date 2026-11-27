@@ -6,8 +6,9 @@ import {
   useCampaignList,
   type OverviewFilters,
 } from "@/programs/useProgramAggregates";
-import type { KkbMetrics } from "@/components/metrics/program-overviews";
+import type { KkbMetrics } from "@/components/metrics/overview-metrics";
 import { humanizeCampaignType } from "@/lib/campaign-name";
+import { numericMetrics } from "@/components/metrics/metric-values";
 
 interface Props {
   campaign: string;
@@ -17,8 +18,13 @@ interface Props {
   filters?: Pick<OverviewFilters, "dateFrom" | "dateTo" | "channel">;
 }
 
+/** KkbMetrics fields as numbers; any of them can be missing from a snapshot. */
+type KkbMetricsValues = Partial<KkbMetrics>;
 
-function score(m: Partial<KkbMetrics> | undefined | null): number | null {
+/** Application attempts a campaign needs before its applications count as significant. */
+const MIN_SIGNIFICANT_APPLICATIONS = 10;
+
+function score(m: KkbMetricsValues | undefined | null): number | null {
   if (!m) return null;
   const answered = m.answeredCalls ?? 0;
   const total = m.totalCalls ?? 0;
@@ -34,20 +40,14 @@ function score(m: Partial<KkbMetrics> | undefined | null): number | null {
   );
 }
 
-function attemptRate(m: Partial<KkbMetrics> | undefined | null): number | null {
+function attemptRate(m: KkbMetricsValues | undefined | null): number | null {
   if (!m) return null;
   const answered = m.answeredCalls ?? 0;
   if (answered <= 0) return null;
   return (m.applicationsTotal ?? 0) / answered;
 }
 
-export function CampaignSuccess({
-  campaign,
-  language,
-  region,
-  campaignDate,
-  filters,
-}: Props) {
+export function CampaignSuccess({ campaign, language, region, campaignDate, filters }: Props) {
   const { config } = useProgram();
   const dateFrom = filters?.dateFrom ?? null;
   const dateTo = filters?.dateTo ?? null;
@@ -91,10 +91,9 @@ export function CampaignSuccess({
     channel,
   });
 
-
-  const thisM = thisAgg.data?.metrics as Partial<KkbMetrics> | undefined;
-  const regionM = regionAgg.data?.metrics as Partial<KkbMetrics> | undefined;
-  const prevM = prevEntry ? (prevAgg.data?.metrics as Partial<KkbMetrics> | undefined) : undefined;
+  const thisM = thisAgg.data ? numericMetrics(thisAgg.data.metrics) : undefined;
+  const regionM = regionAgg.data ? numericMetrics(regionAgg.data.metrics) : undefined;
+  const prevM = prevEntry && prevAgg.data ? numericMetrics(prevAgg.data.metrics) : undefined;
 
   if (!region) return null;
   if (!thisM || !thisM.totalCalls) return null;
@@ -113,17 +112,14 @@ export function CampaignSuccess({
   const c1Pass = c1Applicable && (thisScore ?? 0) > (prevScore ?? 0);
   const c2Applicable = regionScore != null && thisScore != null;
   const c2Pass = c2Applicable && (thisScore ?? 0) > (regionScore ?? 0);
-  const c3Pass = thisAttempt >= regionAttempt && applicationsTotal >= 10;
+  const c3Pass = thisAttempt >= regionAttempt && applicationsTotal >= MIN_SIGNIFICANT_APPLICATIONS;
 
   const passCount = (c1Pass ? 1 : 0) + (c2Pass ? 1 : 0) + (c3Pass ? 1 : 0);
   const applicableCount = (c1Applicable ? 1 : 0) + (c2Applicable ? 1 : 0) + 1;
 
-  const yes =
-    c3Pass && (c1Applicable ? c1Pass || c2Pass : c2Pass);
+  const yes = c3Pass && (c1Applicable ? c1Pass || c2Pass : c2Pass);
 
-  const tone = yes
-    ? "border-emerald-500/40 bg-emerald-500/5"
-    : "border-rose-500/40 bg-rose-500/5";
+  const tone = yes ? "border-emerald-500/40 bg-emerald-500/5" : "border-rose-500/40 bg-rose-500/5";
   const verdictColor = yes
     ? "text-emerald-700 dark:text-emerald-300"
     : "text-rose-700 dark:text-rose-300";
@@ -131,11 +127,9 @@ export function CampaignSuccess({
   const c1Detail = !c1Applicable
     ? "No earlier campaign to compare"
     : c1Pass
-      ? `Beat the previous campaign (${humanizeCampaignType(prevEntry!.campaignType)})`
-      : `Below the previous campaign (${humanizeCampaignType(prevEntry!.campaignType)})`;
-  const c2Detail = c2Pass
-    ? `Above the ${region} average`
-    : `Below the ${region} average`;
+      ? `Beat the previous campaign (${humanizeCampaignType(prevEntry?.campaignType)})`
+      : `Below the previous campaign (${humanizeCampaignType(prevEntry?.campaignType)})`;
+  const c2Detail = c2Pass ? `Above the ${region} average` : `Below the ${region} average`;
   const c3Detail = c3Pass
     ? `Significant applications (${applicationsTotal.toLocaleString()} attempts · ${submitted.toLocaleString()} submitted + ${blocked.toLocaleString()} blocked)`
     : `Few applications (${applicationsTotal.toLocaleString()} attempts · ${submitted.toLocaleString()} submitted + ${blocked.toLocaleString()} blocked)`;
@@ -146,9 +140,7 @@ export function CampaignSuccess({
         Is this campaign successful?
       </div>
       <div className="mt-1 flex items-baseline gap-2">
-        <span className={`text-3xl font-semibold ${verdictColor}`}>
-          {yes ? "Yes" : "No"}
-        </span>
+        <span className={`text-3xl font-semibold ${verdictColor}`}>{yes ? "Yes" : "No"}</span>
         <span className="text-sm text-muted-foreground">
           · {passCount} of {applicableCount} met
         </span>
@@ -162,13 +154,7 @@ export function CampaignSuccess({
   );
 }
 
-function CriterionRow({
-  status,
-  text,
-}: {
-  status: "pass" | "fail" | "na";
-  text: string;
-}) {
+function CriterionRow({ status, text }: { status: "pass" | "fail" | "na"; text: string }) {
   const Icon = status === "pass" ? Check : status === "fail" ? X : Minus;
   const color =
     status === "pass"

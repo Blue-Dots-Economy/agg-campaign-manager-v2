@@ -1,5 +1,9 @@
 export const REVIEW_THRESHOLD = 1;
-export type JobReviewStatus = { unique_reviewers: number; is_reviewed: boolean; you_reviewed: boolean };
+export type JobReviewStatus = {
+  unique_reviewers: number;
+  is_reviewed: boolean;
+  you_reviewed: boolean;
+};
 export type ReviewCall = Record<string, string>;
 
 export function getReviewKey(input: { call_id?: string | number | null; job_id?: string | null }) {
@@ -17,13 +21,18 @@ export function buildStatusMap(
     const key = getReviewKey({ call_id: row.call_id, job_id: row.job_id });
     if (!key) continue;
     const email = String(row.reviewer_email || "").toLowerCase();
-    if (!map.has(key)) map.set(key, new Set());
-    map.get(key)!.add(email);
+    const emails = map.get(key);
+    if (emails) emails.add(email);
+    else map.set(key, new Set([email]));
   }
   const me = (myEmail || "").toLowerCase();
   const out = new Map<string, JobReviewStatus>();
   map.forEach((set, key) =>
-    out.set(key, { unique_reviewers: set.size, is_reviewed: set.size >= REVIEW_THRESHOLD, you_reviewed: !!me && set.has(me) }),
+    out.set(key, {
+      unique_reviewers: set.size,
+      is_reviewed: set.size >= REVIEW_THRESHOLD,
+      you_reviewed: !!me && set.has(me),
+    }),
   );
   return out;
 }

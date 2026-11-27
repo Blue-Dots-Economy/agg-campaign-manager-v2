@@ -1,7 +1,20 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { JobPost } from "./mockData";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import type { JobPost } from "./types";
 import {
   GAP_LEVEL_CLASSES,
   fmtInt,
@@ -36,7 +49,8 @@ export function GapDrilldownDialog({
             {jobs.length} open job {jobs.length === 1 ? "post" : "posts"} in this group.
             {(partial !== undefined || right !== undefined) && (
               <span className="ml-2 text-xs">
-                · Partial Fit pool: <span className="font-medium text-foreground">{partial ?? 0}</span>
+                · Partial Fit pool:{" "}
+                <span className="font-medium text-foreground">{partial ?? 0}</span>
                 {" · "}
                 Right Fit pool: <span className="font-medium text-foreground">{right ?? 0}</span>
               </span>
@@ -73,15 +87,21 @@ export function GapDrilldownDialog({
                     <TableCell>{nz(j.posted_by)}</TableCell>
                     <TableCell>{j.title}</TableCell>
                     <TableCell>{nz(j.sector)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmtInt(j.current_openings)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmtInt(j.applications)}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {fmtInt(j.current_openings)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {fmtInt(j.applications)}
+                    </TableCell>
                     <TableCell className="text-right tabular-nums">{gap}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className={GAP_LEVEL_CLASSES[gl]}>
                         {gl}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">{fmtInt(j.partial_fit_seekers)}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {fmtInt(j.partial_fit_seekers)}
+                    </TableCell>
                   </TableRow>
                 );
               })}

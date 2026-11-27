@@ -1,28 +1,22 @@
-import type { DropRow } from "./DropAnalysisTable";
+import { dropValue, type DropRow } from "./drop-rows";
 import { reasonColor } from "./reasonColors";
 
 const fmt = (n: number) => n.toLocaleString();
 
-export function DropStackedBars({
-  rows,
-  onlyRegion,
-}: {
-  rows: DropRow[];
-  onlyRegion?: string;
-}) {
+export function DropStackedBars({ rows, onlyRegion }: { rows: DropRow[]; onlyRegion?: string }) {
   if (!rows || rows.length === 0) return null;
-
-  const valueOf = (r: DropRow) => (onlyRegion ? (r.byRegion?.[onlyRegion] ?? 0) : r.total);
 
   // Group rows by stage with reason→count
   const stageMap = new Map<string, { reason: string; value: number }[]>();
   const reasonTotals = new Map<string, number>();
   for (const r of rows) {
-    const v = valueOf(r);
+    const v = dropValue(r, onlyRegion);
     if (v <= 0) continue;
     reasonTotals.set(r.reason, (reasonTotals.get(r.reason) ?? 0) + v);
-    if (!stageMap.has(r.stage)) stageMap.set(r.stage, []);
-    stageMap.get(r.stage)!.push({ reason: r.reason, value: v });
+    const item = { reason: r.reason, value: v };
+    const stageItems = stageMap.get(r.stage);
+    if (stageItems) stageItems.push(item);
+    else stageMap.set(r.stage, [item]);
   }
 
   const stages = Array.from(stageMap.entries())
@@ -39,7 +33,9 @@ export function DropStackedBars({
   const max = Math.max(...stages.map((s) => s.total));
 
   const legendOrder = Array.from(reasonTotals.entries())
-    .sort(([reasonA, valueA], [reasonB, valueB]) => valueB - valueA || reasonA.localeCompare(reasonB))
+    .sort(
+      ([reasonA, valueA], [reasonB, valueB]) => valueB - valueA || reasonA.localeCompare(reasonB),
+    )
     .map(([reason]) => reason);
 
   return (

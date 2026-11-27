@@ -18,11 +18,11 @@ on:
     #   20*-s*-rc*  sprint release    e.g. 202610-s1-rc1
     # GitHub reads this workflow FROM THE TAGGED COMMIT, so a tag cut from a
     # commit that predates this file will not build.
-    tags: ['v*.*.*', '20*-s*-rc*']
+    tags: ["v*.*.*", "20*-s*-rc*"]
   workflow_dispatch:
     inputs:
       skip_ci_check:
-        description: 'Publish even if CI has not passed for this commit (emergency use only)'
+        description: "Publish even if CI has not passed for this commit (emergency use only)"
         type: boolean
         required: false
         default: false

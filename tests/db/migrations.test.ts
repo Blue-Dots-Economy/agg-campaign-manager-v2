@@ -7,9 +7,17 @@ import { migrationsFolder, runMigrations } from "../../src/server/db/migrate";
 const URL = process.env.TEST_DATABASE_URL;
 
 const APP_TABLES = [
-  "app_users", "campaign_requests", "launched_batch_inputs", "launched_batches",
-  "north_star_config", "program_agents", "program_export_targets",
-  "program_sync_state", "reviewers", "sheet_connections", "transcript_reviews",
+  "app_users",
+  "campaign_requests",
+  "launched_batch_inputs",
+  "launched_batches",
+  "north_star_config",
+  "program_agents",
+  "program_export_targets",
+  "program_sync_state",
+  "reviewers",
+  "sheet_connections",
+  "transcript_reviews",
   "up_seekers_upload",
 ];
 const DASHBOARD_CALLS: Record<string, string> = {
@@ -58,7 +66,9 @@ describe.skipIf(!URL)("migrations", () => {
   test("every journal entry is applied, and a re-run applies nothing", async () => {
     const journal = JSON.parse(readFileSync(`${migrationsFolder}/meta/_journal.json`, "utf8"));
     const count = async () =>
-      Number((await owner.query("select count(*) from drizzle.__drizzle_migrations")).rows[0].count);
+      Number(
+        (await owner.query("select count(*) from drizzle.__drizzle_migrations")).rows[0].count,
+      );
     expect(await count()).toBe(journal.entries.length);
     await runMigrations(URL!);
     expect(await count()).toBe(journal.entries.length);
@@ -70,7 +80,8 @@ describe.skipIf(!URL)("migrations", () => {
     ).rows.map((r) => r.tablename);
     expect(tables).toEqual([...APP_TABLES, "purple_dots_calls", "purple_dots_connections"].sort());
 
-    const views = (await owner.query("select viewname from pg_views where schemaname = 'public'")).rows;
+    const views = (await owner.query("select viewname from pg_views where schemaname = 'public'"))
+      .rows;
     expect(views.map((r) => r.viewname)).toEqual(["call_rows"]);
 
     const fns = (
@@ -126,7 +137,9 @@ describe.skipIf(!URL)("migrations", () => {
   });
 
   test("it does the dashboard's job and the pipeline's", async () => {
-    expect(await attempt(URL!, "insert into reviewers (email) values ('t@example.org')")).toBeNull();
+    expect(
+      await attempt(URL!, "insert into reviewers (email) values ('t@example.org')"),
+    ).toBeNull();
     for (const [fn, args] of Object.entries(DASHBOARD_CALLS)) {
       expect(await attempt(URL!, `select public.${fn}(${args})`)).toBeNull();
     }

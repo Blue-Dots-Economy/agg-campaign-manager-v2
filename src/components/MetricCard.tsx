@@ -1,7 +1,11 @@
 import type { MetricCardDef, MetricGroup } from "@/lib/snapshot.functions";
 
 const ACCENTS: Record<MetricCardDef["accent"], { bar: string; dot: string; text: string }> = {
-  green: { bar: "bg-emerald-500", dot: "bg-emerald-500", text: "text-emerald-600 dark:text-emerald-400" },
+  green: {
+    bar: "bg-emerald-500",
+    dot: "bg-emerald-500",
+    text: "text-emerald-600 dark:text-emerald-400",
+  },
   amber: { bar: "bg-amber-500", dot: "bg-amber-500", text: "text-amber-600 dark:text-amber-400" },
   red: { bar: "bg-rose-500", dot: "bg-rose-500", text: "text-rose-600 dark:text-rose-400" },
   blue: { bar: "bg-brand", dot: "bg-brand", text: "text-brand" },

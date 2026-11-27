@@ -8,11 +8,17 @@ export function getStoredTheme(): Theme {
   try {
     const t = window.localStorage.getItem(KEY);
     if (t === "light" || t === "dark" || t === "system") return t;
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return "system";
 }
 function systemPrefersDark(): boolean {
-  return typeof window !== "undefined" && !!window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  return (
+    typeof window !== "undefined" &&
+    !!window.matchMedia &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches
+  );
 }
 export function resolveDark(theme: Theme): boolean {
   return theme === "dark" || (theme === "system" && systemPrefersDark());
@@ -27,16 +33,24 @@ const ThemeContext = createContext<Ctx | null>(null);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(getStoredTheme);
-  useEffect(() => { applyTheme(theme); }, [theme]);
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return;
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const handler = () => { if (getStoredTheme() === "system") applyTheme("system"); };
+    const handler = () => {
+      if (getStoredTheme() === "system") applyTheme("system");
+    };
     mq.addEventListener?.("change", handler);
     return () => mq.removeEventListener?.("change", handler);
   }, []);
   const setTheme = (t: Theme) => {
-    try { window.localStorage.setItem(KEY, t); } catch { /* ignore */ }
+    try {
+      window.localStorage.setItem(KEY, t);
+    } catch {
+      /* ignore */
+    }
     setThemeState(t);
   };
   return <ThemeContext.Provider value={{ theme, setTheme }}>{children}</ThemeContext.Provider>;

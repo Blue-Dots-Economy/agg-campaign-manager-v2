@@ -24,7 +24,7 @@ export function useConcurrencyUsage(options: { enabled?: boolean } = {}) {
   const fn = useServerFn(getConcurrencyUsage);
   return useQuery<ConcurrencyUsage>({
     queryKey: ["concurrency-usage", cap],
-    queryFn: () => fn({ data: { cap } }) as Promise<ConcurrencyUsage>,
+    queryFn: () => fn({ data: { cap } }),
     enabled: options.enabled ?? true,
     staleTime: 60_000,
     refetchInterval: false,

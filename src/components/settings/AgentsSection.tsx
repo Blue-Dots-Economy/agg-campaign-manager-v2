@@ -9,14 +9,21 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
-import {
-  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import {
   listProgramAgents,
@@ -25,7 +32,7 @@ import {
   deleteProgramAgent,
   loadAgent,
 } from "@/lib/agents.functions";
-import { registry, type ProgramId } from "@/programs/registry";
+import { isProgramId, registry, type ProgramId } from "@/programs/registry";
 
 function maskId(id: string) {
   if (id.length <= 14) return id;
@@ -40,7 +47,8 @@ export function AgentsSection() {
         description="Add the Raya agents that place calls for each program. Agents added here power the agent dropdown in the Launch wizard."
       >
         <div className="text-xs text-muted-foreground">
-          The agent id is the UUID shown in Raya's dashboard. We validate it against the Raya API before saving.
+          The agent id is the UUID shown in Raya's dashboard. We validate it against the Raya API
+          before saving.
         </div>
       </Panel>
 
@@ -86,14 +94,19 @@ function ProgramAgents({ program }: { program: ProgramId }) {
   });
   const remove = useMutation({
     mutationFn: (id: string) => deleteFn({ data: { id } }),
-    onSuccess: () => { invalidate(); toast.success("Agent removed"); },
+    onSuccess: () => {
+      invalidate();
+      toast.success("Agent removed");
+    },
   });
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="text-sm text-muted-foreground">
-          {isLoading ? "Loading…" : `${data?.length ?? 0} agent${(data?.length ?? 0) === 1 ? "" : "s"}`}
+          {isLoading
+            ? "Loading…"
+            : `${data?.length ?? 0} agent${(data?.length ?? 0) === 1 ? "" : "s"}`}
         </div>
         <AddAgentDialog defaultProgram={program} onCreated={invalidate} />
       </div>
@@ -108,10 +121,14 @@ function ProgramAgents({ program }: { program: ProgramId }) {
               <div className="flex items-center gap-2">
                 <Bot className="h-4 w-4 text-brand" />
                 <div className="font-medium">{a.name || "Unnamed agent"}</div>
-                <Badge variant="outline" className="text-[10px]">{registry[a.program as ProgramId]?.label ?? a.program}</Badge>
+                <Badge variant="outline" className="text-[10px]">
+                  {isProgramId(a.program) ? registry[a.program].label : a.program}
+                </Badge>
                 <StatusBadge status={a.status} lastError={a.last_error} />
               </div>
-              <div className="mt-1 text-xs text-muted-foreground font-mono">{maskId(a.agent_id)}</div>
+              <div className="mt-1 text-xs text-muted-foreground font-mono">
+                {maskId(a.agent_id)}
+              </div>
               {a.status === "error" && a.last_error && (
                 <div className="mt-1 text-xs text-red-600 break-all">
                   {a.last_error.length > 200 ? `${a.last_error.slice(0, 200)}…` : a.last_error}
@@ -182,8 +199,12 @@ function StatusBadge({ status, lastError }: { status: string; lastError?: string
 }
 
 function AddAgentDialog({
-  defaultProgram, onCreated,
-}: { defaultProgram: ProgramId; onCreated: () => void }) {
+  defaultProgram,
+  onCreated,
+}: {
+  defaultProgram: ProgramId;
+  onCreated: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const [program, setProgram] = useState<ProgramId>(defaultProgram);
   const [agentId, setAgentId] = useState("");
@@ -196,36 +217,54 @@ function AddAgentDialog({
   const createFn = useServerFn(createProgramAgent);
 
   const reset = () => {
-    setProgram(defaultProgram); setAgentId(""); setName(""); setProbe(null);
+    setProgram(defaultProgram);
+    setAgentId("");
+    setName("");
+    setProbe(null);
   };
 
   const onProbe = async () => {
     if (!agentId.trim()) return;
-    setLoadingProbe(true); setProbe(null);
+    setLoadingProbe(true);
+    setProbe(null);
     try {
       const res = await loadFn({ data: { agentId: agentId.trim() } });
       if (res.ok) setProbe({ ok: true, name: res.name });
       else setProbe({ ok: false, error: res.error });
     } catch (e) {
       setProbe({ ok: false, error: e instanceof Error ? e.message : String(e) });
-    } finally { setLoadingProbe(false); }
+    } finally {
+      setLoadingProbe(false);
+    }
   };
 
   const onSave = async () => {
     if (!agentId.trim()) return toast.error("Agent id is required");
     setSaving(true);
     try {
-      const res = await createFn({ data: { program, agentId: agentId.trim(), name: name.trim() || undefined } });
+      const res = await createFn({
+        data: { program, agentId: agentId.trim(), name: name.trim() || undefined },
+      });
       if (res.ok) toast.success("Agent added");
       else toast.error(`Saved with error: ${res.error}`);
-      setOpen(false); reset(); onCreated();
+      setOpen(false);
+      reset();
+      onCreated();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed");
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        if (!v) reset();
+      }}
+    >
       <DialogTrigger asChild>
         <Button className="bg-brand hover:bg-brand/90">
           <Plus className="mr-2 h-4 w-4" /> Add agent
@@ -238,11 +277,20 @@ function AddAgentDialog({
         <div className="space-y-3 pt-2">
           <div>
             <Label>Program</Label>
-            <Select value={program} onValueChange={(v) => setProgram(v as ProgramId)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+            <Select
+              value={program}
+              onValueChange={(v) => {
+                if (isProgramId(v)) setProgram(v);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 {Object.values(registry).map((p) => (
-                  <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.label}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -251,17 +299,26 @@ function AddAgentDialog({
             <Label>Agent id</Label>
             <Input
               value={agentId}
-              onChange={(e) => { setAgentId(e.target.value); setProbe(null); }}
+              onChange={(e) => {
+                setAgentId(e.target.value);
+                setProbe(null);
+              }}
               placeholder="e.g. 9c0a…-…-…"
               className="font-mono"
             />
           </div>
           <div>
             <Label>Friendly name (optional)</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Defaults to the Raya agent's name" />
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Defaults to the Raya agent's name"
+            />
           </div>
           {probe && (
-            <div className={`rounded-md px-3 py-2 text-sm ${probe.ok ? "bg-brand-soft text-brand" : "bg-red-500/15 text-red-700 dark:text-red-400"}`}>
+            <div
+              className={`rounded-md px-3 py-2 text-sm ${probe.ok ? "bg-brand-soft text-brand" : "bg-red-500/15 text-red-700 dark:text-red-400"}`}
+            >
               {probe.ok ? `Loaded · ${probe.name}` : probe.error}
             </div>
           )}
@@ -271,7 +328,11 @@ function AddAgentDialog({
             {loadingProbe ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Load agent
           </Button>
-          <Button onClick={onSave} disabled={saving || !agentId.trim()} className="bg-brand hover:bg-brand/90">
+          <Button
+            onClick={onSave}
+            disabled={saving || !agentId.trim()}
+            className="bg-brand hover:bg-brand/90"
+          >
             {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Save
           </Button>

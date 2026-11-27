@@ -1,4 +1,5 @@
 // Program config registry. Add a new program = add a new ProgramConfig here.
+import { isOneOf } from "@/lib/guards";
 
 export type KpiKey = string;
 
@@ -155,17 +156,19 @@ export const providers: ProgramConfig = {
     { key: "jobs_verified", label: "Jobs verified", icon: "ShieldCheck", format: "number" },
     { key: "new_jobs_posted", label: "New jobs posted", icon: "Plus", format: "number" },
     { key: "high_intent", label: "High-intent (≥5)", icon: "Flame", format: "number" },
-    { key: "talent_insights_shown", label: "Talent insights shown", icon: "Sparkles", format: "number" },
+    {
+      key: "talent_insights_shown",
+      label: "Talent insights shown",
+      icon: "Sparkles",
+      format: "number",
+    },
   ],
-  dropReasons: [
-    "Early Disconnect",
-    "No Answer",
-    "Completed",
-    "Callback Requested",
-    "Failure",
-  ],
+  dropReasons: ["Early Disconnect", "No Answer", "Completed", "Callback Requested", "Failure"],
   launchSteps: [
-    { title: "Upload employer CSV", description: "Drop the source list of employers / job postings" },
+    {
+      title: "Upload employer CSV",
+      description: "Drop the source list of employers / job postings",
+    },
     { title: "Map job & company fields", description: "Match to the DKB verification schema" },
     { title: "Assign verification slot", description: "Pick a window for outbound calls" },
     { title: "Schedule call window", description: "Pick a date and time window" },
@@ -175,6 +178,14 @@ export const providers: ProgramConfig = {
 
 export const registry: Record<"seekers" | "providers", ProgramConfig> = { seekers, providers };
 export type ProgramId = keyof typeof registry;
+
+/** Every program id, for narrowing strings from the URL, selects and the server. */
+export const PROGRAM_IDS: readonly ProgramId[] = ["seekers", "providers"];
+
+/** Checks that a string is a known program id. */
+export function isProgramId(value: string): value is ProgramId {
+  return isOneOf(PROGRAM_IDS, value);
+}
 
 export function sheetLabelFor(config: ProgramConfig): string {
   return `${config.label} master sheet`;

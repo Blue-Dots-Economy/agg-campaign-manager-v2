@@ -28,11 +28,19 @@ export function makeDefaultSchedule(): ScheduleState {
     hour12: false,
   }).formatToParts(now);
   const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
-  const weekdayMap: Record<string, number> = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
+  const weekdayMap: Record<string, number> = {
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
+    Sun: 7,
+  };
   const day = weekdayMap[get("weekday")] ?? 1;
   const hh = get("hour");
   const mm = get("minute");
-  const startMin = parseInt(hh, 10) * 60 + parseInt(mm, 10);
+  const startMin = Number.parseInt(hh, 10) * 60 + Number.parseInt(mm, 10);
   const endMin = Math.min(startMin + 10, 23 * 60 + 59);
   const pad = (n: number) => String(n).padStart(2, "0");
   return {
@@ -62,7 +70,7 @@ export function ScheduleEditor({
 }) {
   const toggleDay = (d: number) => {
     const has = value.days.includes(d);
-    const days = has ? value.days.filter((x) => x !== d) : [...value.days, d].sort();
+    const days = has ? value.days.filter((x) => x !== d) : [...value.days, d].sort((a, b) => a - b);
     onChange({ ...value, days });
   };
 
@@ -98,7 +106,9 @@ export function ScheduleEditor({
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <Label htmlFor="start" className="text-xs">Start time</Label>
+          <Label htmlFor="start" className="text-xs">
+            Start time
+          </Label>
           <Input
             id="start"
             type="time"
@@ -108,7 +118,9 @@ export function ScheduleEditor({
           />
         </div>
         <div>
-          <Label htmlFor="end" className="text-xs">End time</Label>
+          <Label htmlFor="end" className="text-xs">
+            End time
+          </Label>
           <Input
             id="end"
             type="time"
@@ -123,7 +135,9 @@ export function ScheduleEditor({
       )}
 
       <div>
-        <Label htmlFor="tz" className="text-xs">Timezone (IANA)</Label>
+        <Label htmlFor="tz" className="text-xs">
+          Timezone (IANA)
+        </Label>
         <Input
           id="tz"
           value={value.timezone}

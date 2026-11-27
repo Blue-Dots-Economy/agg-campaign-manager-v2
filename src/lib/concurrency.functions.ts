@@ -2,13 +2,23 @@
 // Raya gives ONE pool (default 20) shared by every agent / program.
 
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 import { requireRole } from "@/auth/middleware";
 import { FN_ROLES } from "@/auth/roles";
 import { getDb } from "@/server/db/client.server";
 import { programAgents } from "@/server/db/schema";
-import { delay, rayaFetch } from "./raya-api";
+import { parseInput } from "@/lib/validation";
+import { isRecord } from "@/lib/input-schemas";
+import { CONCURRENCY_CAP_DEFAULT } from "./concurrency-cap";
+import type { JsonObject } from "./json";
+import { delay, rayaFetch } from "./raya-api.server";
+import { BatchListReplySchema, batchItems } from "./raya-live-batches";
 
-export const CONCURRENCY_CAP_DEFAULT = 20;
+/** Batches requested per agent; enough to cover every batch an agent runs at once. */
+const BATCH_PAGE_SIZE = 100;
+
+/** Pause between agents, to stay under Raya's request-rate limit. */
+const AGENT_CHECK_SPACING_MS = 400;
 
 const ACTIVE_STATUSES = new Set([
   "running",
@@ -33,62 +43,87 @@ interface ActiveBatch {
   status: string;
 }
 
-async function rayaListAgentBatches(agentId: string): Promise<any[]> {
-  const qs = new URLSearchParams({ agent_id: agentId, page_size: "100" });
-  const parsed = await rayaFetch(`/batch?${qs.toString()}`, { method: "GET" }) as any;
-  const items: any[] =
-    parsed?.items ?? parsed?.data ?? parsed?.batches ?? (Array.isArray(parsed) ? parsed : []);
-  return items;
+/** Shown when the agent list cannot be read; the cause goes to the server log only. */
+export const AGENTS_UNAVAILABLE = "Could not read the agent list. Try again later.";
+
+/**
+ * Usage with no active batches, for when it cannot be measured.
+ *
+ * @param error - Short reason shown on the page; never a raw error message.
+ */
+export function emptyUsage(cap: number, error: string) {
+  const batches: ActiveBatch[] = [];
+  return { cap, used: 0, available: cap, batches, error };
 }
 
-function pickConcurrency(item: any): number {
+async function rayaListAgentBatches(agentId: string): Promise<JsonObject[]> {
+  const qs = new URLSearchParams({ agent_id: agentId, page_size: String(BATCH_PAGE_SIZE) });
+  return batchItems(
+    await rayaFetch(`/batch?${qs.toString()}`, { method: "GET" }, BatchListReplySchema),
+  );
+}
+
+function pickConcurrency(item: JsonObject): number {
+  const nested = (key: string) => {
+    const v = item[key];
+    return isRecord(v) ? v.concurrency : undefined;
+  };
   const c =
-    item?.concurrency ??
-    item?.max_concurrency ??
-    item?.parallel_calls ??
-    item?.parallelCalls ??
-    item?.schedule?.concurrency ??
-    item?.settings?.concurrency ??
+    item.concurrency ??
+    item.max_concurrency ??
+    item.parallel_calls ??
+    item.parallelCalls ??
+    nested("schedule") ??
+    nested("settings") ??
     0;
   const n = Number(c);
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
+/** Sums the concurrency of every active Raya batch against the account cap. */
 export const getConcurrencyUsage = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.dashboard)])
-  .inputValidator((d: { cap?: number }) => d ?? {})
+  .validator(parseInput(z.object({ cap: z.number().optional() }).optional()))
   .handler(async ({ data }) => {
-    const cap = Number.isFinite(data?.cap) && (data!.cap as number) > 0
-      ? (data!.cap as number)
-      : CONCURRENCY_CAP_DEFAULT;
+    const requested = data?.cap;
+    const cap =
+      requested !== undefined && Number.isFinite(requested) && requested > 0
+        ? requested
+        : CONCURRENCY_CAP_DEFAULT;
 
-    if (!process.env.RAYA_API_KEY) {
-      return { cap, used: 0, available: cap, batches: [] as ActiveBatch[], error: "RAYA_API_KEY not set" };
-    }
+    if (!process.env.RAYA_API_KEY) return emptyUsage(cap, "RAYA_API_KEY not set");
 
     let agents: Array<{ program: string; agent_id: string; name: string }>;
     try {
       agents = await getDb()
-        .select({ program: programAgents.program, agent_id: programAgents.agentId, name: programAgents.name })
+        .select({
+          program: programAgents.program,
+          agent_id: programAgents.agentId,
+          name: programAgents.name,
+        })
         .from(programAgents);
     } catch (e) {
-      return { cap, used: 0, available: cap, batches: [] as ActiveBatch[], error: e instanceof Error ? e.message : String(e) };
+      const { logEvent } = await import("@/server/log.server");
+      logEvent("error", { operation: "concurrency.listAgents", status: "failure", error: e });
+      return emptyUsage(cap, AGENTS_UNAVAILABLE);
     }
 
     const active: ActiveBatch[] = [];
     // Sequential to respect Raya's API request-rate limit; avoid parallel bursts across agents.
-    for (const a of agents ?? []) {
+    for (const a of agents) {
       try {
         const items = await rayaListAgentBatches(a.agent_id);
         for (const item of items) {
-          const status = String(item?.status ?? "").toLowerCase().trim();
+          const status = String(item.status ?? "")
+            .toLowerCase()
+            .trim();
           if (!ACTIVE_STATUSES.has(status)) continue;
           const concurrency = pickConcurrency(item);
           if (concurrency <= 0) continue;
           active.push({
-            program: String(a.program),
-            agentName: String(a.name ?? a.agent_id),
-            agentId: String(a.agent_id),
+            program: a.program,
+            agentName: a.name,
+            agentId: a.agent_id,
             batchId: String(item.id ?? item.batch_id ?? item.batchId ?? ""),
             batchName: String(item.name ?? item.batch_name ?? "—"),
             concurrency,
@@ -96,12 +131,15 @@ export const getConcurrencyUsage = createServerFn({ method: "GET" })
           });
         }
       } catch (e) {
-        console.warn("[raya] concurrency usage check skipped an agent", {
-          agentId: a.agent_id,
-          error: e instanceof Error ? e.message : String(e),
+        const { logEvent } = await import("@/server/log.server");
+        logEvent("warn", {
+          operation: "raya.concurrencyUsage",
+          status: "skipped",
+          agent_id: a.agent_id,
+          error: e,
         });
       }
-      await delay(400);
+      await delay(AGENT_CHECK_SPACING_MS);
     }
 
     const used = active.reduce((s, b) => s + b.concurrency, 0);

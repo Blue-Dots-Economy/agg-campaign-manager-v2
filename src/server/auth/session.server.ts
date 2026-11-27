@@ -16,7 +16,7 @@ function secretKey(): Uint8Array {
 
 export async function signSession(uid: string, now = Date.now()): Promise<string> {
   const iat = Math.floor(now / 1000);
-  return new SignJWT({ uid })
+  return await new SignJWT({ uid })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt(iat)
     .setExpirationTime(iat + SESSION_TTL_SECONDS)

@@ -21,8 +21,6 @@ export interface OverviewFilterValue {
   channel: ChannelValue;
 }
 
-
-
 const CHANNEL_OPTIONS: { value: ChannelValue; label: string }[] = [
   { value: "all", label: "All calls" },
   { value: "outbound", label: "Outbound" },
@@ -33,8 +31,8 @@ const fmt = (d: Date) => format(d, "yyyy-MM-dd");
 
 // Parse a YYYY-MM-DD string as a LOCAL date (avoid UTC shift from new Date("YYYY-MM-DD")).
 const parseLocal = (s: string): Date => {
-  const [y, m, d] = s.split("-").map(Number);
-  return new Date(y, (m ?? 1) - 1, d ?? 1);
+  const [y = Number.NaN, m = 1, d = 1] = s.split("-").map(Number);
+  return new Date(y, m - 1, d);
 };
 
 export function OverviewFilters({
@@ -50,7 +48,10 @@ export function OverviewFilters({
   const { config } = useProgram();
   const { data: options } = useProgramFilterOptions(config);
   const stateOptions = useMemo(
-    () => [{ value: "all", label: "All states" }, ...(options?.cities ?? []).map((c) => ({ value: c, label: c }))],
+    () => [
+      { value: "all", label: "All states" },
+      ...(options?.cities ?? []).map((c) => ({ value: c, label: c })),
+    ],
     [options?.cities],
   );
 
@@ -71,7 +72,6 @@ export function OverviewFilters({
     const t = value.dateTo ? format(parseLocal(value.dateTo), "MMM d, yyyy") : "…";
     return `${f} → ${t}`;
   }, [value.dateFrom, value.dateTo]);
-
 
   const setPreset = (days: number | null) => {
     if (days === null) {
@@ -94,26 +94,26 @@ export function OverviewFilters({
     <div className="flex flex-wrap items-center gap-2">
       {/* State segmented control */}
       {(options?.cities.length ?? 0) > 0 && (
-      <div className="inline-flex rounded-md border border-border bg-card p-0.5 text-xs">
-        {stateOptions.map((opt) => {
-          const active = value.state === opt.value;
-          return (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => onChange({ ...value, state: opt.value })}
-              className={cn(
-                "px-3 py-1.5 rounded transition-colors",
-                active
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {opt.label}
-            </button>
-          );
-        })}
-      </div>
+        <div className="inline-flex rounded-md border border-border bg-card p-0.5 text-xs">
+          {stateOptions.map((opt) => {
+            const active = value.state === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => onChange({ ...value, state: opt.value })}
+                className={cn(
+                  "px-3 py-1.5 rounded transition-colors",
+                  active
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
       )}
 
       {/* Channel segmented control (KKB only) */}
@@ -195,8 +195,6 @@ export function OverviewFilters({
                   dateTo: to,
                 });
               }}
-
-              initialFocus
               className={cn("p-3 pointer-events-auto")}
             />
           </div>
@@ -208,7 +206,15 @@ export function OverviewFilters({
           variant="ghost"
           size="sm"
           className="h-8 gap-1 text-xs text-muted-foreground"
-          onClick={() => onChange({ state: "all", dateFrom: null, dateTo: null, campaignType: "all", channel: "all" })}
+          onClick={() =>
+            onChange({
+              state: "all",
+              dateFrom: null,
+              dateTo: null,
+              campaignType: "all",
+              channel: "all",
+            })
+          }
         >
           <X className="h-3.5 w-3.5" />
           Clear

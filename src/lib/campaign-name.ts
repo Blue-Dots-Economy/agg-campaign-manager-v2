@@ -12,7 +12,7 @@ export function humanizeCampaignType(raw: string | null | undefined): string {
   const formatted = parts.flatMap((part) => {
     // "Day24" -> "Day 24"
     const dayMatch = part.match(/^([A-Za-z]+?)(\d+)$/);
-    if (dayMatch) return [`${splitCamel(dayMatch[1])} ${dayMatch[2]}`];
+    if (dayMatch) return [`${splitCamel(dayMatch[1] ?? "")} ${dayMatch[2] ?? ""}`];
     return [splitCamel(part)];
   });
   // Drop a redundant "Campaign" filler segment if it sits alone.

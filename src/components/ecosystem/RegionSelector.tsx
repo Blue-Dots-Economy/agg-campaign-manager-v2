@@ -19,7 +19,8 @@ export function RegionSelector({
   value: RegionValue;
   onChange: (v: RegionValue) => void;
 }) {
-  const stateEntry = REGION_TREE.find((s) => s.state === value.state) ?? REGION_TREE[0];
+  const districts =
+    (REGION_TREE.find((s) => s.state === value.state) ?? REGION_TREE[0])?.districts ?? [];
   return (
     <div className="flex items-center gap-2">
       <Select
@@ -45,7 +46,7 @@ export function RegionSelector({
           <SelectValue placeholder="District" />
         </SelectTrigger>
         <SelectContent>
-          {stateEntry.districts.map((d) => (
+          {districts.map((d) => (
             <SelectItem key={d} value={d}>
               {d}
             </SelectItem>

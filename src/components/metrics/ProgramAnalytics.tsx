@@ -17,15 +17,16 @@ import {
   Bar,
   Legend,
 } from "recharts";
-import { useProgramAggregates, useKkbDropAnalysis, useDkbDropAnalysis, useFunnelDurations, useKkbCallOutcomes } from "@/programs/useProgramAggregates";
+import {
+  useProgramAggregates,
+  useKkbDropAnalysis,
+  useDkbDropAnalysis,
+  useFunnelDurations,
+  useKkbCallOutcomes,
+} from "@/programs/useProgramAggregates";
 import type { ProgramConfig } from "@/programs/registry";
 import { KpiCard } from "@/components/KpiCard";
-import {
-  KkbOverviewMetrics,
-  DkbOverviewMetrics,
-  type KkbMetrics,
-  type DkbMetrics,
-} from "@/components/metrics/program-overviews";
+import { KkbOverviewMetrics, DkbOverviewMetrics } from "@/components/metrics/program-overviews";
 import { Panel } from "@/components/Panel";
 import { NoDataState, LoadingState } from "@/components/EmptyState";
 import { DropAnalysisHeatmap } from "@/components/metrics/DropAnalysisHeatmap";
@@ -35,6 +36,13 @@ import { fetchFunnelCallIds } from "@/lib/snapshot.functions";
 import { fetchAllReviewedCallIds } from "@/lib/review.functions";
 import { useAuth } from "@/auth/context";
 import type { OverviewFilterValue } from "@/components/metrics/OverviewFilters";
+import { numericMetrics } from "@/components/metrics/metric-values";
+import { BULK_QUEUE_STORAGE_KEY } from "@/lib/review/review-form";
+import {
+  intentBuckets,
+  previousPeriodFilters,
+  rollupPerDay,
+} from "@/components/metrics/program-analytics";
 
 async function copyText(text: string): Promise<boolean> {
   try {
@@ -71,6 +79,8 @@ const PIE_COLORS = [
 ];
 
 const tooltipStyle = {
+  // Keeps tooltip rows in series order; recharts sorts them by name by default.
+  itemSorter: () => 0,
   contentStyle: {
     background: "var(--color-card)",
     border: "1px solid var(--color-border)",
@@ -88,8 +98,8 @@ export interface ProgramAnalyticsProps {
   /** Replace previous-period baseline with a state-average baseline. */
   comparison?: {
     mode: "state-average";
-    region: string | null;          // 'GZB' | 'KA' | null = all
-    label: string;                  // e.g. "vs GZB avg"
+    region: string | null; // 'GZB' | 'KA' | null = all
+    label: string; // e.g. "vs GZB avg"
   };
 }
 
@@ -112,24 +122,7 @@ export function ProgramAnalytics({
   const data = query.data;
 
   // Previous-period baseline (default behavior, used only when no comparison override).
-  const prevFilters = (() => {
-    if (comparison) return null;
-    if (!filters.dateFrom || !filters.dateTo) return null;
-    const from = new Date(filters.dateFrom);
-    const to = new Date(filters.dateTo);
-    const dayMs = 24 * 60 * 60 * 1000;
-    const len = Math.max(1, Math.round((to.getTime() - from.getTime()) / dayMs) + 1);
-    const prevTo = new Date(from.getTime() - dayMs);
-    const prevFrom = new Date(prevTo.getTime() - (len - 1) * dayMs);
-    const iso = (d: Date) => d.toISOString().slice(0, 10);
-    return {
-      state: filters.state,
-      dateFrom: iso(prevFrom),
-      dateTo: iso(prevTo),
-      campaignType: filters.campaignType,
-      channel: filters.channel,
-    };
-  })();
+  const prevFilters = comparison ? null : previousPeriodFilters(filters);
   const prevQuery = useProgramAggregates(
     config,
     prevFilters ?? {
@@ -156,21 +149,11 @@ export function ProgramAnalytics({
   const prevMetrics = comparison
     ? stateAvgQuery.data?.metrics
     : prevFilters
-    ? prevQuery.data?.metrics
-    : undefined;
+      ? prevQuery.data?.metrics
+      : undefined;
 
-  const perDay = data?.aggregates?.perDay ?? [];
-  const perDayRollup = useMemo(() => {
-    const m = new Map<string, { day: string; date: string; label: string; rows: number; answered: number; engaged: number; converted: number; new_jobs: number; high_intent: number }>();
-    for (const p of perDay) {
-      const key = p.date || p.day;
-      const cur = m.get(key) ?? { day: p.day, date: p.date, label: p.date || p.day, rows: 0, answered: 0, engaged: 0, converted: 0, new_jobs: 0, high_intent: 0 };
-      cur.rows += p.rows; cur.answered += p.answered; cur.engaged += p.engaged;
-      cur.converted += p.converted; cur.new_jobs += p.new_jobs; cur.high_intent += p.high_intent;
-      m.set(key, cur);
-    }
-    return [...m.values()].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-  }, [perDay]);
+  const perDay = data?.aggregates?.perDay;
+  const perDayRollup = useMemo(() => rollupPerDay(perDay ?? []), [perDay]);
 
   const fetchIds = useServerFn(fetchFunnelCallIds);
   const fetchAllReviewed = useServerFn(fetchAllReviewedCallIds);
@@ -185,26 +168,23 @@ export function ProgramAnalytics({
     (!isDkb && filters.campaignType !== "all");
   const isEmpty = !data || data.source === "empty" || data.totalRows === 0;
   if (isEmpty) {
-    const reason =
-      data?.emptyReason ?? (hasActiveFilters ? "no_results" : "no_connections");
+    const reason = data?.emptyReason ?? (hasActiveFilters ? "no_results" : "no_connections");
     return (
-      <NoDataState
-        reason={reason}
-        onClearFilters={hasActiveFilters ? onClearFilters : undefined}
-      />
+      <NoDataState reason={reason} onClearFilters={hasActiveFilters ? onClearFilters : undefined} />
     );
   }
 
-  const { kpis, intents, regions, phases, jobStatus, outcomes, dkbIntents } =
-    data.aggregates;
+  const { kpis, intents, regions, phases, jobStatus, outcomes, dkbIntents } = data.aggregates;
   const metrics = data.metrics ?? {};
   const hasMetrics = Object.keys(metrics).length > 0;
   const prevKpis = comparison
     ? stateAvgQuery.data?.aggregates?.kpis
     : prevFilters
-    ? prevQuery.data?.aggregates?.kpis
-    : undefined;
+      ? prevQuery.data?.aggregates?.kpis
+      : undefined;
 
+  const overviewMetrics = numericMetrics(metrics);
+  const overviewPrevious = prevMetrics ? numericMetrics(prevMetrics) : undefined;
   const comparisonLabel = comparison ? `vs ${comparison.label} avg` : undefined;
 
   const handleStageClick = async (stage: string, action: "copy" | "review") => {
@@ -240,30 +220,44 @@ export function ProgramAnalytics({
     if (action === "review") {
       let queue = ids;
       try {
-        const reviewed = await fetchAllReviewed({ data: { program: config.id as "seekers" | "providers" } });
+        const reviewed = await fetchAllReviewed({
+          data: { program: config.id },
+        });
         const done = new Set(reviewed);
         const remaining = ids.filter((id) => !done.has(id));
         if (remaining.length === 0) {
-          toast.success(`All ${ids.length.toLocaleString()} call${ids.length === 1 ? "" : "s"} in this cohort have already been reviewed`);
+          toast.success(
+            `All ${ids.length.toLocaleString()} call${ids.length === 1 ? "" : "s"} in this cohort have already been reviewed`,
+          );
           return;
         }
         queue = remaining;
-      } catch { /* if the lookup fails, fall back to the full cohort */ }
+      } catch {
+        /* if the lookup fails, fall back to the full cohort */
+      }
       const skipped = ids.length - queue.length;
-      try { window.sessionStorage.setItem("bulk_review_queue", JSON.stringify(queue)); } catch { /* ignore */ }
+      try {
+        window.sessionStorage.setItem(BULK_QUEUE_STORAGE_KEY, JSON.stringify(queue));
+      } catch {
+        /* ignore */
+      }
       toast.success(
         `Reviewing ${queue.length.toLocaleString()} call${queue.length === 1 ? "" : "s"}`,
-        skipped > 0 ? { description: `Resuming — ${skipped.toLocaleString()} already reviewed are skipped.` } : undefined,
+        skipped > 0
+          ? { description: `Resuming — ${skipped.toLocaleString()} already reviewed are skipped.` }
+          : undefined,
       );
-      navigate({ to: "/review/$callId", params: { callId: queue[0] }, search: { bulk: "1" } });
+      const first = queue[0];
+      if (!first) return;
+      await navigate({ to: "/review/$callId", params: { callId: first }, search: { bulk: "1" } });
       return;
     }
     const ok = await copyText(ids.join(", "));
     if (ok) {
-      toast.success(
-        `Copied ${ids.length.toLocaleString()} call ID${ids.length === 1 ? "" : "s"}`,
-        { description: "Paste into the Review hub search, or use “Review Calls” to open them directly." },
-      );
+      toast.success(`Copied ${ids.length.toLocaleString()} call ID${ids.length === 1 ? "" : "s"}`, {
+        description:
+          "Paste into the Review hub search, or use “Review Calls” to open them directly.",
+      });
     } else {
       toast.error("Couldn't copy to clipboard");
     }
@@ -273,19 +267,21 @@ export function ProgramAnalytics({
     <div className="space-y-6">
       {campaign && config.id === "seekers" && (
         <div className="flex justify-end">
-          <NorthStarMetrics program={config.id} m={metrics as unknown as Record<string, number>} />
+          <NorthStarMetrics program={config.id} m={numericMetrics(metrics)} />
         </div>
       )}
       {comparison && (
         <div className="text-xs text-muted-foreground">
-          Compared to <span className="font-medium text-foreground">{comparison.label} average</span>
+          Compared to{" "}
+          <span className="font-medium text-foreground">{comparison.label} average</span>
         </div>
       )}
       {hasMetrics ? (
         isDkb ? (
           <DkbOverviewMetrics
-            m={metrics as unknown as DkbMetrics}
-            previous={prevMetrics as unknown as DkbMetrics | undefined}
+            m={overviewMetrics}
+            providerFunnel={metrics.providerFunnel}
+            previous={overviewPrevious}
             perDay={perDayRollup}
             comparisonLabel={comparisonLabel}
             onFunnelStageClick={handleStageClick}
@@ -293,8 +289,8 @@ export function ProgramAnalytics({
           />
         ) : (
           <KkbOverviewMetrics
-            m={metrics as unknown as KkbMetrics}
-            previous={prevMetrics as unknown as KkbMetrics | undefined}
+            m={overviewMetrics}
+            previous={overviewPrevious}
             perDay={perDayRollup}
             comparisonLabel={comparisonLabel}
             onFunnelStageClick={handleStageClick}
@@ -309,15 +305,13 @@ export function ProgramAnalytics({
               key={def.key}
               def={def}
               value={kpis[def.key] ?? 0}
-              previous={prevKpis ? prevKpis[def.key] ?? null : null}
+              previous={prevKpis ? (prevKpis[def.key] ?? null) : null}
             />
           ))}
         </div>
       )}
 
-      {!isDkb && <NorthStarTrend program={config.id} campaigns={perDay} />}
-
-
+      {!isDkb && <NorthStarTrend program={config.id} campaigns={perDay ?? []} />}
 
       {isDkb ? (
         <>
@@ -329,16 +323,49 @@ export function ProgramAnalytics({
             >
               <div className="h-72">
                 <ResponsiveContainer>
-                  <LineChart data={perDayRollup} margin={{ top: 10, right: 16, left: -10, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                    <XAxis dataKey="label" tick={{ fontSize: 11 }} stroke="var(--color-muted-foreground)" />
+                  <LineChart
+                    data={perDayRollup}
+                    margin={{ top: 10, right: 16, left: -10, bottom: 0 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="var(--color-border)"
+                      vertical={false}
+                    />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fontSize: 11 }}
+                      stroke="var(--color-muted-foreground)"
+                    />
 
                     <YAxis tick={{ fontSize: 11 }} stroke="var(--color-muted-foreground)" />
                     <Tooltip {...tooltipStyle} />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Line type="monotone" dataKey="rows" name="calls" stroke="var(--color-chart-1)" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="answered" stroke="var(--color-chart-2)" strokeWidth={2} strokeDasharray="6 3" dot={false} />
-                    <Line type="monotone" dataKey="new_jobs" name="new jobs" stroke="var(--color-chart-3)" strokeWidth={2} strokeDasharray="2 2" dot={false} />
+                    <Legend wrapperStyle={{ fontSize: 12 }} itemSorter={null} />
+                    <Line
+                      type="monotone"
+                      dataKey="rows"
+                      name="calls"
+                      stroke="var(--color-chart-1)"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="answered"
+                      stroke="var(--color-chart-2)"
+                      strokeWidth={2}
+                      strokeDasharray="6 3"
+                      dot={false}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="new_jobs"
+                      name="new jobs"
+                      stroke="var(--color-chart-3)"
+                      strokeWidth={2}
+                      strokeDasharray="2 2"
+                      dot={false}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -348,10 +375,28 @@ export function ProgramAnalytics({
               <div className="h-72">
                 {phases.some((p) => p.count > 0) ? (
                   <ResponsiveContainer>
-                    <BarChart data={phases} layout="vertical" margin={{ top: 10, right: 16, left: 10, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" horizontal={false} />
-                      <XAxis type="number" tick={{ fontSize: 11 }} stroke="var(--color-muted-foreground)" />
-                      <YAxis dataKey="phase" type="category" tick={{ fontSize: 11 }} stroke="var(--color-muted-foreground)" width={90} />
+                    <BarChart
+                      data={phases}
+                      layout="vertical"
+                      margin={{ top: 10, right: 16, left: 10, bottom: 0 }}
+                    >
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="var(--color-border)"
+                        horizontal={false}
+                      />
+                      <XAxis
+                        type="number"
+                        tick={{ fontSize: 11 }}
+                        stroke="var(--color-muted-foreground)"
+                      />
+                      <YAxis
+                        dataKey="phase"
+                        type="category"
+                        tick={{ fontSize: 11 }}
+                        stroke="var(--color-muted-foreground)"
+                        width={90}
+                      />
                       <Tooltip {...tooltipStyle} />
                       <Bar dataKey="count" fill="var(--color-chart-2)" radius={[0, 4, 4, 0]} />
                     </BarChart>
@@ -372,20 +417,25 @@ export function ProgramAnalytics({
             <DropAnalysisHeatmap data={dkbDropAnalysisQuery.data} />
           </Panel>
 
-
-
           <div className="grid gap-4 lg:grid-cols-3">
             <Panel title="Job status" description="Verification outcome per posting">
               <div className="h-64">
                 <ResponsiveContainer>
                   <PieChart>
-                    <Pie data={jobStatus} dataKey="count" nameKey="status" innerRadius={45} outerRadius={80} paddingAngle={2}>
-                      {jobStatus.map((_, i) => (
-                        <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                    <Pie
+                      data={jobStatus}
+                      dataKey="count"
+                      nameKey="status"
+                      innerRadius={45}
+                      outerRadius={80}
+                      paddingAngle={2}
+                    >
+                      {jobStatus.map((s, i) => (
+                        <Cell key={s.status} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                       ))}
                     </Pie>
                     <Tooltip {...tooltipStyle} />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    <Legend wrapperStyle={{ fontSize: 11 }} itemSorter={null} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -395,8 +445,20 @@ export function ProgramAnalytics({
               <div className="h-64">
                 <ResponsiveContainer>
                   <BarChart data={outcomes} margin={{ top: 10, right: 16, left: -10, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                    <XAxis dataKey="outcome" tick={{ fontSize: 10 }} stroke="var(--color-muted-foreground)" interval={0} angle={-15} textAnchor="end" height={50} />
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="var(--color-border)"
+                      vertical={false}
+                    />
+                    <XAxis
+                      dataKey="outcome"
+                      tick={{ fontSize: 10 }}
+                      stroke="var(--color-muted-foreground)"
+                      interval={0}
+                      angle={-15}
+                      textAnchor="end"
+                      height={50}
+                    />
                     <YAxis tick={{ fontSize: 11 }} stroke="var(--color-muted-foreground)" />
                     <Tooltip {...tooltipStyle} />
                     <Bar dataKey="count" fill="var(--color-chart-1)" radius={[4, 4, 0, 0]} />
@@ -409,8 +471,16 @@ export function ProgramAnalytics({
               <div className="h-64">
                 <ResponsiveContainer>
                   <BarChart data={dkbIntents} margin={{ top: 10, right: 16, left: -10, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                    <XAxis dataKey="score" tick={{ fontSize: 11 }} stroke="var(--color-muted-foreground)" />
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="var(--color-border)"
+                      vertical={false}
+                    />
+                    <XAxis
+                      dataKey="score"
+                      tick={{ fontSize: 11 }}
+                      stroke="var(--color-muted-foreground)"
+                    />
                     <YAxis tick={{ fontSize: 11 }} stroke="var(--color-muted-foreground)" />
                     <Tooltip {...tooltipStyle} />
                     <Bar dataKey="count" fill="var(--color-chart-3)" radius={[4, 4, 0, 0]} />
@@ -438,17 +508,51 @@ export function ProgramAnalytics({
                     }))}
                     margin={{ top: 10, right: 16, left: -10, bottom: 0 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                    <XAxis dataKey="label" tick={{ fontSize: 11 }} stroke="var(--color-muted-foreground)" />
-                    <YAxis tick={{ fontSize: 11 }} stroke="var(--color-muted-foreground)" unit="%" />
-                    <Tooltip
-                      {...tooltipStyle}
-                      formatter={(value: number) => [`${value}%`, ""]}
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="var(--color-border)"
+                      vertical={false}
                     />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Line type="monotone" dataKey="answered" stroke="var(--color-chart-1)" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="engaged" stroke="var(--color-chart-2)" strokeWidth={2} strokeDasharray="6 3" dot={false} />
-                    <Line type="monotone" dataKey="converted" name={config.successMetric === "applications" ? "connections" : config.successMetric} stroke="var(--color-chart-3)" strokeWidth={2} strokeDasharray="2 2" dot={false} />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fontSize: 11 }}
+                      stroke="var(--color-muted-foreground)"
+                    />
+                    <YAxis
+                      tick={{ fontSize: 11 }}
+                      stroke="var(--color-muted-foreground)"
+                      unit="%"
+                    />
+                    <Tooltip {...tooltipStyle} formatter={(value) => [`${String(value)}%`, ""]} />
+                    <Legend wrapperStyle={{ fontSize: 12 }} itemSorter={null} />
+                    <Line
+                      type="monotone"
+                      dataKey="answered"
+                      stroke="var(--color-chart-1)"
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="engaged"
+                      stroke="var(--color-chart-2)"
+                      strokeWidth={2}
+                      strokeDasharray="6 3"
+                      dot={false}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="converted"
+                      name={
+                        config.successMetric === "applications"
+                          ? "connections"
+                          : config.successMetric
+                      }
+                      stroke="var(--color-chart-3)"
+                      strokeWidth={2}
+                      strokeDasharray="2 2"
+                      dot={false}
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -462,31 +566,28 @@ export function ProgramAnalytics({
             </Panel>
           </div>
 
-
           <div className="grid gap-4 lg:grid-cols-3">
-            <Panel className="lg:col-span-2" title="Intent score distribution" description="Engaged callers only (score 1–10), bucketed">
+            <Panel
+              className="lg:col-span-2"
+              title="Intent score distribution"
+              description="Engaged callers only (score 1–10), bucketed"
+            >
               <div className="h-64">
                 <ResponsiveContainer>
                   <BarChart
-                    data={(() => {
-                      const buckets = [
-                        { range: "Low (1–4)", count: 0 },
-                        { range: "Medium (5–7)", count: 0 },
-                        { range: "High (8–10)", count: 0 },
-                      ];
-                      for (const r of intents as Array<{ score: number | string; count: number }>) {
-                        const s = Number(r.score);
-                        if (!Number.isFinite(s) || s <= 0) continue;
-                        if (s <= 4) buckets[0].count += r.count;
-                        else if (s <= 7) buckets[1].count += r.count;
-                        else if (s <= 10) buckets[2].count += r.count;
-                      }
-                      return buckets;
-                    })()}
+                    data={intentBuckets(intents)}
                     margin={{ top: 10, right: 16, left: -10, bottom: 0 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-                    <XAxis dataKey="range" tick={{ fontSize: 11 }} stroke="var(--color-muted-foreground)" />
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="var(--color-border)"
+                      vertical={false}
+                    />
+                    <XAxis
+                      dataKey="range"
+                      tick={{ fontSize: 11 }}
+                      stroke="var(--color-muted-foreground)"
+                    />
                     <YAxis tick={{ fontSize: 11 }} stroke="var(--color-muted-foreground)" />
                     <Tooltip {...tooltipStyle} />
                     <Bar dataKey="count" fill="var(--color-chart-1)" radius={[4, 4, 0, 0]} />
@@ -498,10 +599,27 @@ export function ProgramAnalytics({
             <Panel title="Region split">
               <div className="h-64">
                 <ResponsiveContainer>
-                  <BarChart data={regions} layout="vertical" margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" horizontal={false} />
-                    <XAxis type="number" tick={{ fontSize: 11 }} stroke="var(--color-muted-foreground)" />
-                    <YAxis dataKey="region" type="category" tick={{ fontSize: 11 }} stroke="var(--color-muted-foreground)" />
+                  <BarChart
+                    data={regions}
+                    layout="vertical"
+                    margin={{ top: 10, right: 16, left: 0, bottom: 0 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="var(--color-border)"
+                      horizontal={false}
+                    />
+                    <XAxis
+                      type="number"
+                      tick={{ fontSize: 11 }}
+                      stroke="var(--color-muted-foreground)"
+                    />
+                    <YAxis
+                      dataKey="region"
+                      type="category"
+                      tick={{ fontSize: 11 }}
+                      stroke="var(--color-muted-foreground)"
+                    />
                     <Tooltip {...tooltipStyle} />
                     <Bar dataKey="count" fill="var(--color-chart-2)" radius={[0, 4, 4, 0]} />
                   </BarChart>

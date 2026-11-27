@@ -75,18 +75,20 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## Toolchain
 
-- **Bun is required.** The lockfile is `bun.lock`. Do not use npm, pnpm or yarn, and do not commit another lockfile. `bunfig.toml` holds a 24-hour supply-chain guard (`minimumReleaseAge`); ask the user before adding a package to its exclude list.
+- **Bun is required**, version 1.4 or newer (`packageManager` in `package.json`; CI and the Dockerfile use the same version). The lockfile is `bun.lock`. Do not use npm, pnpm or yarn, and do not commit another lockfile. `bunfig.toml` holds a 24-hour supply-chain guard (`minimumReleaseAge`); ask the user before adding a package to its exclude list.
+- `overrides` in `package.json` pins patched versions for two development-only dependencies with known advisories: `esbuild` under drizzle-kit's `@esbuild-kit/core-utils`, and `minimatch` under typescript-eslint and `eslint-plugin-import-x`. Remove an entry once that package ships a fixed range. Nested overrides need Bun 1.4 or newer. Run `bun audit` after any dependency change; it must report no vulnerabilities.
 - `vite.config.ts` uses `@lovable.dev/vite-tanstack-config`, which already adds the TanStack Start, React, Tailwind, path-alias and Nitro plugins. Do not add them again.
 - `src/routeTree.gen.ts` is generated. Do not edit it by hand.
-- Prettier settings are in `.prettierrc` (double quotes, semicolons, 100 columns). Format the files you change; do not reformat files you did not change.
+- Prettier settings are in `.prettierrc` (double quotes, semicolons, 100 columns). The repository is formatted and CI fails on unformatted files; run `bun run format` before committing. The formatting commit is listed in `.git-blame-ignore-revs` (`git config blame.ignoreRevsFile .git-blame-ignore-revs`).
 
 ## Common commands
 
 ```bash
 bun install --frozen-lockfile        # install exactly what is committed
 bun run dev                          # local dev server
-bun x tsc --noEmit                   # type-check (there is no typecheck script)
-bun run lint                         # ESLint (advisory in CI, see below)
+bun run typecheck                    # tsc --noEmit
+bun run lint                         # ESLint; errors fail CI
+bun run lint:report                  # lint findings per rule and block (server, web, vendored, tests, tooling)
 bun run build                        # production build
 bun run test                         # unit tests (tests/unit)
 bun test tests/unit/auth.test.ts     # one test file
@@ -98,6 +100,8 @@ bun run db:migrate                   # apply migrations to DATABASE_URL
 
 The database login is created by `db/bootstrap.sql` (see the `migrations` job in `.github/workflows/ci.yaml` for the exact steps).
 
+Local end-to-end checks: `scripts/e2e/` (`setup.sh` brings up Postgres in Docker and seeds one user per role plus sample calls; `smoke.ts` checks login, the server-function role matrix and dashboard numbers against a running dev server). The `campaign-manager-e2e` skill walks through it, including the browser checks per role.
+
 ## Architecture
 
 - **Routes** — `src/routes/` is file-based routing; read `src/routes/README.md` for the naming rules. `__root.tsx` is the app shell. Pages check access with `canAccess` from `src/auth/roles.ts` to hide what a role may not open.
@@ -105,10 +109,10 @@ The database login is created by `db/bootstrap.sql` (see the `migrations` job in
 - **Server-only code** — modules named `*.server.ts` (and `src/server/**`) never reach the browser. Client-reachable modules import them dynamically inside `.server()` / handlers. Do not import the Next.js `server-only` package; ESLint blocks it.
 - **Auth** — a signed session cookie (`cm_session`, `jose`, `SESSION_SECRET`), with users in `app_users` and bcrypt passwords. A same-origin check runs on every POST server function.
 - **Database** — Drizzle schema in `src/server/db/schema.ts`, migrations in `src/server/db/migrations/`. Change the schema, then run `bun run db:generate` and commit the SQL and snapshot together; CI fails on drift. `getDb()` in `client.server.ts` is the only way to get a connection.
-- **External systems** — the Raya voice API (`src/lib/raya-api.ts`, `RAYA_API_KEY`) and Google Sheets (`src/lib/sheets.server.ts`, `GOOGLE_SERVICE_ACCOUNT_JSON`). Cron endpoints under `src/routes/api/` authenticate with `CRON_SECRET` (`src/server/auth/cron.server.ts`).
+- **External systems** — the Raya voice API (`src/lib/raya-api.server.ts`, `RAYA_API_KEY`) and Google Sheets (`src/lib/sheets.server.ts`, `GOOGLE_SERVICE_ACCOUNT_JSON`). Cron endpoints under `src/routes/api/` authenticate with `CRON_SECRET` (`src/server/auth/cron.server.ts`).
 - **Programs** — program-specific columns, KPIs and drop reasons come from config (`src/programs/`, `src/lib/program-overrides.ts`), not from code in components.
 
-Environment variables read today: `DATABASE_URL`, `MIGRATOR_DATABASE_URL`, `SESSION_SECRET`, `RAYA_API_KEY`, `GOOGLE_SERVICE_ACCOUNT_JSON`, `CRON_SECRET`, `CRON_SECRET_PREVIOUS`. Never put a secret behind a `VITE_` prefix; those values are bundled into the browser.
+Environment variables read today: `DATABASE_URL`, `MIGRATOR_DATABASE_URL`, `SESSION_SECRET`, `RAYA_API_KEY`, `RAYA_BASE_URL`, `RAYA_TIMEOUT_MS`, `RAYA_WRITE_TIMEOUT_MS`, `RAYA_RETRIES`, `GOOGLE_SERVICE_ACCOUNT_JSON`, `SHEETS_API_BASE_URL`, `SHEETS_TIMEOUT_MS`, `SHEETS_RETRIES`, `CRON_SECRET`, `CRON_SECRET_PREVIOUS`. Never put a secret behind a `VITE_` prefix; those values are bundled into the browser.
 
 ## Project rules (`.claude/rules/`)
 
@@ -122,9 +126,9 @@ Apply them to every line you write or change. Existing code does not meet all of
 
 ## CI
 
-`.github/workflows/ci.yaml` runs on every PR and every push to `main`. Blocking: `typecheck`, `build`, `migrations` (bootstrap, migrate, schema drift, `bun test tests`) and `smoke-image` (builds and boots the Docker image). Advisory: `lint` (ESLint and Prettier have a large existing baseline) and `sonar`. Images are published by `build-images.yaml` on release tags only.
+`.github/workflows/ci.yaml` runs on every PR and every push to `main`. Blocking: `typecheck`, `build`, `lint` (ESLint errors and Prettier), `migrations` (bootstrap, migrate, schema drift, `bun test tests`) and `smoke-image` (builds and boots the Docker image). Advisory: `sonar`. Images are published by `build-images.yaml` on release tags only.
 
-Do not add new ESLint or Prettier problems in files you change, even though the lint job does not fail the build.
+Type-safety rules (no casts, no `any`, no non-null assertions, `import type`, unused variables) and React hook rules are errors. Accessibility and react-refresh rules are warnings; do not add new ones. `tsconfig.json` has `strict` and `noUncheckedIndexedAccess` on.
 
 ## Commits and pull requests
 

@@ -118,7 +118,10 @@ export function UsersRolesSection() {
   });
 
   const resetPassword = useMutation({
-    mutationFn: async (email: string) => ({ email, password: (await resetFn({ data: { email } })).temporaryPassword }),
+    mutationFn: async (email: string) => ({
+      email,
+      password: (await resetFn({ data: { email } })).temporaryPassword,
+    }),
     onSuccess: (r) => {
       setIssued(r);
       refresh();
@@ -244,7 +247,9 @@ export function UsersRolesSection() {
           </DialogHeader>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="sm:col-span-2">
-              <Label htmlFor="u-email" className="text-xs">Email</Label>
+              <Label htmlFor="u-email" className="text-xs">
+                Email
+              </Label>
               <Input
                 id="u-email"
                 value={form.email}
@@ -255,7 +260,9 @@ export function UsersRolesSection() {
               />
             </div>
             <div>
-              <Label htmlFor="u-name" className="text-xs">Name</Label>
+              <Label htmlFor="u-name" className="text-xs">
+                Name
+              </Label>
               <Input
                 id="u-name"
                 value={form.name}
@@ -266,18 +273,27 @@ export function UsersRolesSection() {
             <div>
               <Label className="text-xs">Role</Label>
               <Select value={form.role} onValueChange={(v) => setForm({ ...form, role: v })}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   {ROLE_OPTIONS.map((r) => (
-                    <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                    <SelectItem key={r.value} value={r.value}>
+                      {r.label}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label className="text-xs">District</Label>
-              <Select value={form.district} onValueChange={(v) => setForm({ ...form, district: v })}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+              <Select
+                value={form.district}
+                onValueChange={(v) => setForm({ ...form, district: v })}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NONE}>None</SelectItem>
                   <SelectItem value="KA">KA</SelectItem>
@@ -288,19 +304,28 @@ export function UsersRolesSection() {
             <div>
               <Label className="text-xs">Program</Label>
               <Select value={form.program} onValueChange={(v) => setForm({ ...form, program: v })}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NONE}>None</SelectItem>
                   {Object.values(registry).map((p) => (
-                    <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.label}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label className="text-xs">Node type</Label>
-              <Select value={form.node_type} onValueChange={(v) => setForm({ ...form, node_type: v })}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+              <Select
+                value={form.node_type}
+                onValueChange={(v) => setForm({ ...form, node_type: v })}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NONE}>None</SelectItem>
                   <SelectItem value="College">College</SelectItem>
@@ -309,7 +334,9 @@ export function UsersRolesSection() {
               </Select>
             </div>
             <div>
-              <Label htmlFor="u-node" className="text-xs">Node name</Label>
+              <Label htmlFor="u-node" className="text-xs">
+                Node name
+              </Label>
               <Input
                 id="u-node"
                 value={form.node_name}
@@ -319,12 +346,15 @@ export function UsersRolesSection() {
             </div>
             {!editingEmail && (
               <p className="sm:col-span-2 text-xs text-muted-foreground">
-                A temporary password is generated and shown once. The user sets their own at first sign-in.
+                A temporary password is generated and shown once. The user sets their own at first
+                sign-in.
               </p>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
             <Button
               className="bg-brand text-brand-foreground hover:bg-brand/90"
               disabled={save.isPending || !form.email.trim()}
@@ -342,10 +372,15 @@ export function UsersRolesSection() {
             <DialogTitle>Temporary password</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Send this to <span className="font-mono text-foreground">{issued?.email}</span>. It is shown only once;
-            they will be asked to change it when they sign in.
+            Send this to <span className="font-mono text-foreground">{issued?.email}</span>. It is
+            shown only once; they will be asked to change it when they sign in.
           </p>
-          <Input readOnly value={issued?.password ?? ""} className="font-mono" onFocus={(e) => e.currentTarget.select()} />
+          <Input
+            readOnly
+            value={issued?.password ?? ""}
+            className="font-mono"
+            onFocus={(e) => e.currentTarget.select()}
+          />
           <DialogFooter>
             <Button
               variant="outline"

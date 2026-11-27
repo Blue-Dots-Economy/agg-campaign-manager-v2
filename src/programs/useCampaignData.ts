@@ -18,7 +18,7 @@ export function useCampaignData(config: ProgramConfig): {
   });
   if (query.data) {
     return {
-      rows: query.data.rows as CallRow[],
+      rows: query.data.rows,
       isLoading: false,
       source: query.data.source,
       connectionCount: query.data.connectionCount,

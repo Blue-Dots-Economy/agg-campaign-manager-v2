@@ -51,26 +51,30 @@ export function AuroraFlow() {
   useEffect(() => {
     const canvas = ref.current;
     if (!canvas) return;
-    const gl = (canvas.getContext("webgl") || canvas.getContext("experimental-webgl")) as WebGLRenderingContext | null;
-    if (!gl) return;
+    const gl = canvas.getContext("webgl") ?? canvas.getContext("experimental-webgl");
+    if (!(gl instanceof WebGLRenderingContext)) return;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     const compile = (type: number, src: string) => {
-      const s = gl.createShader(type)!;
+      const s = gl.createShader(type);
+      if (!s) return null;
       gl.shaderSource(s, src);
       gl.compileShader(s);
       return s;
     };
-    const prog = gl.createProgram()!;
-    gl.attachShader(prog, compile(gl.VERTEX_SHADER, VERT));
-    gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FRAG));
+    const prog = gl.createProgram();
+    const vert = compile(gl.VERTEX_SHADER, VERT);
+    const frag = compile(gl.FRAGMENT_SHADER, FRAG);
+    if (!prog || !vert || !frag) return;
+    gl.attachShader(prog, vert);
+    gl.attachShader(prog, frag);
     gl.linkProgram(prog);
     if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return;
     gl.useProgram(prog);
 
     const buf = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
     const loc = gl.getAttribLocation(prog, "a_pos");
     gl.enableVertexAttribArray(loc);
     gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
@@ -91,7 +95,10 @@ export function AuroraFlow() {
     const resize = () => {
       const w = Math.max(1, Math.floor(canvas.clientWidth * dpr));
       const h = Math.max(1, Math.floor(canvas.clientHeight * dpr));
-      if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.uniform2f(uRes, canvas.width, canvas.height);
     };

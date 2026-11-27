@@ -9,9 +9,11 @@ function record(error: unknown) {
 }
 
 if (typeof globalThis.addEventListener === "function") {
-  globalThis.addEventListener("error", (event) => record((event as ErrorEvent).error ?? event));
+  globalThis.addEventListener("error", (event) =>
+    record("error" in event ? (event.error ?? event) : event),
+  );
   globalThis.addEventListener("unhandledrejection", (event) =>
-    record((event as PromiseRejectionEvent).reason),
+    record("reason" in event ? event.reason : undefined),
   );
 }
 

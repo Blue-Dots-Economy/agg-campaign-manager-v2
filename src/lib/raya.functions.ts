@@ -1,69 +1,154 @@
-// Server-side Raya Voice AI client. RAYA_API_KEY is read from process.env
-// inside .handler() and never sent to the browser.
+// Server functions for Raya batches, agents and test calls. RAYA_API_KEY stays on the server.
 
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 import { requireRole } from "@/auth/middleware";
 import { FN_ROLES } from "@/auth/roles";
-import { delay, rayaFetch, RayaApiError } from "./raya-api";
+import { parseInput } from "@/lib/validation";
+import { MAX_CONTACTS_PER_BATCH } from "@/lib/input-schemas";
+import { JsonObjectSchema, JsonValueSchema, type JsonObject } from "@/lib/json";
+import { DEFAULT_COUNTRY_CODE, validateContactRows } from "./contact-validation";
+import { delay, rayaFetch, RayaApiError } from "./raya-api.server";
 
-export interface RayaContact {
-  contact_name: string;
-  contact_phone: string;
-  country_code: string;
-  [extra: string]: any;
+/** Most rows accepted by the upload check. */
+export const MAX_UPLOAD_ROWS = MAX_CONTACTS_PER_BATCH;
+/** Most columns accepted by the upload check. */
+export const MAX_UPLOAD_COLUMNS = 200;
+/** Wait before starting a batch, so Raya has finished creating it. */
+const START_AFTER_CREATE_DELAY_MS = 1_500;
+/** Statuses dialled when the caller picks none: freshly uploaded contacts only. */
+const DEFAULT_SELECTED_STATUSES = ["Pending"];
+
+const requiredId = (message: string) => z.string().min(1, message);
+const optionalCount = z.number().optional();
+
+/** One contact sent to Raya. Extra fields are kept: Raya passes them to the agent. */
+export const RayaContactSchema = z
+  .object({
+    contact_name: z.string(),
+    contact_phone: z.string(),
+    country_code: z.string().optional(),
+  })
+  .catchall(z.unknown());
+
+/** One contact sent to Raya. */
+export type RayaContact = z.infer<typeof RayaContactSchema>;
+
+/** Daily calling window for a batch. */
+export const RayaScheduleSchema = z
+  .object({
+    /** IANA time zone, for example "Asia/Kolkata". */
+    timezone: z.string(),
+    /** "HH:mm". */
+    start_time: z.string().min(1, "Schedule requires start_time and end_time."),
+    /** "HH:mm". */
+    end_time: z.string().min(1, "Schedule requires start_time and end_time."),
+    /** 1 = Monday … 7 = Sunday. */
+    days: z.array(z.number().int().min(1).max(7)).min(1, "Pick at least one day of the week."),
+  })
+  .refine((s) => s.start_time < s.end_time, {
+    message: "end_time must be after start_time.",
+    path: ["end_time"],
+  });
+
+/** Daily calling window for a batch. */
+export type RayaSchedule = z.infer<typeof RayaScheduleSchema>;
+
+/** A Raya reply passed back to the page as it is. Any JSON is accepted, so a write Raya has done is never reported as failed. */
+const RayaReply = JsonValueSchema;
+
+const RayaId = z.union([z.string(), z.number()]);
+/** Optional reply field; an unexpected type reads as missing. */
+const lenient = <T extends z.ZodTypeAny>(schema: T) => schema.nullish().catch(null);
+const RayaIds = z.object({
+  batchId: lenient(RayaId),
+  batch_id: lenient(RayaId),
+  id: lenient(RayaId),
+});
+
+/**
+ * Fields of Raya's batch-creation reply, for both success and row validation errors.
+ * Fields are lenient: the batch may already exist, so an odd reply must not fail the launch.
+ */
+export const CreateBatchReply = z.object({
+  status: lenient(z.string()),
+  message: lenient(z.string()),
+  batchId: lenient(RayaId),
+  batch_id: lenient(RayaId),
+  id: lenient(RayaId),
+  data: lenient(RayaIds),
+  batch: lenient(RayaIds),
+  totalRows: lenient(z.number()),
+  validRows: lenient(z.number()),
+  invalidRows: lenient(z.number()),
+  contactsInserted: lenient(z.number()),
+  errors: z.unknown().optional(),
+});
+type CreateBatchReply = z.infer<typeof CreateBatchReply>;
+
+/** Returns Raya's row-level validation errors for the page; entries that are not objects are skipped. */
+export function validationErrorList(errors: unknown): JsonObject[] {
+  if (!Array.isArray(errors)) return [];
+  return errors.flatMap((entry: unknown) => {
+    const parsed = JsonObjectSchema.safeParse(entry);
+    return parsed.success ? [parsed.data] : [];
+  });
 }
 
-export interface RayaSchedule {
-  timezone: string; // IANA, e.g. "Asia/Kolkata"
-  start_time: string; // "HH:mm"
-  end_time: string; // "HH:mm"
-  days: number[]; // 1=Mon … 7=Sun
+function validationResult(r: CreateBatchReply) {
+  return {
+    ok: false as const,
+    batchId: null,
+    validation: {
+      message: r.message ?? "Validation failed",
+      totalRows: r.totalRows ?? undefined,
+      validRows: r.validRows ?? undefined,
+      invalidRows: r.invalidRows ?? undefined,
+      errors: validationErrorList(r.errors),
+    },
+  };
 }
 
-// ---------- createBatch ----------
+/** Input of `rayaCreateBatch`. */
+export const CreateBatchInput = z.object({
+  agentId: requiredId("Missing agent id for this program. Set it in Settings."),
+  batchName: requiredId("Missing batch name."),
+  contacts: z
+    .array(RayaContactSchema)
+    .min(1, "No contacts to send.")
+    .max(MAX_CONTACTS_PER_BATCH, "Too many contacts for one batch."),
+});
+
+/** Creates a Raya batch with the contacts; returns the batch id or Raya's row-level validation errors. */
 export const rayaCreateBatch = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.launch)])
-  .inputValidator(
-    (data: { agentId: string; batchName: string; contacts: RayaContact[] }) => {
-      if (!data.agentId) throw new Error("Missing agent id for this program. Set it in Settings.");
-      if (!data.batchName) throw new Error("Missing batch name.");
-      if (!Array.isArray(data.contacts) || data.contacts.length === 0)
-        throw new Error("No contacts to send.");
-      return data;
-    },
-  )
+  .validator(parseInput(CreateBatchInput))
   .handler(async ({ data }) => {
     const body = {
       agent_id: data.agentId,
       batch_name: data.batchName,
       contacts: data.contacts,
     };
-    let res: any;
+    let r: CreateBatchReply;
     try {
-      res = await rayaFetch("/batch", { method: "POST", json: body });
+      r =
+        (await rayaFetch(
+          "/batch",
+          { method: "POST", json: body },
+          CreateBatchReply.nullable().catch(null),
+        )) ?? {};
     } catch (e) {
-      // Raya 400 validation: { status:"error", message, errors:[{row,field,...}] }
-      if (e instanceof RayaApiError && e.body && typeof e.body === "object") {
-        const b = e.body as Record<string, any>;
-        if (b.status === "error" || Array.isArray(b.errors)) {
-          return {
-            ok: false as const,
-            batchId: null,
-            validation: {
-              message: b.message ?? "Validation failed",
-              totalRows: b.totalRows,
-              validRows: b.validRows,
-              invalidRows: b.invalidRows,
-              errors: Array.isArray(b.errors) ? b.errors : [],
-            },
-          };
+      // Raya 400 validation: { status: "error", message, errors: [{ row, field, ... }] }
+      if (e instanceof RayaApiError) {
+        const b = CreateBatchReply.safeParse(e.body);
+        if (b.success && (b.data.status === "error" || Array.isArray(b.data.errors))) {
+          return validationResult(b.data);
         }
       }
       throw e;
     }
 
-    const r = (res ?? {}) as Record<string, any>;
-    // Raya success uses camelCase `batchId` (number). Fall back to other common keys.
+    // Raya answers with camelCase `batchId` (a number); other keys are fallbacks.
     const rawId =
       r.batchId ??
       r.batch_id ??
@@ -74,18 +159,11 @@ export const rayaCreateBatch = createServerFn({ method: "POST" })
       r.batch?.id ??
       r.batch?.batchId;
 
-    if (r.status === "error" || (!rawId && typeof r.invalidRows === "number" && r.invalidRows > 0)) {
-      return {
-        ok: false as const,
-        batchId: null,
-        validation: {
-          message: r.message ?? "Validation failed",
-          totalRows: r.totalRows,
-          validRows: r.validRows,
-          invalidRows: r.invalidRows,
-          errors: Array.isArray(r.errors) ? r.errors : [],
-        },
-      };
+    if (
+      r.status === "error" ||
+      (!rawId && typeof r.invalidRows === "number" && r.invalidRows > 0)
+    ) {
+      return validationResult(r);
     }
 
     if (!rawId) throw new Error("Raya did not return a batchId.");
@@ -93,251 +171,229 @@ export const rayaCreateBatch = createServerFn({ method: "POST" })
     return {
       ok: true as const,
       batchId: String(rawId),
-      totalRows: r.totalRows,
-      validRows: r.validRows,
-      invalidRows: r.invalidRows,
-      contactsInserted: r.contactsInserted,
-      message: r.message,
+      totalRows: r.totalRows ?? undefined,
+      validRows: r.validRows ?? undefined,
+      invalidRows: r.invalidRows ?? undefined,
+      contactsInserted: r.contactsInserted ?? undefined,
+      message: r.message ?? undefined,
     };
   });
 
-// ---------- startBatch ----------
+/** Input of `rayaStartBatch`. */
+export const StartBatchInput = z.object({
+  batchId: requiredId("Missing batch id."),
+  schedule: RayaScheduleSchema.optional(),
+  maxRetries: optionalCount,
+  retryAfterHrs: optionalCount,
+  concurrency: optionalCount,
+  selectedStatuses: z.array(z.string()).optional(),
+});
+
+/** Starts a created batch with its schedule and retry settings. */
 export const rayaStartBatch = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.launch)])
-  .inputValidator(
-    (data: {
-      batchId: string;
-      schedule?: RayaSchedule;
-      maxRetries?: number;
-      retryAfterHrs?: number;
-      concurrency?: number;
-      selectedStatuses?: string[];
-    }) => {
-      if (!data.batchId) throw new Error("Missing batch id.");
-      if (data.schedule) {
-        const s = data.schedule;
-        if (!s.start_time || !s.end_time) throw new Error("Schedule requires start_time and end_time.");
-        if (s.start_time >= s.end_time) throw new Error("end_time must be after start_time.");
-        if (!Array.isArray(s.days) || s.days.length === 0)
-          throw new Error("Pick at least one day of the week.");
-      }
-      return data;
-    },
-  )
+  .validator(parseInput(StartBatchInput))
   .handler(async ({ data }) => {
-    await delay(1_500);
-    const body: Record<string, any> = {};
-    if (data.schedule) body.schedule = data.schedule;
-    if (typeof data.maxRetries === "number") body.max_retries = data.maxRetries;
-    if (typeof data.retryAfterHrs === "number") body.retry_after_hrs = data.retryAfterHrs;
-    if (typeof data.concurrency === "number") body.concurrency = data.concurrency;
-    // Raya requires selected_statuses on /batch/:id/start. Default to ["Pending"]
-    // which dials freshly-uploaded contacts. Including "Unanswered"/"Failed"
-    // immediately re-calls those contacts (resume mode).
-    body.selected_statuses =
-      data.selectedStatuses && data.selectedStatuses.length ? data.selectedStatuses : ["Pending"];
-    return (await rayaFetch(`/batch/${encodeURIComponent(data.batchId)}/start`, {
-      method: "POST",
-      json: body,
-    })) as Record<string, any>;
+    await delay(START_AFTER_CREATE_DELAY_MS);
+    // Raya requires selected_statuses. Adding "Unanswered" or "Failed" re-calls those contacts.
+    const body = {
+      ...batchSettings(data),
+      selected_statuses: data.selectedStatuses?.length
+        ? data.selectedStatuses
+        : DEFAULT_SELECTED_STATUSES,
+    };
+    return rayaFetch(
+      `/batch/${encodeURIComponent(data.batchId)}/start`,
+      { method: "POST", json: body },
+      RayaReply,
+    );
   });
 
-// ---------- listAgents ----------
+/** Maps optional batch settings to Raya's field names, leaving out the ones not given. */
+function batchSettings(data: {
+  schedule?: RayaSchedule;
+  maxRetries?: number;
+  retryAfterHrs?: number;
+  concurrency?: number;
+}): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+  if (data.schedule) body.schedule = data.schedule;
+  if (data.maxRetries !== undefined) body.max_retries = data.maxRetries;
+  if (data.retryAfterHrs !== undefined) body.retry_after_hrs = data.retryAfterHrs;
+  if (data.concurrency !== undefined) body.concurrency = data.concurrency;
+  return body;
+}
+
+/** Input of `rayaListAgents`. */
+export const ListAgentsInput = z
+  .object({ page: z.number().optional(), pageSize: z.number().optional() })
+  .optional()
+  .default({});
+
+const AgentItem = z.object({
+  id: RayaId.nullish(),
+  agent_id: RayaId.nullish(),
+  _id: RayaId.nullish(),
+  name: RayaId.nullish(),
+  agent_name: RayaId.nullish(),
+  title: RayaId.nullish(),
+});
+const AgentList = z.array(AgentItem);
+const AgentsReply = z.union([
+  AgentList,
+  z.object({
+    agents: AgentList.optional(),
+    data: AgentList.optional(),
+    items: AgentList.optional(),
+    results: AgentList.optional(),
+  }),
+]);
+
+/** Builds the `?page=…&page_size=…` query string, or "" when neither is set. */
+function pageQuery(page?: number, pageSize?: number, extra: Record<string, string> = {}): string {
+  const qs = new URLSearchParams(extra);
+  if (page) qs.set("page", String(page));
+  if (pageSize) qs.set("page_size", String(pageSize));
+  const q = qs.toString();
+  return q ? `?${q}` : "";
+}
+
+/** Lists Raya agents as id and name. */
 export const rayaListAgents = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator((data: { page?: number; pageSize?: number }) => data)
+  .validator(parseInput(ListAgentsInput))
   .handler(async ({ data }) => {
-    const qs = new URLSearchParams();
-    if (data.page) qs.set("page", String(data.page));
-    if (data.pageSize) qs.set("page_size", String(data.pageSize));
-    const q = qs.toString();
-    const res = await rayaFetch(`/agents${q ? `?${q}` : ""}`, { method: "GET" });
-    // Normalize → array of { id, name }
-    const raw = res as any;
-    const list: any[] = Array.isArray(raw)
-      ? raw
-      : raw?.agents ?? raw?.data ?? raw?.items ?? raw?.results ?? [];
-    return list.map((a) => ({
-      id: String(a.id ?? a.agent_id ?? a._id ?? ""),
-      name: String(a.name ?? a.agent_name ?? a.title ?? a.id ?? "Unnamed agent"),
-    })).filter((a) => a.id);
+    const res = await rayaFetch(
+      `/agents${pageQuery(data.page, data.pageSize)}`,
+      { method: "GET" },
+      AgentsReply,
+    );
+    const list = Array.isArray(res)
+      ? res
+      : (res.agents ?? res.data ?? res.items ?? res.results ?? []);
+    return list
+      .map((a) => ({
+        id: String(a.id ?? a.agent_id ?? a._id ?? ""),
+        name: String(a.name ?? a.agent_name ?? a.title ?? a.id ?? "Unnamed agent"),
+      }))
+      .filter((a) => a.id);
   });
 
-// ---------- validateContacts (no Raya call — pure validation) ----------
+/** Input of `validateContacts`: an uploaded CSV as headers plus rows of cells. */
+export const ValidateContactsInput = z.object({
+  headers: z.array(z.string()).max(MAX_UPLOAD_COLUMNS),
+  rows: z.array(z.array(z.string()).max(MAX_UPLOAD_COLUMNS)).max(MAX_UPLOAD_ROWS),
+});
+
+/** Checks an uploaded contact list before launch, without calling Raya. */
 export const validateContacts = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.launch)])
-  .inputValidator(
-    (data: { headers: string[]; rows: string[][] }) => {
-      if (!Array.isArray(data.headers)) throw new Error("headers required");
-      if (!Array.isArray(data.rows)) throw new Error("rows required");
-      return data;
-    },
-  )
-  .handler(async ({ data }) => {
-    const lc = data.headers.map((h) => h.trim().toLowerCase());
-    const find = (cands: string[]) => {
-      for (const c of cands) {
-        const i = lc.indexOf(c.toLowerCase());
-        if (i >= 0) return i;
-      }
-      return -1;
-    };
-    const nameIdx = find(["contact_name", "name", "seeker_name", "candidate_name"]);
-    const phoneIdx = find(["contact_phone", "phone", "mobile", "phone_number"]);
-    const ccIdx = find(["country_code", "cc"]);
+  .validator(parseInput(ValidateContactsInput))
+  .handler(async ({ data }) => validateContactRows(data.headers, data.rows));
 
-    const missingCols: string[] = [];
-    if (nameIdx < 0) missingCols.push("contact_name");
-    if (phoneIdx < 0) missingCols.push("contact_phone");
+/** Input of `rayaUpdateBatch`. */
+export const UpdateBatchInput = z.object({
+  batchId: requiredId("Missing batch id."),
+  name: z.string().optional(),
+  schedule: RayaScheduleSchema.optional(),
+  maxRetries: optionalCount,
+  retryAfterHrs: optionalCount,
+  concurrency: optionalCount,
+});
 
-    interface Problem { row: number; reason: string; phone?: string; name?: string }
-    const problems: Problem[] = [];
-    const validRows: { name: string; phone: string; cc: string; extras: Record<string, string>; rowIndex: number }[] = [];
-    const seen = new Map<string, number>();
-
-    if (missingCols.length === 0) {
-      data.rows.forEach((r, i) => {
-        const rowNum = i + 2; // header is row 1
-        const name = (r[nameIdx] ?? "").trim();
-        const rawPhone = (r[phoneIdx] ?? "").trim();
-        const cc = ccIdx >= 0 ? (r[ccIdx] ?? "").replace(/[^\d]/g, "") || "91" : "91";
-        if (!name) { problems.push({ row: rowNum, reason: "missing contact_name" }); return; }
-        if (!rawPhone) { problems.push({ row: rowNum, reason: "missing contact_phone", name }); return; }
-        let digits = rawPhone.replace(/[^\d]/g, "");
-        // strip country code if present at start
-        if (digits.startsWith(cc) && digits.length > 10) digits = digits.slice(cc.length);
-        if (digits.length !== 10 || !/^[6-9]\d{9}$/.test(digits)) {
-          problems.push({ row: rowNum, reason: `invalid phone: ${rawPhone}`, name });
-          return;
-        }
-        const dupRow = seen.get(digits);
-        if (dupRow !== undefined) {
-          problems.push({ row: rowNum, reason: `duplicate of row ${dupRow}`, phone: digits, name });
-          return;
-        }
-        seen.set(digits, rowNum);
-        const extras: Record<string, string> = {};
-        data.headers.forEach((h, j) => {
-          if (j === nameIdx || j === phoneIdx || j === ccIdx) return;
-          if (!h) return;
-          extras[h] = r[j] ?? "";
-        });
-        validRows.push({ name, phone: digits, cc, extras, rowIndex: rowNum });
-      });
-    }
-
-    return {
-      total: data.rows.length,
-      valid: validRows.length,
-      invalid: problems.length,
-      missingCols,
-      problems: problems.slice(0, 500),
-      validRows,
-    };
-  });
-
-
-// ---------- updateBatch ----------
+/** Changes a batch's name, schedule or retry settings. */
 export const rayaUpdateBatch = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator(
-    (data: {
-      batchId: string;
-      name?: string;
-      schedule?: RayaSchedule;
-      maxRetries?: number;
-      retryAfterHrs?: number;
-      concurrency?: number;
-    }) => {
-      if (!data.batchId) throw new Error("Missing batch id.");
-      return data;
-    },
-  )
+  .validator(parseInput(UpdateBatchInput))
   .handler(async ({ data }) => {
-    const body: Record<string, any> = {};
-    if (data.name) body.name = data.name;
-    if (data.schedule) body.schedule = data.schedule;
-    if (typeof data.maxRetries === "number") body.max_retries = data.maxRetries;
-    if (typeof data.retryAfterHrs === "number") body.retry_after_hrs = data.retryAfterHrs;
-    if (typeof data.concurrency === "number") body.concurrency = data.concurrency;
-    return (await rayaFetch(`/batch/${encodeURIComponent(data.batchId)}`, {
-      method: "PATCH",
-      json: body,
-    })) as Record<string, any>;
+    const body = { ...(data.name ? { name: data.name } : {}), ...batchSettings(data) };
+    return rayaFetch(
+      `/batch/${encodeURIComponent(data.batchId)}`,
+      { method: "PATCH", json: body },
+      RayaReply,
+    );
   });
 
-// ---------- stopBatch ----------
+/** Input of `rayaStopBatch`. */
+export const StopBatchInput = z.object({ batchId: requiredId("Missing batch id.") });
+
+/** Stops a running batch. */
 export const rayaStopBatch = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.campaigns)])
-  .inputValidator((data: { batchId: string }) => {
-    if (!data.batchId) throw new Error("Missing batch id.");
-    return data;
-  })
-  .handler(async ({ data }) => {
-    return (await rayaFetch(`/batch/${encodeURIComponent(data.batchId)}/stop`, {
-      method: "POST",
-      json: {},
-    })) as Record<string, any>;
-  });
+  .validator(parseInput(StopBatchInput))
+  .handler(async ({ data }) =>
+    rayaFetch(
+      `/batch/${encodeURIComponent(data.batchId)}/stop`,
+      { method: "POST", json: {} },
+      RayaReply,
+    ),
+  );
 
-// ---------- listBatches ----------
+/** Input of `rayaListBatches`. */
+export const ListBatchesInput = z
+  .object({
+    agentId: z.string().optional(),
+    page: z.number().optional(),
+    pageSize: z.number().optional(),
+  })
+  .optional()
+  .default({});
+
+/** Lists Raya batches, optionally for one agent. */
 export const rayaListBatches = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator((data: { agentId?: string; page?: number; pageSize?: number }) => data)
+  .validator(parseInput(ListBatchesInput))
   .handler(async ({ data }) => {
-    const qs = new URLSearchParams();
-    if (data.agentId) qs.set("agent_id", data.agentId);
-    if (data.page) qs.set("page", String(data.page));
-    if (data.pageSize) qs.set("page_size", String(data.pageSize));
-    const q = qs.toString();
-    const res = await rayaFetch(`/batch${q ? `?${q}` : ""}`, { method: "GET" });
-    return res as Record<string, any>;
+    const agent: Record<string, string> = data.agentId ? { agent_id: data.agentId } : {};
+    return rayaFetch(
+      `/batch${pageQuery(data.page, data.pageSize, agent)}`,
+      { method: "GET" },
+      RayaReply,
+    );
   });
 
-// ---------- getBatchContacts ----------
+/** Input of `rayaGetBatchContacts`. */
+export const GetBatchContactsInput = z.object({
+  batchId: requiredId("Missing batch id."),
+  page: z.number().optional(),
+  pageSize: z.number().optional(),
+});
+
+/** Returns one page of a batch's contacts as Raya sends them. */
 export const rayaGetBatchContacts = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator((data: { batchId: string; page?: number; pageSize?: number }) => {
-    if (!data.batchId) throw new Error("Missing batch id.");
-    return data;
-  })
-  .handler(async ({ data }) => {
-    const qs = new URLSearchParams();
-    if (data.page) qs.set("page", String(data.page));
-    if (data.pageSize) qs.set("page_size", String(data.pageSize));
-    const q = qs.toString();
-    return (await rayaFetch(
-      `/batch/${encodeURIComponent(data.batchId)}/contacts${q ? `?${q}` : ""}`,
+  .validator(parseInput(GetBatchContactsInput))
+  .handler(async ({ data }) =>
+    rayaFetch(
+      `/batch/${encodeURIComponent(data.batchId)}/contacts${pageQuery(data.page, data.pageSize)}`,
       { method: "GET" },
-    )) as Record<string, any>;
-  });
+      RayaReply,
+    ),
+  );
 
-// ---------- initiateCall ----------
+/** Input of `rayaInitiateCall`. */
+export const InitiateCallInput = z.object({
+  agentId: requiredId("Missing agent id."),
+  toNumber: requiredId("Missing phone number."),
+  countryCode: z.string().optional(),
+  agentArgs: z.record(z.string(), z.unknown()).optional(),
+});
+
+/** Places one test call from an agent to a phone number. */
 export const rayaInitiateCall = createServerFn({ method: "POST" })
   .middleware([requireRole(FN_ROLES.admin)])
-  .inputValidator(
-    (data: {
-      agentId: string;
-      toNumber: string;
-      countryCode?: string;
-      agentArgs?: Record<string, any>;
-    }) => {
-      if (!data.agentId) throw new Error("Missing agent id.");
-      if (!data.toNumber) throw new Error("Missing phone number.");
-      return data;
-    },
-  )
+  .validator(parseInput(InitiateCallInput))
   .handler(async ({ data }) => {
     const body = {
       agent_id: data.agentId,
       to_number: data.toNumber,
-      country_code: data.countryCode ?? "91",
+      country_code: data.countryCode ?? DEFAULT_COUNTRY_CODE,
       agent_args: data.agentArgs ?? {},
     };
-    return (await rayaFetch("/call", { method: "POST", json: body })) as Record<string, any>;
+    return rayaFetch("/call", { method: "POST", json: body }, RayaReply);
   });
 
-// ---------- key status (does not expose the key) ----------
+/** Tells whether RAYA_API_KEY is set, without returning the key. */
 export const rayaKeyStatus = createServerFn({ method: "GET" })
   .middleware([requireRole(FN_ROLES.admin)])
   .handler(async () => {
