@@ -111,7 +111,7 @@ export function RateDial({
   return (
     <div className="flex items-center gap-5 rounded-xl border bg-card p-5">
       <div className="relative shrink-0" style={{ width: size, height: size }}>
-        <svg width={size} height={size} className="-rotate-90">
+        <svg width={size} height={size} className="-rotate-90" aria-hidden="true">
           <circle
             cx={size / 2}
             cy={size / 2}
@@ -267,7 +267,7 @@ export function SplitBar({
 
         {/* Right: donut chart */}
         <div className="relative shrink-0" style={{ width: size, height: size }}>
-          <svg width={size} height={size} className="-rotate-90">
+          <svg width={size} height={size} className="-rotate-90" aria-hidden="true">
             <circle
               cx={size / 2}
               cy={size / 2}

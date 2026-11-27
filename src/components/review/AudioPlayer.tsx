@@ -13,7 +13,7 @@ const SPEED_KEY = "audio_playback_speed";
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 
 function fmt(t: number) {
-  if (!isFinite(t) || t < 0) t = 0;
+  if (!Number.isFinite(t) || t < 0) t = 0;
   const m = Math.floor(t / 60);
   const s = Math.floor(t % 60);
   return `${m}:${s.toString().padStart(2, "0")}`;

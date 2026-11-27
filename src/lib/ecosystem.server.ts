@@ -53,12 +53,15 @@ export interface EcoPayload {
   unmapped: string[];
 }
 
-const normKey = (h: string): string =>
-  String(h ?? "")
+const normKey = (h: string): string => {
+  const k = String(h ?? "")
     .trim()
     .toLowerCase()
-    .replace(/[\s\-()./]+/g, "_")
-    .replace(/_+$/g, "");
+    .replace(/[\s\-()./]+/g, "_");
+  let end = k.length;
+  while (end > 0 && k[end - 1] === "_") end--;
+  return k.slice(0, end);
+};
 
 /** Column index per normalized header; the first column wins when headers repeat. */
 type HeaderIndex = Map<string, number>;

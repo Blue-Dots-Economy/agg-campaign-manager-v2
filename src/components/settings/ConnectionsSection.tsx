@@ -78,8 +78,10 @@ export function ConnectionsSection() {
             variant="ghost"
             size="sm"
             onClick={() => {
-              navigator.clipboard.writeText(DEFAULT_SA_EMAIL);
-              toast.success("Service account email copied");
+              navigator.clipboard.writeText(DEFAULT_SA_EMAIL).then(
+                () => toast.success("Service account email copied"),
+                () => toast.error("Could not copy the email"),
+              );
             }}
           >
             <Copy className="mr-1 h-3.5 w-3.5" /> Copy

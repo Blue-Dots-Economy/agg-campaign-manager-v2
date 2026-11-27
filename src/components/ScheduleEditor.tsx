@@ -40,7 +40,7 @@ export function makeDefaultSchedule(): ScheduleState {
   const day = weekdayMap[get("weekday")] ?? 1;
   const hh = get("hour");
   const mm = get("minute");
-  const startMin = parseInt(hh, 10) * 60 + parseInt(mm, 10);
+  const startMin = Number.parseInt(hh, 10) * 60 + Number.parseInt(mm, 10);
   const endMin = Math.min(startMin + 10, 23 * 60 + 59);
   const pad = (n: number) => String(n).padStart(2, "0");
   return {
@@ -70,7 +70,7 @@ export function ScheduleEditor({
 }) {
   const toggleDay = (d: number) => {
     const has = value.days.includes(d);
-    const days = has ? value.days.filter((x) => x !== d) : [...value.days, d].sort();
+    const days = has ? value.days.filter((x) => x !== d) : [...value.days, d].sort((a, b) => a - b);
     onChange({ ...value, days });
   };
 

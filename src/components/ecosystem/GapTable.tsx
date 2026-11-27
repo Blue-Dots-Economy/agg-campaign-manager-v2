@@ -120,7 +120,9 @@ export function GapTable({ jobs }: { jobs: JobPost[] }) {
   })();
 
   const keyOptions = useMemo(() => {
-    const s = Array.from(new Set(rows.map((r) => r.key))).sort();
+    const s = Array.from(new Set(rows.map((r) => r.key))).sort((a, b) =>
+      a < b ? -1 : a > b ? 1 : 0,
+    );
     return s;
   }, [rows]);
 
